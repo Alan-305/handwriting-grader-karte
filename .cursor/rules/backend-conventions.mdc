@@ -1,0 +1,37 @@
+---
+description: Flask バックエンド — 画像処理・API・AI クライアント規約
+globs: backend/**/*
+alwaysApply: false
+---
+
+# Backend 規約
+
+## 構成
+
+- `app/routes/`: Flask ブループリント（upload, image, grading, analysis, health）
+- `app/services/`: ビジネスロジック（image_processor, session_service, karte_service, scoring）
+- `app/ai/`: Anthropic / Gemini クライアント、プロンプト、スキーマ
+
+## 画像パイプライン（OpenCV）
+
+1. 四隅の■トンボ（位置合わせマーク）を検出
+2. 射影変換で傾き・歪みを補正
+3. 問題定義の `cropRegion` 座標で第1〜4問をトリミング
+4. Storage に aligned / cropped 画像を保存
+
+## API 設計
+
+- プレフィックス: `/api`
+- 主要フロー: `upload` → `align` → `crop` → `grade` →（カルテ）`analyze`
+- 契約は `shared/openapi.yaml` と整合させる
+
+## AI・モック
+
+- API キー未設定時はモックレスポンスを返し開発を継続可能にする
+- プロンプトは `app/ai/prompts/` に種別（english / japanese / symbol / no_model / karte）ごとに分離
+- リトライは `app/ai/retry.py` を使用
+
+## テスト
+
+- `pytest` で image_processor, scoring, grading_prompts, ai_clients をカバー
+- 新機能追加時は対応する `backend/tests/` を追加

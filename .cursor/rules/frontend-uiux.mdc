@@ -1,0 +1,31 @@
+---
+description: UI/UX Pro Max — フォント・ typography トークン・防御的 UX
+globs: frontend/**/*
+alwaysApply: false
+---
+
+# Frontend UI/UX Pro Max
+
+## フォント・文字サイズ
+
+- 英語: `font-en` / `--font-en`（Century）
+- 日本語: `font-ja` / `--font-ja`（明朝体）
+- 解説・添削のサイズは `tokens.css` の `--text-feedback` 等で固定。画面ごとに変えない
+- 和訳中の英語には必ず「」を付ける
+
+## 防御的 UX
+
+- すべての入力フォームで Enter による意図しない submit を無効化（`SafeForm` を使用）
+- 添削・AI 処理中は即座に「添削中」「考えてます」を `LoadingOverlay` で表示
+
+## コンポーネント指針
+
+- shadcn/ui + Tailwind。視認性の高いコントラスト、44px 以上のタップ領域
+- 模範解答: `ModelAnswerPanel`（解説枠外 + TTS ボタン）
+- グラフ: Recharts で得点推移・大問別正解率をインタラクティブに表示
+- 新規ページは `AppShell` 内ルートに追加し、`routes.tsx` を更新
+
+## 参照ファイル
+
+- デザイントークン: `frontend/src/styles/tokens.css`
+- 型定義: `frontend/src/types/firestore.ts`
