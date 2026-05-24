@@ -47,7 +47,7 @@ function GoogleIcon() {
 }
 
 export function LoginPage() {
-  const { user, loginWithGoogle, loading } = useAuth();
+  const { user, loginWithGoogle, loginWithGoogleRedirect, loading } = useAuth();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [hostWarning, setHostWarning] = useState("");
@@ -59,17 +59,26 @@ export function LoginPage() {
         "127.0.0.1 では Firebase ログインできません。http://localhost:5173/login を開いてください。",
       );
     }
+    if (window.location.port === "5001") {
+      setHostWarning(
+        "これは API サーバーです。アプリは http://localhost:5173/login を Chrome または Safari で開いてください。",
+      );
+    }
     if (!isFirebaseConfigured) {
-      setHostWarning("Firebase 設定（.env.local）が読み込まれていません。");
+      setHostWarning("Firebase 設定（プロジェクトルートの .env）が読み込まれていません。");
     }
   }, []);
 
   if (!loading && user) return <Navigate to="/students" replace />;
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = async (mode: "popup" | "redirect") => {
     setError("");
     setSubmitting(true);
     try {
+      if (mode === "redirect") {
+        await loginWithGoogleRedirect();
+        return;
+      }
       await loginWithGoogle();
     } catch (e) {
       setError(formatAuthError(e));
@@ -89,16 +98,27 @@ export function LoginPage() {
           {submitting ? (
             <InlineLoading message="考えてます" className="justify-center py-4" />
           ) : (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-12 w-full gap-3 border-slate-300 bg-white text-base hover:bg-slate-50"
-              disabled={submitting}
-              onClick={handleGoogleLogin}
-            >
-              <GoogleIcon />
-              Google でログイン
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 w-full gap-3 border-slate-300 bg-white text-base hover:bg-slate-50"
+                disabled={submitting}
+                onClick={() => handleGoogleLogin("popup")}
+              >
+                <GoogleIcon />
+                Google でログイン
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-11 w-full font-ja text-sm text-slate-600"
+                disabled={submitting}
+                onClick={() => handleGoogleLogin("redirect")}
+              >
+                ポップアップが開かない場合はこちら（リダイレクト）
+              </Button>
+            </>
           )}
           {hostWarning && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-center font-ja text-xs text-amber-800">

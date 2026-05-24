@@ -9,8 +9,10 @@ import {
 } from "react";
 import {
   GoogleAuthProvider,
+  getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User,
 } from "firebase/auth";
@@ -21,6 +23,7 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   loginWithGoogle: () => Promise<void>;
+  loginWithGoogleRedirect: () => Promise<void>;
   logout: () => Promise<void>;
   getIdToken: () => Promise<string | null>;
 }
@@ -57,21 +60,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    return onAuthStateChanged(getAuthInstance(), async (u) => {
+
+    let unsubscribe: (() => void) | undefined;
+
+    void (async () => {
       try {
-        if (u) await ensureTeacherDoc(u);
-        setUser(u);
-      } catch {
-        // 認証は成功しているが Firestore 書き込みに失敗した場合もログイン状態は維持
-        setUser(u);
-      } finally {
-        setLoading(false);
+        const result = await getRedirectResult(getAuthInstance());
+        if (result?.user) await ensureTeacherDoc(result.user);
+      } catch (error) {
+        console.error("Google リダイレクトログインに失敗しました:", error);
       }
-    });
+
+      unsubscribe = onAuthStateChanged(getAuthInstance(), async (u) => {
+        try {
+          if (u) await ensureTeacherDoc(u);
+          setUser(u);
+        } catch {
+          // 認証は成功しているが Firestore 書き込みに失敗した場合もログイン状態は維持
+          setUser(u);
+        } finally {
+          setLoading(false);
+        }
+      });
+    })();
+
+    return () => unsubscribe?.();
   }, []);
 
   const loginWithGoogle = useCallback(async () => {
     await signInWithPopup(getAuthInstance(), googleProvider);
+  }, []);
+
+  const loginWithGoogleRedirect = useCallback(async () => {
+    await signInWithRedirect(getAuthInstance(), googleProvider);
   }, []);
 
   const logout = useCallback(async () => {
@@ -84,8 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const value = useMemo(
-    () => ({ user, loading, loginWithGoogle, logout, getIdToken }),
-    [user, loading, loginWithGoogle, logout, getIdToken],
+    () => ({ user, loading, loginWithGoogle, loginWithGoogleRedirect, logout, getIdToken }),
+    [user, loading, loginWithGoogle, loginWithGoogleRedirect, logout, getIdToken],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

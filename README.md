@@ -24,7 +24,39 @@ cp .env.example .env
 # Firebase / Anthropic / Gemini のキーを設定
 ```
 
-### 2. Frontend
+### 2. 開発サーバー起動（1コマンド）
+
+初回のみルートで `npm install`（`concurrently` 用）と `frontend` の依存関係を入れます。
+
+```bash
+cd frontend && npm install && cd ..
+npm install
+```
+
+**以降はプロジェクトルートで:**
+
+```bash
+npm run dev
+```
+
+ブラウザで **http://localhost:5173/login** を開いてください（Chrome / Safari 推奨）。
+
+- フロント: `localhost:5173`（画面）
+- バックエンド: `localhost:5001`（API・自動起動。直接開く必要なし）
+- フロントの `/api` は Vite が 5001 に転送します
+
+`npm` を使わない場合:
+
+```bash
+chmod +x scripts/dev.sh
+./scripts/dev.sh
+```
+
+#### なぜ2つに分かれているか
+
+フロント（React/Vite）とバックエンド（Python/Flask）は**言語も開発サーバーも別**です。開発中はそれぞれがホットリロード用のサーバーを立てます。本番でも Hosting + Cloud Run のように別デプロイになるため、リポジトリも `frontend/` と `backend/` に分けています。`npm run dev` で両方まとめて起動し、**確認用 URL は localhost:5173 だけ**で足ります。
+
+### 3. Frontend（個別起動する場合）
 
 ```bash
 cd frontend
@@ -32,23 +64,21 @@ npm install
 npm run dev
 ```
 
-http://localhost:5173 で起動。API は Vite プロキシ経由で `http://localhost:5001` に転送されます。
-
-### 3. Backend
+### 4. Backend（個別起動する場合）
 
 ```bash
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python run.py
+python3 run.py
 ```
 
-macOS では `python` / `pip` ではなく **`python3` / `pip3`**（または venv 有効化後の `python`）を使ってください。
+macOS では `python` / `pip` ではなく **`python3` / `pip3`**（または venv 有効化後の `python3`）を使ってください。
 
 Firebase Admin SDK 用に `GOOGLE_APPLICATION_CREDENTIALS` にサービスアカウント JSON のパスを指定してください。
 
-### 4. Firebase
+### 5. Firebase
 
 ```bash
 firebase deploy --only firestore:rules,storage:rules,firestore:indexes
