@@ -1,0 +1,25 @@
+# Handwriting Grader Karte API
+
+openapi: 3.0.3
+info:
+  title: Handwriting Grader Karte API
+  version: 1.0.0
+paths:
+  /api/health:
+    get:
+      summary: Health check
+  /api/sessions/upload:
+    post:
+      summary: Upload answer sheet image
+  /api/sessions/{sessionId}/align:
+    post:
+      summary: Align sheet using tonbo marks
+  /api/sessions/{sessionId}/crop:
+    post:
+      summary: Crop question regions
+  /api/sessions/{sessionId}/grade:
+    post:
+      summary: Grade session with Claude Vision
+  /api/students/{studentId}/analyze:
+    post:
+      summary: Generate karte analysis with Gemini

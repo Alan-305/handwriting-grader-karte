@@ -1,0 +1,199 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@theme inline {
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text);
+  --color-muted-foreground: var(--color-muted);
+  --color-primary: var(--color-primary);
+  --color-border: var(--color-border);
+  --font-sans: var(--font-ja);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-ja);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@media print {
+  body {
+    background: white;
+  }
+  main {
+    overflow: visible !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+
+  /* A4 印刷：@page で余白、本文は自然改ページ */
+  @page {
+    size: A4 portrait;
+    margin: 20mm 24mm;
+  }
+
+  .print-document {
+    margin: 0;
+    padding: 0;
+  }
+
+  /* 問題用紙：流し込み（表紙＋複数大問を1枚に詰める） */
+  .print-flow-document {
+    width: 100%;
+    max-width: none;
+    padding: 0;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .print-doc-header {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 1.25rem;
+  }
+
+  .print-question-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-layout-document .print-question-wrap.print-question-gap {
+    margin-top: var(--print-question-gap, 12mm);
+  }
+
+  .print-break-before-page {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .print-flow-document.print-layout-document[data-page-margin="wide"],
+  .print-flow-document.print-flow-document--answer-sheet.print-layout-document[data-page-margin="wide"] {
+    padding: 6mm 8mm !important;
+    box-sizing: border-box;
+  }
+
+  /* 解答用紙など：固定1ページコンテナ（余白は @page に任せる） */
+  .print-page {
+    position: relative;
+    width: 100%;
+    min-height: 0;
+    height: auto;
+    padding: 0;
+    margin: 0 !important;
+    box-sizing: border-box;
+    overflow: visible;
+    page-break-after: always;
+    break-after: page;
+    box-shadow: none !important;
+  }
+
+  .print-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .print-break-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* 解答用紙：印刷時各ページ四隅にトンボ */
+  .print-corner-mark {
+    position: fixed;
+    z-index: 9999;
+    width: 3mm;
+    height: 3mm;
+    box-sizing: border-box;
+  }
+
+  .print-corner-tl {
+    top: 0;
+    left: 0;
+  }
+
+  .print-corner-tr {
+    top: 0;
+    right: 0;
+  }
+
+  .print-corner-bl {
+    bottom: 0;
+    left: 0;
+  }
+
+  .print-corner-br {
+    bottom: 0;
+    right: 0;
+  }
+}
+
+/* 画面プレビュー */
+@media screen {
+  .print-flow-document {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 20mm 24mm;
+    margin: 0 auto 12px;
+    box-sizing: border-box;
+  }
+
+  .print-layout-document .print-question-wrap.print-question-gap {
+    margin-top: var(--print-question-gap, 12mm);
+  }
+
+  .print-flow-document.print-layout-document[data-page-margin="wide"],
+  .print-flow-document.print-flow-document--answer-sheet.print-layout-document[data-page-margin="wide"] {
+    padding: 26mm 32mm;
+  }
+
+  .print-page {
+    width: 210mm;
+    min-height: 297mm;
+    height: 297mm;
+    padding: 20mm 24mm;
+    margin-bottom: 12px;
+    box-sizing: border-box;
+  }
+
+  .print-flow-document--answer-sheet {
+    position: relative;
+  }
+
+  .print-flow-document--answer-sheet .print-corner-mark {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+  }
+
+  .print-flow-document--answer-sheet .print-corner-tl {
+    top: 4px;
+    left: 4px;
+  }
+
+  .print-flow-document--answer-sheet .print-corner-tr {
+    top: 4px;
+    right: 4px;
+  }
+
+  .print-flow-document--answer-sheet .print-corner-bl {
+    bottom: 4px;
+    left: 4px;
+  }
+
+  .print-flow-document--answer-sheet .print-corner-br {
+    bottom: 4px;
+    right: 4px;
+  }
+}

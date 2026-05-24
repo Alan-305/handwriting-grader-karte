@@ -1,0 +1,138 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { PageHeader } from "@/components/layout/AppShell";
+import { AnswerSheetDropzone } from "@/components/upload/AnswerSheetDropzone";
+import { ErrorRetry } from "@/components/feedback/ErrorRetry";
+import { LoadingOverlay } from "@/components/feedback/LoadingOverlay";
+import { GradingChecklist, useBackendHealth } from "@/components/grading/GradingChecklist";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { useAuth } from "@/hooks/useAuth";
+import { useStudents } from "@/hooks/useStudent";
+import { apiClient } from "@/lib/api-client";
+import { getDb } from "@/lib/firebase";
+import type { Test } from "@/types/firestore";
+
+export function SessionNewPage() {
+  const { user, getIdToken } = useAuth();
+  const { students } = useStudents();
+  const backendOk = useBackendHealth();
+  const navigate = useNavigate();
+  const [tests, setTests] = useState<Test[]>([]);
+  const [studentId, setStudentId] = useState("");
+  const [testId, setTestId] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [progressMsg, setProgressMsg] = useState<"添削中" | "考えてます">("添削中");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(getDb(), "tests"), where("teacherId", "==", user.uid));
+    return onSnapshot(q, (snap) => {
+      setTests(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Test));
+    });
+  }, [user]);
+
+  const selectedTest = tests.find((t) => t.id === testId);
+  const canGrade =
+    students.length > 0 &&
+    selectedTest &&
+    selectedTest.questionCount > 0 &&
+    selectedTest.templateId &&
+    backendOk === true;
+
+  const runGrading = async () => {
+    if (!file || !studentId || !testId) return;
+    setLoading(true);
+    setError("");
+    setProgressMsg("添削中");
+    try {
+      const token = await getIdToken();
+      if (!token) return;
+
+      const form = new FormData();
+      form.append("image", file);
+      form.append("studentId", studentId);
+      form.append("testId", testId);
+
+      const { sessionId } = await apiClient.uploadSession(token, form);
+      await apiClient.alignSession(token, sessionId);
+      await apiClient.cropSession(token, sessionId);
+
+      setProgressMsg("考えてます");
+      await apiClient.gradeSession(token, sessionId);
+      navigate(`/sessions/${sessionId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "添削に失敗しました");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <LoadingOverlay visible={loading} message={progressMsg} />
+      <PageHeader title="答案添削" description="手書き答案をアップロードして自動添削します" />
+      <div className="mx-auto max-w-2xl space-y-6 p-8">
+        <GradingChecklist
+          studentsCount={students.length}
+          tests={tests}
+          backendOk={backendOk}
+        />
+
+        <Card className="space-y-4">
+          <div>
+            <label className="font-ja text-sm text-slate-600">生徒</label>
+            <select
+              className="mt-1 flex h-11 w-full rounded-lg border border-slate-200 px-3 font-ja"
+              value={studentId}
+              onChange={(e) => setStudentId(e.target.value)}
+            >
+              <option value="">選択してください</option>
+              {students.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="font-ja text-sm text-slate-600">テスト</label>
+            <select
+              className="mt-1 flex h-11 w-full rounded-lg border border-slate-200 px-3 font-ja"
+              value={testId}
+              onChange={(e) => setTestId(e.target.value)}
+            >
+              <option value="">選択してください</option>
+              {tests.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}（{t.questionCount}問）
+                </option>
+              ))}
+            </select>
+            {selectedTest && !selectedTest.templateId && (
+              <p className="mt-1 font-ja text-xs text-amber-700">
+                このテストには解答用紙テンプレートが未設定です。問題エディタで設定してください。
+              </p>
+            )}
+          </div>
+        </Card>
+
+        <AnswerSheetDropzone onFileSelect={setFile} disabled={loading} />
+        {file && <p className="font-ja text-sm text-slate-500">選択: {file.name}</p>}
+
+        {error && <ErrorRetry message={error} onRetry={runGrading} />}
+
+        <Button
+          className="w-full"
+          disabled={!file || !studentId || !testId || !canGrade || loading}
+          onClick={runGrading}
+        >
+          添削を開始
+        </Button>
+      </div>
+    </div>
+  );
+}

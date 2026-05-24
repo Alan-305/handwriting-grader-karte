@@ -1,0 +1,12 @@
+{
+  "firestore": {
+    "rules": "firebase/firestore.rules",
+    "indexes": "firebase/firestore.indexes.json"
+  },
+  "storage": [
+    {
+      "bucket": "handwriting-grader-karte.firebasestorage.app",
+      "rules": "firebase/storage.rules"
+    }
+  ]
+}

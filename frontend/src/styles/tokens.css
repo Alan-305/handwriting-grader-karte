@@ -1,0 +1,69 @@
+:root {
+  --font-en: Century, "Century Schoolbook", Georgia, serif;
+  --font-ja: "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  --text-feedback: var(--text-base);
+  --text-explanation: var(--text-base);
+  --text-model-answer: var(--text-lg);
+
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-border: #e2e8f0;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+  --color-primary: #1e40af;
+  --color-primary-hover: #1d4ed8;
+  --color-success: #15803d;
+  --color-warning: #ca8a04;
+  --color-danger: #b91c1c;
+}
+
+.font-en {
+  font-family: var(--font-en);
+}
+
+.font-ja {
+  font-family: var(--font-ja);
+}
+
+.text-feedback {
+  font-size: var(--text-feedback);
+  line-height: 1.75;
+}
+
+.text-explanation {
+  font-size: var(--text-explanation);
+  line-height: 1.75;
+}
+
+.text-model-answer {
+  font-size: var(--text-model-answer);
+  line-height: 1.75;
+}
+
+/* 問題文：行末揃え（和文・英文） */
+.question-prompt-ja {
+  text-align: justify;
+  text-justify: inter-character;
+  text-align-last: left;
+  line-height: 1.85;
+  word-break: normal;
+}
+
+.question-prompt-en {
+  text-align: justify;
+  text-align-last: left;
+  text-indent: 1.5em;
+  line-height: 1.85;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 3 3;
+  word-break: normal;
+  overflow-wrap: break-word;
+}

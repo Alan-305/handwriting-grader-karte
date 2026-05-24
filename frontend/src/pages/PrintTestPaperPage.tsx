@@ -1,0 +1,94 @@
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
+import { PageHeader } from "@/components/layout/AppShell";
+import { PrintLayoutSettingsPanel } from "@/components/print/PrintLayoutSettingsPanel";
+import { TestPaperPrintLayout } from "@/components/print/TestPaperPrintLayout";
+import { Button } from "@/components/ui/button";
+import { usePrintLayoutSettings } from "@/hooks/usePrintLayoutSettings";
+import { printDocument } from "@/lib/print-layout-settings";
+import { getDb } from "@/lib/firebase";
+import type { Question, Test } from "@/types/firestore";
+
+export function PrintTestPaperPage() {
+  const { testId } = useParams<{ testId: string }>();
+  const [test, setTest] = useState<Test | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { settings, setSettings, reset } = usePrintLayoutSettings(testId);
+
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = "";
+    return () => {
+      document.title = previousTitle;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!testId) return;
+    (async () => {
+      const testSnap = await getDoc(doc(getDb(), "tests", testId));
+      if (!testSnap.exists()) {
+        setLoading(false);
+        return;
+      }
+      setTest({ id: testSnap.id, ...testSnap.data() } as Test);
+
+      const qSnap = await getDocs(
+        query(collection(getDb(), "tests", testId, "questions"), orderBy("order")),
+      );
+      setQuestions(qSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Question));
+      setLoading(false);
+    })();
+  }, [testId]);
+
+  if (loading) {
+    return <div className="p-8 font-ja text-slate-500">読み込み中...</div>;
+  }
+
+  if (!test || questions.length === 0) {
+    return (
+      <div className="space-y-4 p-8 font-ja">
+        <p>問題用紙を印刷できません。設問を追加して問題文を入力してください。</p>
+        <Button asChild variant="outline">
+          <Link to={`/tests/${testId}`}>問題エディタに戻る</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="問題用紙（印刷用）"
+        description="レイアウトを調整してから印刷してください（解答は別紙）"
+      />
+      <div className="no-print space-y-4 p-8 pb-0">
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => printDocument()}>印刷 / PDF</Button>
+          <Button variant="outline" asChild>
+            <Link to={`/tests/${testId}/print/answer-sheet`}>解答用紙を印刷</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to={`/tests/${testId}`}>問題エディタに戻る</Link>
+          </Button>
+        </div>
+        <PrintLayoutSettingsPanel
+          documentLabel="問題用紙"
+          settings={settings}
+          onChange={setSettings}
+          onReset={reset}
+        />
+      </div>
+      <div className="bg-slate-100 p-8 print:bg-white print:p-0">
+        <TestPaperPrintLayout
+          testTitle={test.title}
+          totalPoints={test.totalPoints}
+          questions={questions}
+          settings={settings}
+        />
+      </div>
+    </div>
+  );
+}
