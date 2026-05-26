@@ -155,7 +155,7 @@ export function PrintStudentPage() {
         : toScoreOutOf100(totalScore, maxScore))
     : 0;
 
-  if (loading) return <div className="p-8 font-ja">読み込み中...</div>;
+  if (loading) return <div className="page-content font-ja">読み込み中...</div>;
 
   return (
     <div>
@@ -168,7 +168,7 @@ export function PrintStudentPage() {
         }
       />
 
-      <div className="no-print space-y-4 p-8">
+      <div className="no-print page-content space-y-4">
         {mode === "edit" ? (
           <>
             <Card className="border-blue-100 bg-blue-50/40 p-4">
@@ -177,15 +177,15 @@ export function PrintStudentPage() {
                 内容を確認したら<strong>「確定して印刷プレビュー」</strong>を押してください。確定後に印刷します。
               </p>
             </Card>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={handleSaveDraft} disabled={saveState === "saving" || !isDirty}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <Button className="min-h-11 w-full sm:w-auto" variant="outline" onClick={handleSaveDraft} disabled={saveState === "saving" || !isDirty}>
                 下書きを保存
               </Button>
-              <Button className="gap-2" onClick={handleFinalize} disabled={saveState === "saving"}>
+              <Button className="min-h-11 w-full gap-2 sm:w-auto" onClick={handleFinalize} disabled={saveState === "saving"}>
                 <Check className="h-4 w-4" />
                 確定して印刷プレビュー
               </Button>
-              <Button variant="ghost" asChild>
+              <Button className="min-h-11 w-full sm:w-auto" variant="ghost" asChild>
                 <Link to={`/sessions/${sessionId}`}>結果に戻る</Link>
               </Button>
             </div>

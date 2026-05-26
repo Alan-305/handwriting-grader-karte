@@ -84,16 +84,16 @@ export function SessionTranscriptionReviewPage() {
   };
 
   if (loading) {
-    return <div className="p-8 font-ja text-slate-500">読み込み中...</div>;
+    return <div className="page-content font-ja text-slate-500">読み込み中...</div>;
   }
 
   if (!session) {
-    return <div className="p-8 font-ja text-slate-500">セッションが見つかりません</div>;
+    return <div className="page-content font-ja text-slate-500">セッションが見つかりません</div>;
   }
 
   if (sortedResults.length === 0) {
     return (
-      <div className="p-8">
+      <div className="page-content">
         <p className="font-ja text-slate-600">転記データがありません。答案の読み取りからやり直してください。</p>
         <Button className="mt-4" variant="outline" onClick={() => navigate("/sessions/new")}>
           答案添削へ戻る
@@ -110,7 +110,7 @@ export function SessionTranscriptionReviewPage() {
         description="AIが善意に読み取った内容を確認・修正してから添削します"
       />
       <SafeForm
-        className="mx-auto max-w-3xl space-y-6 p-8"
+        className="page-content mx-auto max-w-3xl space-y-6"
         onSafeSubmit={handleConfirmAndGrade}
       >
         <Card className="border-blue-100 bg-blue-50/80 p-4 font-ja text-sm text-slate-700">

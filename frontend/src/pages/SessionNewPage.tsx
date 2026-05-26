@@ -104,7 +104,7 @@ export function SessionNewPage() {
         title="答案添削"
         description="手書きを読み取り、確認後に添削します"
       />
-      <div className="mx-auto max-w-2xl space-y-6 p-8">
+      <div className="page-content mx-auto max-w-2xl space-y-6">
         <GradingChecklist
           studentsCount={students.length}
           tests={tests}

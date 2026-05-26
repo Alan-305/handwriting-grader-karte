@@ -45,7 +45,7 @@ export function PastExamsPage() {
         title="過去問コーパス"
         description="大学ごとの過去問を年度単位で追加・管理します。年度数に上限はなく、新しい入試が公開されるたびに取り込めます。"
       />
-      <div className="space-y-6 p-8">
+      <div className="page-content space-y-6">
         <Card className="border-blue-100 bg-blue-50/40">
           <CardHeader>
             <CardTitle className="font-ja text-base">柔軟な年度運用</CardTitle>

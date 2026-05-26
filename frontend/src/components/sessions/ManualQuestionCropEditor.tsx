@@ -119,7 +119,7 @@ export function ManualQuestionCropEditor({
     <div className="flex flex-col gap-3 lg:flex-row">
       <aside className="w-full shrink-0 lg:w-56">
         <p className="mb-2 font-ja text-sm font-medium text-slate-700">設問を選択</p>
-        <ul className="max-h-[420px] space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
+        <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2 sm:max-h-64 lg:max-h-[420px]">
           {targets.map((t) => {
             const key = targetKey(t.order, t.partIndex);
             const done = Boolean(t.croppedImagePath);
@@ -160,11 +160,11 @@ export function ManualQuestionCropEditor({
         <p className="mb-2 font-ja text-sm text-slate-600">
           {activeKey
             ? "画像上をドラッグして、この設問の答案範囲を指定してください"
-            : "左のリストから設問を選んでください"}
+            : "上のリストから設問を選んでください"}
         </p>
         <div
           ref={wrapRef}
-          className="relative inline-block w-full max-w-full cursor-crosshair select-none overflow-visible rounded-xl border border-slate-300 bg-slate-100"
+          className="relative inline-block w-full max-w-full cursor-crosshair touch-none select-none overflow-visible rounded-xl border border-slate-300 bg-slate-100"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}

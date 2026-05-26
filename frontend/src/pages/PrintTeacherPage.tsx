@@ -31,7 +31,7 @@ export function PrintTeacherPage() {
     await apiClient.completeSession(token, sessionId);
   };
 
-  if (loading) return <div className="p-8 font-ja">読み込み中...</div>;
+  if (loading) return <div className="page-content font-ja">読み込み中...</div>;
 
   return (
     <div>

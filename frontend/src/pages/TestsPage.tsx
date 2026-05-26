@@ -61,7 +61,7 @@ export function TestsPage() {
         title="問題セット"
         description="手書き添削用のテスト問題・模範解答・配点を管理します（大学過去問とは別のメニューです）"
       />
-      <div className="space-y-6 p-8">
+      <div className="page-content space-y-6">
         <Card className="border-blue-100 bg-blue-50/40">
           <CardHeader>
             <CardTitle className="font-ja text-base">過去問との違い</CardTitle>

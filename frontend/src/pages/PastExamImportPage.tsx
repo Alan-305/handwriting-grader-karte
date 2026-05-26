@@ -80,7 +80,7 @@ export function PastExamImportPage() {
         title={`${displayName} — 過去問取り込み`}
         description="問題・解答・リスニング脚本の PDF をアップロードして解析します（数分かかることがあります）"
       />
-      <div className="mx-auto max-w-2xl space-y-6 p-8">
+      <div className="page-content mx-auto max-w-2xl space-y-6">
         <Button asChild variant="ghost" className="min-h-11 gap-2">
           <Link to={`/past-exams/${slug}`}>
             <ArrowLeft className="h-4 w-4" />

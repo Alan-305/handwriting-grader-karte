@@ -136,7 +136,7 @@ export function QuestionDraftsPage() {
         title="生成問題の下書き"
         description="新規問題セットとして使うのが基本です。必要なときだけ既存セットに追加できます"
       />
-      <div className="space-y-6 p-8">
+      <div className="page-content space-y-6">
         <div className="flex flex-wrap gap-3">
           <Button asChild variant="ghost" className="min-h-11 gap-2">
             <Link to="/tests">

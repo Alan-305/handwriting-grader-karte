@@ -158,7 +158,7 @@ export function UniversitiesPage() {
         title="志望校・テンプレート"
         description="志望校情報と、答案用紙のサイズ設定（テンプレート）を管理します"
       />
-      <div className="space-y-8 p-8">
+      <div className="page-content space-y-8">
         <section className="space-y-4">
           <Card className="border-blue-100 bg-blue-50/50">
             <CardHeader className="pb-2">

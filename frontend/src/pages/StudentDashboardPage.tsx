@@ -77,7 +77,7 @@ export function StudentDashboardPage() {
         title={`${student?.name ?? ""} のカルテ`}
         description="成績推移・弱点分析・志望校対策アドバイス"
       />
-      <div className="space-y-6 p-8">
+      <div className="page-content space-y-6">
         {student &&
           !student.targetUniversities?.length &&
           !student.interviewProfile?.targetUniversities?.length && (

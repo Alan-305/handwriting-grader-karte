@@ -101,7 +101,7 @@ export function PastExamImportReviewPage() {
         title={`${meta.universityName} ${meta.year} 年度 — 確認`}
         description={`大問 ${questions.length} 件 · リスニング脚本 ${listeningCount} 件`}
       />
-      <div className="space-y-6 p-8">
+      <div className="page-content space-y-6">
         <Button asChild variant="ghost" className="min-h-11 gap-2">
           <Link to={`/past-exams/${slug}/import`}>
             <ArrowLeft className="h-4 w-4" />

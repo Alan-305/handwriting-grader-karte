@@ -129,7 +129,7 @@ export function QuestionGeneratePage() {
         title="問題生成"
         description="過去問の出題型（第1問(A)など）を選んで、新しいオリジナル問題を生成します"
       />
-      <div className="space-y-6 p-8">
+      <div className="page-content space-y-6">
         <div className="flex flex-wrap gap-3">
           <Button asChild variant="ghost" className="min-h-11 gap-2">
             <Link to="/question-drafts">

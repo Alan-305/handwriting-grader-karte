@@ -70,7 +70,7 @@ export function PastExamYearDetailPage() {
             : `${statusText} · 大問 ${questions.length} 件`
         }
       />
-      <div className="space-y-6 p-8">
+      <div className="page-content space-y-6">
         <div className="flex flex-wrap gap-3">
           <Button asChild variant="ghost" className="min-h-11 gap-2">
             <Link to={`/past-exams/${slug}`}>

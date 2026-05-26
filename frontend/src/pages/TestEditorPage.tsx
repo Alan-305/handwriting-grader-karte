@@ -254,12 +254,12 @@ export function TestEditorPage() {
   const regions = cropTargets.map((t) => t.region);
 
   return (
-    <div className="pb-24">
+    <div>
       <PageHeader
         title="問題エディタ"
         description="問題を入力 →「解答用紙を自動生成」で印刷用用紙と切り出し位置を一括設定"
       />
-      <div className="space-y-6 p-8">
+      <div className="page-content space-y-6">
         <Card className="border-blue-100 bg-blue-50/40 p-4">
           <p className="font-ja text-sm leading-relaxed text-slate-700">
             <strong>おすすめの流れ：</strong>
@@ -512,7 +512,10 @@ export function TestEditorPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-8 py-4 backdrop-blur md:left-64">
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6 lg:left-64 lg:px-8 lg:py-4"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
           <div className="font-ja text-sm text-slate-600">
             {saveState === "saving" && <InlineLoading message="保存中..." />}

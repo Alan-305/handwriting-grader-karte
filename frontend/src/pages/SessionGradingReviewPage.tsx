@@ -90,7 +90,7 @@ export function SessionGradingReviewPage() {
   };
 
   if (loading) {
-    return <div className="p-8 font-ja text-slate-500">読み込み中...</div>;
+    return <div className="page-content font-ja text-slate-500">読み込み中...</div>;
   }
 
   return (
@@ -101,7 +101,7 @@ export function SessionGradingReviewPage() {
         description="AIの採点・解説を確認・修正してから確定してください"
       />
 
-      <div className="mx-auto max-w-3xl space-y-6 p-8">
+      <div className="page-content mx-auto max-w-3xl space-y-6">
         <Card className="border-amber-100 bg-amber-50/80 p-4 font-ja text-sm leading-relaxed text-slate-800">
           <p>
             この画面で<strong>確定するまで</strong>、生徒への返却・カルテ集計は完了しません。
@@ -109,11 +109,11 @@ export function SessionGradingReviewPage() {
           </p>
         </Card>
 
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleSaveDraft} disabled={saving || confirming}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Button className="min-h-11 w-full sm:w-auto" variant="outline" onClick={handleSaveDraft} disabled={saving || confirming}>
             下書き保存
           </Button>
-          <Button className="min-h-11 gap-2" onClick={handleConfirm} disabled={saving || confirming}>
+          <Button className="min-h-11 w-full gap-2 sm:w-auto" onClick={handleConfirm} disabled={saving || confirming}>
             <Check className="h-4 w-4" />
             添削を確定する
           </Button>
@@ -131,7 +131,7 @@ export function SessionGradingReviewPage() {
             );
             return (
               <Card key={r.id} className="space-y-4 p-5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="font-ja text-lg font-semibold">{resultLabel(r)}</h3>
                   {r.grade ? <GradeBadge grade={r.grade} /> : null}
                 </div>

@@ -40,7 +40,7 @@ export function SessionResultPage() {
   }, [session, loading, navigate, sessionId]);
 
   if (loading) {
-    return <div className="p-8 font-ja text-slate-500">読み込み中...</div>;
+    return <div className="page-content font-ja text-slate-500">読み込み中...</div>;
   }
 
   return (
@@ -49,7 +49,7 @@ export function SessionResultPage() {
         title="添削結果"
         description={session ? formatTotalScoreLabel(session) : undefined}
       />
-      <div className="space-y-6 p-8">
+      <div className="page-content space-y-6">
         {session && (
           <Card className="border-slate-200 bg-slate-50 p-4">
             <p className="font-ja text-lg font-semibold text-slate-900">

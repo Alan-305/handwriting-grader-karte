@@ -260,7 +260,7 @@ export function StudentInterviewPage() {
     return (
       <div>
         <PageHeader title="面談記録" description="読み込み中..." />
-        <p className="p-8 font-ja text-slate-500">読み込み中...</p>
+        <p className="page-content font-ja text-slate-500">読み込み中...</p>
       </div>
     );
   }
@@ -271,7 +271,7 @@ export function StudentInterviewPage() {
         title={`${student.name} — 面談記録`}
         description="テスト返却のたびに1回ずつ記録。相談内容と教師アドバイスは AI 分析に蓄積されます"
       />
-      <div className="mx-auto max-w-5xl space-y-6 p-8">
+      <div className="page-content mx-auto max-w-5xl space-y-6">
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
             <Link to={`/students/${studentId}/dashboard`}>
@@ -318,12 +318,12 @@ export function StudentInterviewPage() {
             {records.length === 0 ? (
               <p className="font-ja text-xs text-slate-500">まだ記録がありません</p>
             ) : (
-              <ul className="space-y-1">
+              <ul className="-mx-1 flex gap-2 overflow-x-auto pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:pb-0">
                 {records.map((rec) => (
-                  <li key={rec.id}>
+                  <li key={rec.id} className="shrink-0 lg:shrink">
                     <button
                       type="button"
-                      className={`w-full rounded-lg border px-3 py-2 text-left font-ja text-sm transition-colors ${
+                      className={`min-w-[9.5rem] rounded-lg border px-3 py-2 text-left font-ja text-sm transition-colors lg:min-w-0 lg:w-full ${
                         viewingRecordId === rec.id
                           ? "border-blue-300 bg-blue-50 text-blue-900"
                           : "border-slate-200 bg-white hover:bg-slate-50"

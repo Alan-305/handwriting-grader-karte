@@ -47,7 +47,7 @@ export function StudentsPage() {
   return (
     <div>
       <PageHeader title="生徒管理" description="生徒を追加したら「保存」を押してください" />
-      <div className="space-y-6 p-8">
+      <div className="page-content space-y-6">
         {saved && (
           <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 font-ja text-sm text-green-800">
             <Check className="h-4 w-4" />

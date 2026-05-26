@@ -80,7 +80,7 @@ export function StudentHistoryModal({ open, onClose, studentId, studentName }: S
 
   return (
     <div
-      className="no-print fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-12 md:pt-20"
+      className="no-print fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/40 p-0 sm:items-start sm:overflow-y-auto sm:p-4 sm:pt-12 md:pt-20"
       role="dialog"
       aria-modal="true"
       aria-labelledby="student-history-title"
@@ -88,7 +88,7 @@ export function StudentHistoryModal({ open, onClose, studentId, studentName }: S
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <Card className="relative w-full max-w-2xl shadow-lg">
+      <Card className="relative flex max-h-[min(100dvh,100%)] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl shadow-lg sm:max-h-[min(90dvh,720px)] sm:rounded-xl">
         <Button
           type="button"
           variant="ghost"
@@ -110,7 +110,7 @@ export function StudentHistoryModal({ open, onClose, studentId, studentName }: S
           </CardDescription>
         </CardHeader>
 
-        <div className="max-h-[min(70vh,560px)] space-y-6 overflow-y-auto px-6 pb-6">
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 pb-6 sm:px-6">
           <section>
             <h3 className="mb-2 font-ja text-sm font-semibold text-slate-800">添削セッション（テスト）</h3>
             {sessionsChrono.length === 0 ? (

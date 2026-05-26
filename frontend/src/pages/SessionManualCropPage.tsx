@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getDownloadURL, ref } from "firebase/storage";
-import { PageHeader } from "@/components/layout/AppShell";
+import { PageContent, PageHeader } from "@/components/layout/AppShell";
 import { ErrorRetry } from "@/components/feedback/ErrorRetry";
 import { LoadingOverlay } from "@/components/feedback/LoadingOverlay";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
@@ -161,7 +161,7 @@ export function SessionManualCropPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center p-8">
+      <div className="page-content flex min-h-[40vh] items-center justify-center">
         <InlineLoading message="解答用紙を読み込んでいます…" />
       </div>
     );
@@ -169,12 +169,12 @@ export function SessionManualCropPage() {
 
   if (!data || !imageUrls[pageIndex]) {
     return (
-      <div className="p-8">
+      <PageContent>
         {error ? <ErrorRetry message={error} onRetry={load} /> : null}
         <Button className="mt-4" variant="outline" asChild>
           <Link to="/sessions/new">答案添削へ戻る</Link>
         </Button>
-      </div>
+      </PageContent>
     );
   }
 
@@ -186,10 +186,10 @@ export function SessionManualCropPage() {
         description="教師が答案範囲を指定します（自動切り出しは使いません）"
       />
 
-      <div className="mx-auto max-w-5xl space-y-6 p-8">
+      <PageContent maxWidth="lg" className="space-y-6">
         <Card className="border-blue-100 bg-blue-50/80 p-4 font-ja text-sm leading-relaxed text-slate-700">
           <ol className="list-decimal space-y-1 pl-5">
-            <li>左のリストから設問（第1問・第2問 (1) など）を選ぶ</li>
+            <li>リストから設問（第1問・第2問 (1) など）を選ぶ</li>
             <li>該当するページで、答案欄をドラッグして囲む</li>
             <li>「この設問に設定」を押す（次の設問へ進みます）</li>
             <li>すべて ✓ になったら「読み取りへ進む」</li>
@@ -255,7 +255,7 @@ export function SessionManualCropPage() {
             <Link to="/sessions/new">やり直す</Link>
           </Button>
         </div>
-      </div>
+      </PageContent>
     </div>
   );
 }

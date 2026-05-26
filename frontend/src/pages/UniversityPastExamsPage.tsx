@@ -102,7 +102,7 @@ export function UniversityPastExamsPage() {
   return (
     <div>
       <PageHeader title={`${displayName} — 過去問`} description={summary} />
-      <div className="space-y-6 p-8">
+      <div className="page-content space-y-6">
         <div className="flex flex-wrap items-center gap-3">
           <Button asChild variant="ghost" className="min-h-11 gap-2">
             <Link to="/past-exams">
