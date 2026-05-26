@@ -36,55 +36,66 @@ def grade_session(session_id: str):
     max_score = 0.0
     results = []
 
-    for i, target in enumerate(targets):
-        session_svc.update_progress(session_id, i, len(targets), "添削中")
+    try:
+        for i, target in enumerate(targets):
+            session_svc.update_progress(session_id, i, len(targets), "添削中")
 
-        q = next(q for q in questions if q["id"] == target["questionId"])
-        parts = q.get("answerParts") or []
-        has_parts = len(parts) > 0
-        filename = crop_filename(target["order"], target["partIndex"], has_parts)
-        crop_path = f"teachers/{g.teacher_id}/sessions/{session_id}/crops/{filename}"
-        crop_bytes = firebase.download_bytes(crop_path)
-        if not crop_bytes:
-            continue
+            q = next(q for q in questions if q["id"] == target["questionId"])
+            parts = q.get("answerParts") or []
+            has_parts = len(parts) > 0
+            filename = crop_filename(target["order"], target["partIndex"], has_parts)
+            crop_path = f"teachers/{g.teacher_id}/sessions/{session_id}/crops/{filename}"
+            crop_bytes = firebase.download_bytes(crop_path)
+            if not crop_bytes:
+                continue
 
-        b64, media_type = image_to_base64(crop_bytes)
-        system, prompt_fn = select_grading_prompts(target)
-        user_text = build_user_prompt(target, prompt_fn)
+            b64, media_type = image_to_base64(crop_bytes)
+            system, prompt_fn = select_grading_prompts(target)
+            user_text = build_user_prompt(target, prompt_fn)
 
-        grade: GradeResult = client.complete_structured(
-            system=system,
-            user_text=user_text,
-            response_schema=GradeResult,
-            image_base64=b64,
-            media_type=media_type,
-        )
+            grade: GradeResult = client.complete_structured(
+                system=system,
+                user_text=user_text,
+                response_schema=GradeResult,
+                image_base64=b64,
+                media_type=media_type,
+            )
 
-        max_points = float(target.get("points", grade.max_points))
-        score = clamp_score(grade.score, max_points)
-        total_score += score
-        max_score += max_points
+            max_points = float(target.get("points", grade.max_points))
+            score = clamp_score(grade.score, max_points)
+            total_score += score
+            max_score += max_points
 
-        result_data = {
-            "questionId": target["questionId"],
-            "order": target["order"],
-            "partIndex": target["partIndex"],
-            "partLabel": target.get("partLabel"),
-            "type": target["type"],
-            "croppedImagePath": crop_path,
-            "grade": grade.grade,
-            "score": score,
-            "maxPoints": max_points,
-            "studentAnswerText": grade.student_answer_text,
-            "feedback": grade.feedback,
-            "explanation": grade.explanation,
-            "modelAnswer": target.get("modelAnswer", ""),
-            "errorTags": grade.error_tags,
-            "teacherNotes": grade.teacher_notes,
-        }
-        result_id = session_svc.save_question_result(session_id, result_data)
-        result_data["id"] = result_id
-        results.append(result_data)
+            result_data = {
+                "questionId": target["questionId"],
+                "order": target["order"],
+                "partIndex": target["partIndex"],
+                "partLabel": target.get("partLabel"),
+                "type": target["type"],
+                "croppedImagePath": crop_path,
+                "grade": grade.grade,
+                "score": score,
+                "maxPoints": max_points,
+                "studentAnswerText": grade.student_answer_text,
+                "feedback": grade.feedback,
+                "explanation": grade.explanation,
+                "modelAnswer": target.get("modelAnswer", ""),
+                "errorTags": grade.error_tags,
+                "teacherNotes": grade.teacher_notes,
+            }
+            result_id = session_svc.save_question_result(session_id, result_data)
+            result_data["id"] = result_id
+            results.append(result_data)
+    except Exception as exc:
+        logger.exception("Grading failed for session %s", session_id)
+        session_svc.update_status(session_id, "review")
+        message = str(exc)
+        if any(
+            key in message
+            for key in ("Anthropic", "JSON", "空の応答", "model", "API")
+        ):
+            return jsonify({"error": message}), 502
+        return jsonify({"error": "添削中にエラーが発生しました。しばらくしてから再試行してください。"}), 500
 
     total_score_100 = to_score_out_of_100(total_score, max_score)
 

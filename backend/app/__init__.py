@@ -9,8 +9,10 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
 
     from app.ai.gemini_client import normalize_gemini_model
+    from app.ai.anthropic_client import normalize_anthropic_model
 
     app.config["GEMINI_MODEL"] = normalize_gemini_model(app.config.get("GEMINI_MODEL"))
+    app.config["ANTHROPIC_MODEL"] = normalize_anthropic_model(app.config.get("ANTHROPIC_MODEL"))
 
     cors.init_app(
         app,
