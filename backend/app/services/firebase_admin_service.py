@@ -36,9 +36,26 @@ class FirebaseAdminService:
     def set_doc(self, collection: str, doc_id: str, data: dict, merge: bool = False):
         db = self.db()
         if not db:
-            return
+            raise RuntimeError(
+                "Firestore is not initialized. Run import via Flask or bootstrap_firebase_from_env()."
+            )
         data["updatedAt"] = datetime.now(timezone.utc)
         db.collection(collection).document(doc_id).set(data, merge=merge)
+
+    def set_nested_doc(self, path_segments: list[str], data: dict, merge: bool = False):
+        """path_segments: [collection, docId, subcollection, docId, ...]"""
+        db = self.db()
+        if not db:
+            raise RuntimeError(
+                "Firestore is not initialized. Run import via Flask or bootstrap_firebase_from_env()."
+            )
+        if len(path_segments) < 2 or len(path_segments) % 2 != 0:
+            raise ValueError("path_segments must be [col, id, col, id, ...]")
+        data["updatedAt"] = datetime.now(timezone.utc)
+        ref = db.collection(path_segments[0]).document(path_segments[1])
+        for i in range(2, len(path_segments), 2):
+            ref = ref.collection(path_segments[i]).document(path_segments[i + 1])
+        ref.set(data, merge=merge)
 
     def update_doc(self, collection: str, doc_id: str, data: dict):
         db = self.db()

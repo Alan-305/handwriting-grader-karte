@@ -28,20 +28,43 @@ def init_firebase(app):
         )
         return
 
+    _init_firebase_app(cred_path, app.config["FIREBASE_STORAGE_BUCKET"], app.config["FIREBASE_PROJECT_ID"])
+
+
+def init_firebase_standalone(*, cred_path: str, storage_bucket: str, project_id: str):
+    """Flask 外（import CLI 等）から Firebase Admin を初期化する。"""
+    global _db, _bucket
+    if firebase_admin._apps:
+        _db = firestore.client()
+        _bucket = storage.bucket()
+        return _db
+    if not cred_path or not Path(cred_path).is_file():
+        raise RuntimeError(
+            f"Firebase credentials not found: {cred_path or '(not set)'}. "
+            "Set GOOGLE_APPLICATION_CREDENTIALS in .env"
+        )
+    if not project_id:
+        raise RuntimeError("FIREBASE_PROJECT_ID is not set in .env")
+    _init_firebase_app(cred_path, storage_bucket, project_id)
+    return _db
+
+
+def _init_firebase_app(cred_path: str | None, storage_bucket: str, project_id: str):
+    global _db, _bucket
     if cred_path:
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(
             cred,
             {
-                "storageBucket": app.config["FIREBASE_STORAGE_BUCKET"],
-                "projectId": app.config["FIREBASE_PROJECT_ID"],
+                "storageBucket": storage_bucket,
+                "projectId": project_id,
             },
         )
     else:
         firebase_admin.initialize_app(
             options={
-                "storageBucket": app.config["FIREBASE_STORAGE_BUCKET"],
-                "projectId": app.config["FIREBASE_PROJECT_ID"],
+                "storageBucket": storage_bucket,
+                "projectId": project_id,
             }
         )
     _db = firestore.client()

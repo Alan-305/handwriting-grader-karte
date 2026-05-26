@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { FeedbackBlock } from "@/components/typography/Typography";
 import { GradeBadge } from "@/components/grading/GradeBadge";
 import { ModelAnswerPanel } from "@/components/grading/ModelAnswerPanel";
+import { PastExamAdvicePanel } from "@/components/sessions/PastExamAdvicePanel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useSession } from "@/hooks/useSession";
@@ -48,6 +49,8 @@ export function SessionResultPage() {
             <Link to="/sessions/new">新しい添削</Link>
           </Button>
         </div>
+
+        <PastExamAdvicePanel sessionId={sessionId ?? ""} initialAdvice={session?.pastExamAdvice} />
 
         {results.map((r) => (
           <Card key={r.id} className="space-y-4">

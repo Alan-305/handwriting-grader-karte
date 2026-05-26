@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -11,8 +11,9 @@ import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useStudents } from "@/hooks/useStudent";
 import { apiClient } from "@/lib/api-client";
+import { generateAnswerSheetLayout, layoutPageCount } from "@/lib/answer-sheet-layout";
 import { getDb } from "@/lib/firebase";
-import type { Test } from "@/types/firestore";
+import type { Question, Test } from "@/types/firestore";
 
 export function SessionNewPage() {
   const { user, getIdToken } = useAuth();
@@ -20,9 +21,10 @@ export function SessionNewPage() {
   const backendOk = useBackendHealth();
   const navigate = useNavigate();
   const [tests, setTests] = useState<Test[]>([]);
+  const [questionsByTest, setQuestionsByTest] = useState<Record<string, Question[]>>({});
   const [studentId, setStudentId] = useState("");
   const [testId, setTestId] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [progressMsg, setProgressMsg] = useState<"添削中" | "考えてます">("添削中");
   const [error, setError] = useState("");
@@ -35,16 +37,48 @@ export function SessionNewPage() {
     });
   }, [user]);
 
+  useEffect(() => {
+    if (!testId) return;
+    const q = query(collection(getDb(), "tests", testId, "questions"));
+    return onSnapshot(q, (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Question);
+      rows.sort((a, b) => a.order - b.order);
+      setQuestionsByTest((prev) => ({ ...prev, [testId]: rows }));
+    });
+  }, [testId]);
+
   const selectedTest = tests.find((t) => t.id === testId);
+  const selectedQuestions = testId ? questionsByTest[testId] ?? [] : [];
+
+  const expectedPages = useMemo(() => {
+    if (selectedQuestions.length === 0) return 1;
+    const layout = generateAnswerSheetLayout(selectedQuestions);
+    return layoutPageCount(layout.slots);
+  }, [selectedQuestions]);
+
+  const uploadHint = useMemo(() => {
+    if (expectedPages <= 1) {
+      return "このテストは解答用紙1枚想定です。2枚に分かれている場合は、1枚目→2枚目の順で追加してください。";
+    }
+    return `このテストは解答用紙 ${expectedPages} 枚想定です。印刷順どおり 1枚目→2枚目… の順でアップロードしてください。`;
+  }, [expectedPages]);
+
   const canGrade =
     students.length > 0 &&
     selectedTest &&
     selectedTest.questionCount > 0 &&
     selectedTest.templateId &&
-    backendOk === true;
+    backendOk === true &&
+    files.length > 0;
 
   const runGrading = async () => {
-    if (!file || !studentId || !testId) return;
+    if (files.length === 0 || !studentId || !testId) return;
+    if (files.length < expectedPages) {
+      setError(
+        `このテストは解答用紙 ${expectedPages} 枚分です。${expectedPages} 枚を順番にアップロードしてください（現在 ${files.length} 枚）。`,
+      );
+      return;
+    }
     setLoading(true);
     setError("");
     setProgressMsg("添削中");
@@ -53,7 +87,9 @@ export function SessionNewPage() {
       if (!token) return;
 
       const form = new FormData();
-      form.append("image", file);
+      for (const file of files) {
+        form.append("images", file);
+      }
       form.append("studentId", studentId);
       form.append("testId", testId);
 
@@ -103,7 +139,10 @@ export function SessionNewPage() {
             <select
               className="mt-1 flex h-11 w-full rounded-lg border border-slate-200 px-3 font-ja"
               value={testId}
-              onChange={(e) => setTestId(e.target.value)}
+              onChange={(e) => {
+                setTestId(e.target.value);
+                setFiles([]);
+              }}
             >
               <option value="">選択してください</option>
               {tests.map((t) => (
@@ -117,17 +156,26 @@ export function SessionNewPage() {
                 このテストには解答用紙テンプレートが未設定です。問題エディタで設定してください。
               </p>
             )}
+            {selectedTest && selectedTest.templateId && expectedPages > 1 && (
+              <p className="mt-1 font-ja text-xs text-blue-800">
+                解答用紙 {expectedPages} 枚構成です。{expectedPages} 枚分を順にアップロードしてください。
+              </p>
+            )}
           </div>
         </Card>
 
-        <AnswerSheetDropzone onFileSelect={setFile} disabled={loading} />
-        {file && <p className="font-ja text-sm text-slate-500">選択: {file.name}</p>}
+        <AnswerSheetDropzone
+          files={files}
+          onFilesChange={setFiles}
+          disabled={loading}
+          hint={testId ? uploadHint : undefined}
+        />
 
         {error && <ErrorRetry message={error} onRetry={runGrading} />}
 
         <Button
-          className="w-full"
-          disabled={!file || !studentId || !testId || !canGrade || loading}
+          className="w-full min-h-11"
+          disabled={!canGrade || loading}
           onClick={runGrading}
         >
           添削を開始

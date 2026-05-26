@@ -315,7 +315,7 @@ sessions/{sessionId}
 
 - [x] トンボ検出・射影変換・トリミング（`image_processor.py`）
 - [x] アップロード → align → crop API
-- [ ] 2ページ（A4×2枚）の一括処理とページ自動判別
+- [x] 2ページ（A4×2枚）の一括アップロード（順番どおり最大4枚）
 - [ ] crop プレビュー UI の精度確認・手動補正フォールバック
 
 ### Phase 3 — 添削エンジン（Claude Vision）

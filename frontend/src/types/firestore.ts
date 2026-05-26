@@ -66,6 +66,8 @@ export interface CropRegion {
   y: number;
   width: number;
   height: number;
+  /** 0 = 1枚目, 1 = 2枚目 …（解答用紙のページ） */
+  pageIndex?: number;
 }
 
 export interface AlignmentMark {
@@ -120,6 +122,8 @@ export interface Test {
   templateId: string;
   totalPoints: number;
   questionCount: number;
+  universitySlug?: string;
+  lastValidityReport?: import("./question-design").ValidityReport & { checkedAt?: unknown };
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -138,7 +142,9 @@ export interface Session {
   status: SessionStatus;
   sessionDate: Timestamp;
   sourceImagePath: string;
+  sourceImagePaths?: string[];
   alignedImagePath?: string;
+  alignedImagePaths?: string[];
   totalScore: number;
   maxScore: number;
   /** 100点満点換算の合計得点 */
@@ -147,6 +153,8 @@ export interface Session {
   completedAt?: Timestamp;
   /** 生徒用返却プリントの内容が教師により確定された日時 */
   studentPrintFinalizedAt?: Timestamp;
+  /** Gemini による過去問視点のアドバイス */
+  pastExamAdvice?: import("./past-exam-advice").SessionPastExamAdvice;
 }
 
 export interface QuestionResult {

@@ -69,5 +69,35 @@ def crop_region(image_bytes: bytes, region: dict) -> bytes:
     return encoded.tobytes()
 
 
+def resolve_crop_location(region: dict, page_height: int) -> tuple[int, dict]:
+    """Map crop region to (page_index, page-local region)."""
+    page_index = region.get("pageIndex")
+    if page_index is not None:
+        return int(page_index), {
+            "x": int(region["x"]),
+            "y": int(region["y"]),
+            "width": int(region["width"]),
+            "height": int(region["height"]),
+        }
+
+    y = int(region["y"])
+    idx = y // page_height if page_height > 0 else 0
+    return idx, {
+        "x": int(region["x"]),
+        "y": y - idx * page_height,
+        "width": int(region["width"]),
+        "height": int(region["height"]),
+    }
+
+
+def crop_region_from_pages(pages: list[bytes], region: dict, page_height: int) -> bytes:
+    page_index, local = resolve_crop_location(region, page_height)
+    if page_index < 0 or page_index >= len(pages):
+        raise ValueError(
+            f"Crop page {page_index + 1} is required but only {len(pages)} page(s) were uploaded"
+        )
+    return crop_region(pages[page_index], local)
+
+
 def bytes_to_pil(image_bytes: bytes) -> Image.Image:
     return Image.open(BytesIO(image_bytes))

@@ -13,6 +13,13 @@ import { StudentsPage } from "@/pages/StudentsPage";
 import { TestEditorPage } from "@/pages/TestEditorPage";
 import { TestsPage } from "@/pages/TestsPage";
 import { UniversitiesPage } from "@/pages/UniversitiesPage";
+import { PastExamsPage } from "@/pages/PastExamsPage";
+import { UniversityPastExamsPage } from "@/pages/UniversityPastExamsPage";
+import { PastExamImportPage } from "@/pages/PastExamImportPage";
+import { PastExamImportReviewPage } from "@/pages/PastExamImportReviewPage";
+import { PastExamYearDetailPage } from "@/pages/PastExamYearDetailPage";
+import { QuestionGeneratePage } from "@/pages/QuestionGeneratePage";
+import { QuestionDraftsPage } from "@/pages/QuestionDraftsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -43,6 +50,8 @@ export function AppRoutes() {
         <Route path="students/:studentId/dashboard" element={<StudentDashboardPage />} />
         <Route path="tests" element={<TestsPage />} />
         <Route path="tests/:testId" element={<TestEditorPage />} />
+        <Route path="questions/generate" element={<QuestionGeneratePage />} />
+        <Route path="question-drafts" element={<QuestionDraftsPage />} />
         <Route path="tests/:testId/print/answer-sheet" element={<PrintAnswerSheetPage />} />
         <Route path="tests/:testId/print/test-paper" element={<PrintTestPaperPage />} />
         <Route path="tests/new" element={<TestEditorPage />} />
@@ -51,6 +60,11 @@ export function AppRoutes() {
         <Route path="sessions/:sessionId/print/student" element={<PrintStudentPage />} />
         <Route path="sessions/:sessionId/print/teacher" element={<PrintTeacherPage />} />
         <Route path="universities" element={<UniversitiesPage />} />
+        <Route path="past-exams" element={<PastExamsPage />} />
+        <Route path="past-exams/:slug" element={<UniversityPastExamsPage />} />
+        <Route path="past-exams/:slug/import" element={<PastExamImportPage />} />
+        <Route path="past-exams/:slug/import/:sessionId/review" element={<PastExamImportReviewPage />} />
+        <Route path="past-exams/:slug/years/:year" element={<PastExamYearDetailPage />} />
       </Route>
     </Routes>
   );

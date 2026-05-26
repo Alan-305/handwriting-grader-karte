@@ -1,5 +1,10 @@
 import { resolveQuestionFormat } from "@/lib/answer-format";
 import { expandAnswerUnits, type AnswerUnit } from "@/lib/answer-parts";
+import {
+  DEFAULT_PRINT_LAYOUT_SETTINGS,
+  shouldBreakBeforeQuestion,
+  type PrintSectionMode,
+} from "@/lib/print-layout-settings";
 import type {
   AnswerFormatOptions,
   AnswerSheetFormat,
@@ -62,7 +67,8 @@ function areaHeight(
 
 function toLayoutSlot(
   unit: AnswerUnit,
-  y: number,
+  localY: number,
+  pageIndex: number,
   hasMultiplePartsInQuestion: boolean,
   fieldHeight: number,
 ): LayoutSlot {
@@ -87,26 +93,38 @@ function toLayoutSlot(
       targetWords: options.targetWords,
       compositionLines: options.compositionLines,
     },
-    labelY: y - 28,
+    labelY: localY - 28,
     cropRegion: {
       x: MARGIN,
-      y: y + labelSpace,
+      y: localY + labelSpace,
       width: CONTENT_WIDTH,
       height: fieldHeight,
+      pageIndex,
     },
   };
 }
 
-export function generateAnswerSheetLayout(questions: Question[]): AnswerSheetLayout {
-  let y = MARGIN + HEADER_HEIGHT;
+export function generateAnswerSheetLayout(
+  questions: Question[],
+  sectionMode: PrintSectionMode = DEFAULT_PRINT_LAYOUT_SETTINGS.sectionMode,
+): AnswerSheetLayout {
+  let pageIndex = 0;
+  let localY = MARGIN + HEADER_HEIGHT;
+  const pageBottom = () => A4_HEIGHT - MARGIN;
   const slots: LayoutSlot[] = [];
 
-  for (const q of questions) {
+  for (let qIndex = 0; qIndex < questions.length; qIndex += 1) {
+    const q = questions[qIndex];
+    if (shouldBreakBeforeQuestion(qIndex, sectionMode)) {
+      pageIndex += 1;
+      localY = MARGIN;
+    }
+
     const units = expandAnswerUnits(q);
     const hasMultiple = units.length > 1;
 
     for (let i = 0; i < units.length; i += 1) {
-      if (i > 0) y += PART_GAP;
+      if (i > 0) localY += PART_GAP;
 
       const unit = units[i];
       const { format, options } = resolveQuestionFormat({
@@ -115,11 +133,19 @@ export function generateAnswerSheetLayout(questions: Question[]): AnswerSheetLay
         formatOptions: unit.formatOptions,
       });
       const fieldHeight = areaHeight(format, options);
-      slots.push(toLayoutSlot(unit, y, hasMultiple, fieldHeight));
-      y += (hasMultiple ? PART_LABEL_HEIGHT : 0) + fieldHeight;
+      const labelSpace = hasMultiple ? PART_LABEL_HEIGHT : 0;
+      const blockHeight = labelSpace + fieldHeight;
+
+      if (localY + blockHeight > pageBottom()) {
+        pageIndex += 1;
+        localY = MARGIN;
+      }
+
+      slots.push(toLayoutSlot(unit, localY, pageIndex, hasMultiple, fieldHeight));
+      localY += blockHeight;
     }
 
-    y += QUESTION_GAP;
+    localY += QUESTION_GAP;
   }
 
   return {
@@ -133,6 +159,12 @@ export function generateAnswerSheetLayout(questions: Question[]): AnswerSheetLay
     ],
     slots,
   };
+}
+
+/** レイアウト上の最大ページ数（0-indexed pageIndex + 1） */
+export function layoutPageCount(slots: LayoutSlot[]): number {
+  if (slots.length === 0) return 1;
+  return Math.max(...slots.map((s) => s.cropRegion.pageIndex ?? 0)) + 1;
 }
 
 export const TYPE_LABEL: Record<QuestionType, string> = {

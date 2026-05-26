@@ -35,6 +35,7 @@ import {
   FORMAT_LABEL,
 } from "@/lib/answer-format";
 import { AnswerPartCard, AnswerPartFormatFields } from "@/components/tests/AnswerPartFormatFields";
+import { TestValidityPanel } from "@/components/tests/TestValidityPanel";
 import { getDb } from "@/lib/firebase";
 import { NO_MODEL_ANSWER_HINT, resolveGradingMode } from "@/lib/grading-mode";
 import { QUESTION_TEXT_HINT, QuestionPromptBlock } from "@/lib/question-text-format";
@@ -113,6 +114,22 @@ export function TestEditorPage() {
   const updateDraftQuestion = (index: number, patch: Partial<Question>) => {
     setDraftQuestions((prev) =>
       prev.map((q, i) => (i === index ? { ...q, ...patch } : q)),
+    );
+    setSaveState("idle");
+  };
+
+  const applyRevision = (questionOrder: number, field: string, value: string) => {
+    setDraftQuestions((prev) =>
+      prev.map((q) => {
+        if (q.order !== questionOrder) return q;
+        if (field === "points") {
+          const points = Number(value);
+          return Number.isFinite(points) ? { ...q, points } : q;
+        }
+        if (field === "prompt") return { ...q, prompt: value };
+        if (field === "modelAnswer") return { ...q, modelAnswer: value };
+        return q;
+      }),
     );
     setSaveState("idle");
   };
@@ -287,6 +304,13 @@ export function TestEditorPage() {
 
         <div className="flex flex-wrap gap-2">
           <Button onClick={addQuestion}>設問を追加</Button>
+          {testId && draftQuestions.length > 0 && (
+            <TestValidityPanel
+              testId={testId}
+              draftQuestions={draftQuestions}
+              onApplyRevision={applyRevision}
+            />
+          )}
           {testId && draftQuestions.length > 0 && (
             <Button variant="outline" className="gap-2" asChild>
               <Link to={`/tests/${testId}/print/test-paper`}>

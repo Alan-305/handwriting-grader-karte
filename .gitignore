@@ -8,3 +8,9 @@ serviceAccountKey.json
 node_modules/
 dist/
 .DS_Store
+
+# 過去問 PDF（著作権・ローカル配置用）
+data/past-exams/**/*.pdf
+data/past-exams/**/import-draft.json
+data/past-exams/**/listening-import-draft.json
+data/past-exams/.import-sessions/

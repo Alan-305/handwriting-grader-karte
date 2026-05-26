@@ -37,4 +37,4 @@ class Config:
     )
     GEMINI_API_KEY = os.getenv("HGK_GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
     ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")

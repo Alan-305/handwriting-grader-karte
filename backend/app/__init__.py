@@ -8,6 +8,10 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    from app.ai.gemini_client import normalize_gemini_model
+
+    app.config["GEMINI_MODEL"] = normalize_gemini_model(app.config.get("GEMINI_MODEL"))
+
     cors.init_app(
         app,
         resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}},
@@ -21,6 +25,8 @@ def create_app(config_class=Config):
     from app.routes.grading import grading_bp
     from app.routes.health import health_bp
     from app.routes.image import image_bp
+    from app.routes.past_exam import past_exam_bp
+    from app.routes.question_design import question_design_bp
     from app.routes.upload import upload_bp
 
     app.register_blueprint(health_bp, url_prefix="/api")
@@ -28,6 +34,8 @@ def create_app(config_class=Config):
     app.register_blueprint(image_bp, url_prefix="/api")
     app.register_blueprint(grading_bp, url_prefix="/api")
     app.register_blueprint(analysis_bp, url_prefix="/api")
+    app.register_blueprint(past_exam_bp, url_prefix="/api")
+    app.register_blueprint(question_design_bp, url_prefix="/api")
 
     @app.get("/")
     def root():

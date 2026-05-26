@@ -4,7 +4,9 @@
   "scripts": {
     "dev": "concurrently -k -n backend,frontend -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "backend/.venv/bin/python3 backend/run.py",
-    "dev:frontend": "npm run dev --prefix frontend"
+    "dev:frontend": "npm run dev --prefix frontend",
+    "import:past-exam": "backend/.venv/bin/python3 scripts/import_past_exam_pdf.py",
+    "import:listening": "backend/.venv/bin/python3 scripts/import_past_exam_pdf.py --listening-only"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

@@ -1,9 +1,20 @@
 import type {
   AnalyzeStudentResponse,
+  ExamYearDetailResponse,
+  ExamYearSummary,
   GradeSessionResponse,
+  PastExamCommitResponse,
+  PastExamImportResponse,
   SessionProgressResponse,
+  TeacherExamMaterialResponse,
   UploadSessionResponse,
 } from "@/types/api";
+import type {
+  GenerateQuestionsResponse,
+  GeneratedQuestionDraft,
+  QuestionTypeCatalogItem,
+  ValidityReport,
+} from "@/types/question-design";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
@@ -36,10 +47,13 @@ export const apiClient = {
     }),
 
   alignSession: (token: string, sessionId: string) =>
-    request<{ alignedImagePath: string }>(`/api/sessions/${sessionId}/align`, {
-      method: "POST",
-      token,
-    }),
+    request<{ alignedImagePath: string; alignedImagePaths?: string[] }>(
+      `/api/sessions/${sessionId}/align`,
+      {
+        method: "POST",
+        token,
+      },
+    ),
 
   cropSession: (token: string, sessionId: string) =>
     request<{ crops: Array<{ questionId: string; order: number; path: string }> }>(
@@ -73,4 +87,147 @@ export const apiClient = {
       method: "POST",
       token,
     }),
+
+  importPastExam: (token: string, slug: string, formData: FormData) =>
+    request<PastExamImportResponse>(`/api/universities/${slug}/past-exams/import`, {
+      method: "POST",
+      body: formData,
+      token,
+    }),
+
+  listExamYears: (token: string, slug: string) =>
+    request<{ examYears: ExamYearSummary[] }>(`/api/universities/${slug}/exam-years`, {
+      token,
+    }),
+
+  getExamYearDetail: (token: string, slug: string, year: number) =>
+    request<ExamYearDetailResponse>(`/api/universities/${slug}/exam-years/${year}`, {
+      token,
+    }),
+
+  getTeacherExamMaterial: (token: string, slug: string, year: number) =>
+    request<{ material: TeacherExamMaterialResponse | null }>(
+      `/api/universities/${slug}/exam-years/${year}/teacher-materials`,
+      { token },
+    ),
+
+  saveTeacherExamMaterial: (
+    token: string,
+    slug: string,
+    year: number,
+    body: { title: string; content: string; attachments: TeacherExamMaterialResponse["attachments"] },
+  ) =>
+    request<{ material: TeacherExamMaterialResponse }>(
+      `/api/universities/${slug}/exam-years/${year}/teacher-materials`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        token,
+      },
+    ),
+
+  commitPastExamImport: (
+    token: string,
+    slug: string,
+    sessionId: string,
+    body: { profileStatus?: "draft" | "approved"; parsed?: PastExamImportResponse["parsed"] },
+  ) =>
+    request<PastExamCommitResponse>(
+      `/api/universities/${slug}/past-exams/import/${sessionId}/commit`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        token,
+      },
+    ),
+
+  listQuestionTypes: (token: string, slug: string) =>
+    request<{ questionTypes: QuestionTypeCatalogItem[] }>(
+      `/api/universities/${slug}/question-types`,
+      { token },
+    ),
+
+  runValidityCheck: (
+    token: string,
+    testId: string,
+    body: {
+      universitySlug?: string;
+      referenceYears?: number[];
+      questions?: Array<{ order: number; type: string; prompt: string; modelAnswer: string; points: number }>;
+    },
+  ) =>
+    request<{ report: ValidityReport }>(`/api/tests/${testId}/validity-check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
+  generateQuestions: (
+    token: string,
+    slug: string,
+    body: {
+      selections: Array<{ majorOrder: number; partLabel?: string | null; typeLabel?: string }>;
+      referenceYears?: number[];
+      difficulty?: string;
+      topicHint?: string;
+      countPerType?: number;
+    },
+  ) =>
+    request<GenerateQuestionsResponse>(`/api/universities/${slug}/generate-questions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
+  listQuestionDrafts: (token: string) =>
+    request<{ drafts: GeneratedQuestionDraft[] }>("/api/question-drafts", { token }),
+
+  deleteQuestionDraft: (token: string, draftId: string) =>
+    request<{ status: string }>(`/api/question-drafts/${draftId}`, {
+      method: "DELETE",
+      token,
+    }),
+
+  promoteQuestionDraft: (token: string, draftId: string, testId: string) =>
+    request<{ testId: string; questionId: string; order: number; testTitle: string }>(
+      `/api/question-drafts/${draftId}/promote`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ testId }),
+        token,
+      },
+    ),
+
+  promoteQuestionDraftAsNewTest: (token: string, draftId: string, title?: string) =>
+    request<{ testId: string; questionId: string; order: number; testTitle: string }>(
+      `/api/question-drafts/${draftId}/promote-new`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(title ? { title } : {}),
+        token,
+      },
+    ),
+
+  getPastExamAdvice: (token: string, sessionId: string) =>
+    request<{ advice: import("@/types/past-exam-advice").SessionPastExamAdvice | null }>(
+      `/api/sessions/${sessionId}/past-exam-advice`,
+      { token },
+    ),
+
+  generatePastExamAdvice: (token: string, sessionId: string, universitySlug?: string) =>
+    request<{ advice: import("@/types/past-exam-advice").SessionPastExamAdvice }>(
+      `/api/sessions/${sessionId}/past-exam-advice`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(universitySlug ? { universitySlug } : {}),
+        token,
+      },
+    ),
 };

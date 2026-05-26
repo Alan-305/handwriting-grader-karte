@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { BookOpen, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Users } from "lucide-react";
+import { BookOpen, ClipboardList, GraduationCap, Archive, FileEdit, LayoutDashboard, LogOut, Sparkles, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -7,7 +7,10 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { to: "/students", label: "生徒", icon: Users },
   { to: "/tests", label: "問題", icon: BookOpen },
+  { to: "/questions/generate", label: "問題生成", icon: Sparkles },
+  { to: "/question-drafts", label: "下書き", icon: FileEdit },
   { to: "/sessions/new", label: "添削", icon: ClipboardList },
+  { to: "/past-exams", label: "過去問", icon: Archive },
   { to: "/universities", label: "志望校", icon: GraduationCap },
 ];
 

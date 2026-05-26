@@ -5,7 +5,7 @@ export function LoadingOverlay({
   message = "添削中",
   visible,
 }: {
-  message?: "添削中" | "考えてます";
+  message?: "添削中" | "考えてます" | "取り込み中" | string;
   visible: boolean;
 }) {
   if (!visible) return null;
