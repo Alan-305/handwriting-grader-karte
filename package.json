@@ -6,7 +6,9 @@
     "dev:backend": "backend/.venv/bin/python3 backend/run.py",
     "dev:frontend": "npm run dev --prefix frontend",
     "import:past-exam": "backend/.venv/bin/python3 scripts/import_past_exam_pdf.py",
-    "import:listening": "backend/.venv/bin/python3 scripts/import_past_exam_pdf.py --listening-only"
+    "import:listening": "backend/.venv/bin/python3 scripts/import_past_exam_pdf.py --listening-only",
+    "deploy:trial": "bash scripts/deploy-trial.sh",
+    "setup:gcp-secrets": "bash scripts/setup-gcp-secrets.sh"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

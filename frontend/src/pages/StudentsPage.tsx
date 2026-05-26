@@ -6,7 +6,12 @@ import { SafeForm } from "@/components/forms/SafeForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { COURSE_OPTIONS } from "@/constants/student-interview";
 import { useStudents } from "@/hooks/useStudent";
+import { StudentHistoryModal } from "@/components/students/StudentHistoryModal";
+
+const courseSelectClass =
+  "mt-1 flex h-11 w-full rounded-lg border border-slate-200 bg-white px-3 font-ja text-sm text-slate-900";
 
 export function StudentsPage() {
   const { students, loading, createStudent, removeStudent } = useStudents();
@@ -16,6 +21,7 @@ export function StudentsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [historyStudent, setHistoryStudent] = useState<{ id: string; name: string } | null>(null);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -73,7 +79,17 @@ export function StudentsPage() {
                 </div>
                 <div className="space-y-1">
                   <label className="font-ja text-sm text-slate-600">コース</label>
-                  <Input value={course} onChange={(e) => setCourse(e.target.value)} />
+                  <select
+                    className={courseSelectClass}
+                    value={course}
+                    onChange={(e) => setCourse(e.target.value)}
+                  >
+                    {COURSE_OPTIONS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               {error && <p className="font-ja text-sm text-red-600">{error}</p>}
@@ -109,9 +125,21 @@ export function StudentsPage() {
                     </p>
                   )}
                 </div>
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <Button asChild variant="outline" size="sm">
                     <Link to={`/students/${s.id}/dashboard`}>カルテ</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to={`/students/${s.id}/interview`}>面談</Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="min-h-9"
+                    onClick={() => setHistoryStudent({ id: s.id, name: s.name })}
+                  >
+                    過去の結果
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => removeStudent(s.id)}>
                     削除
@@ -122,6 +150,14 @@ export function StudentsPage() {
           </div>
         )}
       </div>
+      {historyStudent && (
+        <StudentHistoryModal
+          open
+          studentId={historyStudent.id}
+          studentName={historyStudent.name}
+          onClose={() => setHistoryStudent(null)}
+        />
+      )}
     </div>
   );
 }

@@ -10,7 +10,18 @@ export type AnswerSheetFormat =
 
 /** 添削プロンプトの種別（模範解答なしのとき no_model 用プロンプトを使用） */
 export type GradingMode = "standard" | "no_model";
-export type SessionStatus = "uploaded" | "aligning" | "grading" | "review" | "completed";
+export type SessionStatus =
+  | "uploaded"
+  | "aligning"
+  | "aligned"
+  | "crop_review"
+  | "transcribing"
+  | "transcription_review"
+  | "grading"
+  | "review"
+  | "completed";
+
+export type TranscriptionStatus = "pending_review" | "confirmed";
 
 /** 解答用紙形式ごとの数値設定（設問入力時に教師が指定） */
 export interface AnswerFormatOptions {
@@ -40,12 +51,47 @@ export interface TargetUniversityRef {
   priority: number;
 }
 
+/** 共通テスト得点（科目キー → 得点帯コード。constants/student-interview 参照） */
+export type CommonTestScoreMap = Record<string, string>;
+
+/** 面談で確定した構造化プロフィール（最新回のスナップショット。AI分析も参照） */
+export interface StudentInterviewProfile {
+  targetUniversities: TargetUniversityRef[];
+  commonTestYear?: number;
+  commonTestScores: CommonTestScoreMap;
+  confirmedFactIds: string[];
+  /** @deprecated 面談記録の studentConsultation / teacherAdvice を使用 */
+  additionalNotes?: string;
+  updatedAt?: Timestamp;
+}
+
+/** 1回分の面談記録（テスト返却のたびに追加） */
+export interface StudentInterviewRecord {
+  id: string;
+  /** 面談実施日時 */
+  conductedAt: Timestamp;
+  /** 通算回数（1始まり） */
+  recordNumber: number;
+  /** 生徒からの相談・申し送り */
+  studentConsultation: string;
+  /** 教師が伝えたアドバイス・指示 */
+  teacherAdvice: string;
+  targetUniversities: TargetUniversityRef[];
+  commonTestYear?: number;
+  commonTestScores: CommonTestScoreMap;
+  confirmedFactIds: string[];
+  /** 関連する添削セッション（任意） */
+  sessionId?: string;
+  createdAt: Timestamp;
+}
+
 export interface Student {
   id: string;
   teacherId: string;
   name: string;
   course: string;
   targetUniversities: TargetUniversityRef[];
+  interviewProfile?: StudentInterviewProfile;
   memo?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -89,6 +135,8 @@ export interface AnswerSheetTemplate {
 export interface AnswerPart {
   /** 表示ラベル（例: "(1)"） */
   label: string;
+  /** 小問ごとの配点（未指定時は大問配点を小問数で按分） */
+  points?: number;
   answerFormat: AnswerSheetFormat;
   formatOptions?: AnswerFormatOptions;
   /** 未指定時は answerFormat / 問題文から自動判定 */
@@ -131,7 +179,7 @@ export interface Test {
 export interface GradingProgress {
   current: number;
   total: number;
-  message: "添削中" | "考えてます";
+  message: "添削中" | "考えてます" | "読み取り中";
 }
 
 export interface Session {
@@ -151,10 +199,24 @@ export interface Session {
   totalScore100?: number;
   gradingProgress?: GradingProgress;
   completedAt?: Timestamp;
+  /** 教師が AI 添削内容を確認・確定した日時 */
+  gradingConfirmedAt?: Timestamp;
   /** 生徒用返却プリントの内容が教師により確定された日時 */
   studentPrintFinalizedAt?: Timestamp;
   /** Gemini による過去問視点のアドバイス */
   pastExamAdvice?: import("./past-exam-advice").SessionPastExamAdvice;
+  /** 教師が指定した手動切り出し（キー: "{order}-{partIndex}"） */
+  manualCrops?: Record<
+    string,
+    {
+      questionId: string;
+      order: number;
+      partIndex: number;
+      partLabel?: string;
+      cropRegion: CropRegion;
+      croppedImagePath: string;
+    }
+  >;
 }
 
 export interface QuestionResult {
@@ -165,15 +227,26 @@ export interface QuestionResult {
   partLabel?: string;
   type: QuestionType;
   croppedImagePath: string;
-  grade: GradeLevel;
-  score: number;
+  /** 転記確認前は未採点のことがある */
+  grade?: GradeLevel;
+  score?: number;
   maxPoints: number;
   studentAnswerText?: string;
-  feedback: string;
-  explanation: string;
+  transcriptionStatus?: TranscriptionStatus;
+  transcriptionProfile?: string;
+  graded?: boolean;
+  feedback?: string;
+  explanation?: string;
   modelAnswer: string;
-  errorTags: string[];
+  errorTags?: string[];
   teacherNotes?: string;
+  /** 自由英作文: 内容の評価・解説 */
+  contentEvaluation?: string;
+  /** 自由英作文: 文法・語法の評価・解説 */
+  grammarEvaluation?: string;
+  /** 自由英作文: 完成版英文 */
+  polishedAnswer?: string;
+  teacherReviewed?: boolean;
   createdAt: Timestamp;
 }
 

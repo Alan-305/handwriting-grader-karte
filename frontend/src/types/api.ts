@@ -13,6 +13,74 @@ export interface GradeSessionResponse {
   results: Array<Record<string, unknown>>;
 }
 
+export interface TranscribeSessionResponse {
+  sessionId: string;
+  results: Array<Record<string, unknown>>;
+}
+
+export interface CropPreviewTarget {
+  questionId: string;
+  order: number;
+  partIndex: number;
+  partLabel?: string;
+  cropRegion: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    pageIndex?: number;
+  };
+  touchesHeader?: boolean;
+}
+
+export interface CropPreviewResponse {
+  sessionId: string;
+  alignedImagePaths: string[];
+  pageWidth: number;
+  pageHeight: number;
+  headerExclusion: CropPreviewTarget["cropRegion"];
+  targets: CropPreviewTarget[];
+}
+
+export interface CropTargetsResponse {
+  sessionId: string;
+  alignedImagePaths: string[];
+  pageWidth: number;
+  pageHeight: number;
+  targets: Array<{
+    questionId: string;
+    order: number;
+    partIndex: number;
+    partLabel?: string;
+    suggestedRegion?: CropPreviewTarget["cropRegion"];
+    savedRegion?: CropPreviewTarget["cropRegion"];
+    croppedImagePath?: string;
+  }>;
+  allAssigned: boolean;
+}
+
+export interface SaveManualCropRequest {
+  order: number;
+  partIndex: number;
+  cropRegion: CropPreviewTarget["cropRegion"];
+}
+
+export interface SaveManualCropResponse {
+  sessionId: string;
+  croppedImagePath: string;
+  cropRegion: CropPreviewTarget["cropRegion"];
+  allAssigned: boolean;
+}
+
+export interface PatchTranscriptionsRequest {
+  items: Array<{
+    id: string;
+    studentAnswerText?: string;
+    transcriptionStatus?: "pending_review" | "confirmed";
+  }>;
+  confirmAll?: boolean;
+}
+
 export interface SessionProgressResponse {
   status: string;
   gradingProgress?: {

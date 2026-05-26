@@ -5,7 +5,17 @@ from app.services.firebase_admin_service import FirebaseAdminService
 
 logger = logging.getLogger(__name__)
 
-STATUS_FLOW = ["uploaded", "aligning", "grading", "review", "completed"]
+STATUS_FLOW = [
+    "uploaded",
+    "aligning",
+    "aligned",
+    "crop_review",
+    "transcribing",
+    "transcription_review",
+    "grading",
+    "review",
+    "completed",
+]
 
 
 class SessionService:
@@ -54,19 +64,49 @@ class SessionService:
         result["createdAt"] = datetime.now(timezone.utc)
         return self.firebase.add_subdoc(["sessions", session_id, "question_results"], result)
 
-    def complete_session(
+    def clear_question_results(self, session_id: str) -> None:
+        db = self.firebase.db()
+        if not db:
+            return
+        ref = (
+            db.collection("sessions")
+            .document(session_id)
+            .collection("question_results")
+        )
+        for doc in ref.stream():
+            doc.reference.delete()
+
+    def get_question_results(self, session_id: str) -> list[dict]:
+        return self.firebase.get_subcollection(
+            ["sessions", session_id, "question_results"]
+        )
+
+    def update_question_result(self, session_id: str, result_id: str, data: dict) -> None:
+        db = self.firebase.db()
+        if not db:
+            return
+        data["updatedAt"] = datetime.now(timezone.utc)
+        (
+            db.collection("sessions")
+            .document(session_id)
+            .collection("question_results")
+            .document(result_id)
+            .update(data)
+        )
+
+    def save_grading_scores(
         self,
         session_id: str,
         total_score: float,
-        aligned_path: str | None = None,
         *,
         max_score: float | None = None,
         total_score_100: int | None = None,
+        aligned_path: str | None = None,
     ):
+        """AI添削直後: 教師確認待ち（completed にしない）。"""
         data = {
-            "status": "completed",
+            "status": "review",
             "totalScore": total_score,
-            "completedAt": datetime.now(timezone.utc),
             "gradingProgress": None,
         }
         if max_score is not None:
@@ -76,6 +116,38 @@ class SessionService:
         if aligned_path:
             data["alignedImagePath"] = aligned_path
         self.firebase.update_doc("sessions", session_id, data)
+
+    def confirm_grading(self, session_id: str):
+        """教師が添削内容を確定したあとに呼ぶ。"""
+        now = datetime.now(timezone.utc)
+        self.firebase.update_doc(
+            "sessions",
+            session_id,
+            {
+                "status": "completed",
+                "gradingConfirmedAt": now,
+                "completedAt": now,
+            },
+        )
+
+    def complete_session(
+        self,
+        session_id: str,
+        total_score: float,
+        aligned_path: str | None = None,
+        *,
+        max_score: float | None = None,
+        total_score_100: int | None = None,
+    ):
+        """後方互換: 即 completed にする旧動作。"""
+        self.save_grading_scores(
+            session_id,
+            total_score,
+            max_score=max_score,
+            total_score_100=total_score_100,
+            aligned_path=aligned_path,
+        )
+        self.confirm_grading(session_id)
 
     def get_session(self, session_id: str) -> dict | None:
         doc = self.firebase.get_doc("sessions", session_id)

@@ -48,7 +48,7 @@ def align_session(session_id: str):
 
     session_svc.update_status(
         session_id,
-        "grading",
+        "aligned",
         alignedImagePath=aligned_paths[0],
         alignedImagePaths=aligned_paths,
     )
@@ -105,4 +105,63 @@ def crop_session(session_id: str):
                 }
             )
 
+    session_svc.update_status(session_id, "crop_review")
+
     return jsonify({"crops": crop_paths})
+
+
+@image_bp.get("/sessions/<session_id>/crop-preview")
+@require_auth
+def crop_preview(session_id: str):
+    """整列済み画像と crop 矩形メタデータ（幾何確認 UI 用）。"""
+    session_svc = SessionService()
+    session = session_svc.get_session(session_id)
+    if not session or session.get("teacherId") != g.teacher_id:
+        return jsonify({"error": "セッションが見つかりません"}), 404
+
+    aligned_paths = aligned_image_paths(session)
+    if not aligned_paths:
+        return jsonify({"error": "位置合わせが完了していません。先にアップロードと整列を行ってください。"}), 400
+
+    test = session_svc.get_test(session["testId"])
+    template = session_svc.get_template(test["templateId"]) if test else None
+    page_w = int(template.get("pageWidth", 2480)) if template else 2480
+    page_h = int(template.get("pageHeight", 3508)) if template else 3508
+
+    margin = 120
+    header_height = 200
+    header_exclusion = {
+        "x": margin,
+        "y": margin,
+        "width": page_w - margin * 2,
+        "height": header_height,
+        "pageIndex": 0,
+    }
+
+    questions = session_svc.get_questions_for_test(session["testId"])
+    targets = []
+    for q in questions:
+        for target in iter_crop_targets([q]):
+            region = target.get("cropRegion") or {}
+            targets.append(
+                {
+                    "questionId": target["questionId"],
+                    "order": target["order"],
+                    "partIndex": target["partIndex"],
+                    "partLabel": target.get("partLabel"),
+                    "cropRegion": region,
+                    "touchesHeader": (region.get("pageIndex") or 0) == 0
+                    and region.get("y", 0) < margin + header_height,
+                }
+            )
+
+    return jsonify(
+        {
+            "sessionId": session_id,
+            "alignedImagePaths": aligned_paths,
+            "pageWidth": page_w,
+            "pageHeight": page_h,
+            "headerExclusion": header_exclusion,
+            "targets": targets,
+        }
+    )

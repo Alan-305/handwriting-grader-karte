@@ -26,7 +26,7 @@ def _collect_upload_files() -> list:
 def upload_session():
     image_files = _collect_upload_files()
     if not image_files:
-        return jsonify({"error": "画像ファイルが必要です（1〜2枚）"}), 400
+        return jsonify({"error": "画像ファイルを1枚以上アップロードしてください"}), 400
 
     if len(image_files) > MAX_ANSWER_SHEET_PAGES:
         return jsonify({"error": f"画像は最大 {MAX_ANSWER_SHEET_PAGES} 枚までです"}), 400

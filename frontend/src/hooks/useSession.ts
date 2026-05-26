@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   collection,
   deleteField,
@@ -11,13 +11,20 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
-import type { PrintArtifact, QuestionResult, Session } from "@/types/firestore";
+import { omitUndefined } from "@/lib/firestore-write";
+import {
+  applyExpectedPartPoints,
+  pickQuestionResultPatch,
+  sortQuestionResults,
+} from "@/lib/question-results";
 import { sumResultScores, toScoreOutOf100 } from "@/lib/scoring";
+import type { PrintArtifact, Question, QuestionResult, Session, StudentInterviewRecord } from "@/types/firestore";
 import { useAuth } from "./useAuth";
 
 export function useSession(sessionId: string | undefined) {
   const [session, setSession] = useState<Session | null>(null);
   const [results, setResults] = useState<QuestionResult[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,7 +36,8 @@ export function useSession(sessionId: string | undefined) {
     const unsubResults = onSnapshot(
       query(collection(getDb(), "sessions", sessionId, "question_results"), orderBy("order")),
       (snap) => {
-        setResults(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as QuestionResult));
+        const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as QuestionResult);
+        setResults(sortQuestionResults(rows));
       },
     );
     return () => {
@@ -38,7 +46,29 @@ export function useSession(sessionId: string | undefined) {
     };
   }, [sessionId]);
 
-  return { session, results, loading };
+  const testId = session?.testId;
+
+  useEffect(() => {
+    if (!testId) {
+      setQuestions([]);
+      return;
+    }
+    const unsub = onSnapshot(
+      query(collection(getDb(), "tests", testId, "questions"), orderBy("order")),
+      (snap) => {
+        setQuestions(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Question));
+      },
+    );
+    return () => unsub();
+  }, [testId]);
+
+  const displayResults = useMemo(() => {
+    const sorted = sortQuestionResults(results);
+    if (!questions.length) return sorted;
+    return applyExpectedPartPoints(sorted, questions);
+  }, [results, questions]);
+
+  return { session, results: displayResults, rawResults: results, questions, loading };
 }
 
 export function useUpdateQuestionResults(sessionId: string | undefined) {
@@ -46,9 +76,13 @@ export function useUpdateQuestionResults(sessionId: string | undefined) {
     async (drafts: Array<{ id: string } & Partial<QuestionResult>>) => {
       if (!sessionId) return;
       await Promise.all(
-        drafts.map(({ id, ...data }) =>
-          updateDoc(doc(getDb(), "sessions", sessionId, "question_results", id), data),
-        ),
+        drafts.map((draft) => {
+          const { id, ...data } = pickQuestionResultPatch(draft);
+          return updateDoc(
+            doc(getDb(), "sessions", sessionId, "question_results", id),
+            omitUndefined(data),
+          );
+        }),
       );
     },
     [sessionId],
@@ -65,15 +99,18 @@ export function useUpdateQuestionResults(sessionId: string | undefined) {
   );
 
   const syncSessionScores = useCallback(
-    async (results: Pick<QuestionResult, "score" | "maxPoints">[]) => {
+    async (results: QuestionResult[]) => {
       if (!sessionId) return;
       const { totalScore, maxScore } = sumResultScores(results);
       const totalScore100 = toScoreOutOf100(totalScore, maxScore);
-      await updateDoc(doc(getDb(), "sessions", sessionId), {
-        totalScore,
-        maxScore,
-        totalScore100,
-      });
+      await updateDoc(
+        doc(getDb(), "sessions", sessionId),
+        omitUndefined({
+          totalScore,
+          maxScore,
+          totalScore100,
+        }),
+      );
     },
     [sessionId],
   );
@@ -116,4 +153,22 @@ export function useSessionsForStudent(studentId: string | undefined) {
   }, [user, studentId]);
 
   return sessions;
+}
+
+/** 生徒の面談記録（面談画面と共通） */
+export function useInterviewRecords(studentId: string | undefined) {
+  const [records, setRecords] = useState<StudentInterviewRecord[]>([]);
+
+  useEffect(() => {
+    if (!studentId) return;
+    const q = query(
+      collection(getDb(), "students", studentId, "interview_records"),
+      orderBy("conductedAt", "desc"),
+    );
+    return onSnapshot(q, (snap) => {
+      setRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as StudentInterviewRecord));
+    });
+  }, [studentId]);
+
+  return records;
 }

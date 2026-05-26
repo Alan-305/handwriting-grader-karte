@@ -8,7 +8,11 @@ import { PrintStudentPage } from "@/pages/PrintStudentPage";
 import { PrintTeacherPage } from "@/pages/PrintTeacherPage";
 import { SessionNewPage } from "@/pages/SessionNewPage";
 import { SessionResultPage } from "@/pages/SessionResultPage";
+import { SessionGradingReviewPage } from "@/pages/SessionGradingReviewPage";
+import { SessionManualCropPage } from "@/pages/SessionManualCropPage";
+import { SessionTranscriptionReviewPage } from "@/pages/SessionTranscriptionReviewPage";
 import { StudentDashboardPage } from "@/pages/StudentDashboardPage";
+import { StudentInterviewPage } from "@/pages/StudentInterviewPage";
 import { StudentsPage } from "@/pages/StudentsPage";
 import { TestEditorPage } from "@/pages/TestEditorPage";
 import { TestsPage } from "@/pages/TestsPage";
@@ -48,6 +52,7 @@ export function AppRoutes() {
         <Route index element={<Navigate to="/students" replace />} />
         <Route path="students" element={<StudentsPage />} />
         <Route path="students/:studentId/dashboard" element={<StudentDashboardPage />} />
+        <Route path="students/:studentId/interview" element={<StudentInterviewPage />} />
         <Route path="tests" element={<TestsPage />} />
         <Route path="tests/:testId" element={<TestEditorPage />} />
         <Route path="questions/generate" element={<QuestionGeneratePage />} />
@@ -56,6 +61,9 @@ export function AppRoutes() {
         <Route path="tests/:testId/print/test-paper" element={<PrintTestPaperPage />} />
         <Route path="tests/new" element={<TestEditorPage />} />
         <Route path="sessions/new" element={<SessionNewPage />} />
+        <Route path="sessions/:sessionId/crop-review" element={<SessionManualCropPage />} />
+        <Route path="sessions/:sessionId/transcription" element={<SessionTranscriptionReviewPage />} />
+        <Route path="sessions/:sessionId/grading-review" element={<SessionGradingReviewPage />} />
         <Route path="sessions/:sessionId" element={<SessionResultPage />} />
         <Route path="sessions/:sessionId/print/student" element={<PrintStudentPage />} />
         <Route path="sessions/:sessionId/print/teacher" element={<PrintTeacherPage />} />

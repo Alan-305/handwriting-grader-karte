@@ -7,6 +7,7 @@ venv/
 serviceAccountKey.json
 node_modules/
 dist/
+.firebase/
 .DS_Store
 
 # 過去問 PDF（著作権・ローカル配置用）

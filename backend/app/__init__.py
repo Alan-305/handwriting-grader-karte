@@ -25,16 +25,20 @@ def create_app(config_class=Config):
 
     from app.routes.analysis import analysis_bp
     from app.routes.grading import grading_bp
+    from app.routes.transcription import transcription_bp
     from app.routes.health import health_bp
     from app.routes.image import image_bp
     from app.routes.past_exam import past_exam_bp
     from app.routes.question_design import question_design_bp
+    from app.routes.manual_crop import manual_crop_bp
     from app.routes.upload import upload_bp
 
     app.register_blueprint(health_bp, url_prefix="/api")
     app.register_blueprint(upload_bp, url_prefix="/api")
     app.register_blueprint(image_bp, url_prefix="/api")
+    app.register_blueprint(manual_crop_bp, url_prefix="/api")
     app.register_blueprint(grading_bp, url_prefix="/api")
+    app.register_blueprint(transcription_bp, url_prefix="/api")
     app.register_blueprint(analysis_bp, url_prefix="/api")
     app.register_blueprint(past_exam_bp, url_prefix="/api")
     app.register_blueprint(question_design_bp, url_prefix="/api")

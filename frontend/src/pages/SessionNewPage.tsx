@@ -26,7 +26,7 @@ export function SessionNewPage() {
   const [testId, setTestId] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
-  const [progressMsg, setProgressMsg] = useState<"添削中" | "考えてます">("添削中");
+  const [progressMsg, setProgressMsg] = useState<string>("位置合わせ中");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -58,9 +58,9 @@ export function SessionNewPage() {
 
   const uploadHint = useMemo(() => {
     if (expectedPages <= 1) {
-      return "このテストは解答用紙1枚想定です。2枚に分かれている場合は、1枚目→2枚目の順で追加してください。";
+      return "1枚だけでもアップロードできます。2枚に分かれている場合は、1枚目→2枚目の順で追加してください。";
     }
-    return `このテストは解答用紙 ${expectedPages} 枚想定です。印刷順どおり 1枚目→2枚目… の順でアップロードしてください。`;
+    return `このテストは最大 ${expectedPages} 枚の解答用紙想定です。書けた枚数だけでも構いません（1枚のみ可）。ある場合は印刷順どおり 1枚目→2枚目… の順で追加してください。`;
   }, [expectedPages]);
 
   const canGrade =
@@ -73,15 +73,9 @@ export function SessionNewPage() {
 
   const runGrading = async () => {
     if (files.length === 0 || !studentId || !testId) return;
-    if (files.length < expectedPages) {
-      setError(
-        `このテストは解答用紙 ${expectedPages} 枚分です。${expectedPages} 枚を順番にアップロードしてください（現在 ${files.length} 枚）。`,
-      );
-      return;
-    }
     setLoading(true);
     setError("");
-    setProgressMsg("添削中");
+    setProgressMsg("位置合わせ中");
     try {
       const token = await getIdToken();
       if (!token) return;
@@ -95,11 +89,7 @@ export function SessionNewPage() {
 
       const { sessionId } = await apiClient.uploadSession(token, form);
       await apiClient.alignSession(token, sessionId);
-      await apiClient.cropSession(token, sessionId);
-
-      setProgressMsg("考えてます");
-      await apiClient.gradeSession(token, sessionId);
-      navigate(`/sessions/${sessionId}`);
+      navigate(`/sessions/${sessionId}/crop-review`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "添削に失敗しました");
     } finally {
@@ -110,7 +100,10 @@ export function SessionNewPage() {
   return (
     <div>
       <LoadingOverlay visible={loading} message={progressMsg} />
-      <PageHeader title="答案添削" description="手書き答案をアップロードして自動添削します" />
+      <PageHeader
+        title="答案添削"
+        description="手書きを読み取り、確認後に添削します"
+      />
       <div className="mx-auto max-w-2xl space-y-6 p-8">
         <GradingChecklist
           studentsCount={students.length}
@@ -158,7 +151,7 @@ export function SessionNewPage() {
             )}
             {selectedTest && selectedTest.templateId && expectedPages > 1 && (
               <p className="mt-1 font-ja text-xs text-blue-800">
-                解答用紙 {expectedPages} 枚構成です。{expectedPages} 枚分を順にアップロードしてください。
+                解答用紙は最大 {expectedPages} 枚想定です。1枚だけの提出でもアップロードできます。
               </p>
             )}
           </div>
@@ -178,7 +171,7 @@ export function SessionNewPage() {
           disabled={!canGrade || loading}
           onClick={runGrading}
         >
-          添削を開始
+          アップロードして切り出し
         </Button>
       </div>
     </div>

@@ -15,8 +15,10 @@ import type {
 
 export const A4_WIDTH = 2480;
 export const A4_HEIGHT = 3508;
-const MARGIN = 120;
-const HEADER_HEIGHT = 200;
+export const SHEET_MARGIN = 120;
+export const SHEET_HEADER_HEIGHT = 200;
+const MARGIN = SHEET_MARGIN;
+const HEADER_HEIGHT = SHEET_HEADER_HEIGHT;
 const GAP = 36;
 const PART_GAP = 24;
 const QUESTION_GAP = 36;
@@ -162,6 +164,17 @@ export function generateAnswerSheetLayout(
 }
 
 /** レイアウト上の最大ページ数（0-indexed pageIndex + 1） */
+/** 1枚目上部の氏名・解答時間欄（crop 対象外の目安） */
+export function getHeaderExclusionRegion(pageIndex = 0): CropRegion {
+  return {
+    x: MARGIN,
+    y: MARGIN,
+    width: CONTENT_WIDTH,
+    height: HEADER_HEIGHT,
+    pageIndex,
+  };
+}
+
 export function layoutPageCount(slots: LayoutSlot[]): number {
   if (slots.length === 0) return 1;
   return Math.max(...slots.map((s) => s.cropRegion.pageIndex ?? 0)) + 1;

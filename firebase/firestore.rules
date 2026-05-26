@@ -28,6 +28,10 @@ service cloud.firestore {
       match /stats/{statId} {
         allow read, write: if isTeacher(get(/databases/$(database)/documents/students/$(studentId)).data.teacherId);
       }
+
+      match /interview_records/{recordId} {
+        allow read, write: if isTeacher(get(/databases/$(database)/documents/students/$(studentId)).data.teacherId);
+      }
     }
 
     match /target_universities/{universityId} {

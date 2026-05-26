@@ -22,8 +22,8 @@ export function PrintTeacherPage() {
       sections: results.map((r) => ({
         questionOrder: r.order,
         studentAnswer: r.studentAnswerText ?? "",
-        grade: r.grade,
-        explanation: r.explanation,
+        grade: r.grade ?? "良",
+        explanation: r.explanation ?? "",
         modelAnswer: r.modelAnswer,
         teacherNotes: r.teacherNotes,
       })),

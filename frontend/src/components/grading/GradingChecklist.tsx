@@ -74,12 +74,19 @@ export function GradingChecklist({ studentsCount, tests, backendOk }: ChecklistP
   );
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+
 export function useBackendHealth() {
   const [ok, setOk] = useState<boolean | null>(null);
 
   useEffect(() => {
-    fetch("/api/health")
-      .then((r) => r.ok)
+    const url = API_BASE ? `${API_BASE}/api/health` : "/api/health";
+    fetch(url)
+      .then(async (r) => {
+        if (!r.ok) return false;
+        const data = (await r.json()) as { status?: string };
+        return data.status === "ok";
+      })
       .then(setOk)
       .catch(() => setOk(false));
   }, []);

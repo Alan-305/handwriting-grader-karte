@@ -20,6 +20,14 @@ class GradeResult(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class EnglishCompositionGradeResult(GradeResult):
+    """自由英作文: 内容・文法・完成版英文を分離して返す。"""
+
+    content_evaluation: str = Field(alias="contentEvaluation")
+    grammar_evaluation: str = Field(alias="grammarEvaluation")
+    polished_answer: str = Field(alias="polishedAnswer")
+
+
 class AdviceCard(BaseModel):
     title: str
     body: str

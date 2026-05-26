@@ -21,6 +21,51 @@ def _order_points(pts: np.ndarray) -> np.ndarray:
     return rect
 
 
+def _image_matches_template_size(width: int, height: int, page_width: int, page_height: int) -> bool:
+    """スキャン画像がテンプレート解像度と同程度なら、マーク座標をそのまま使える。"""
+    if page_width <= 0 or page_height <= 0:
+        return False
+    return (
+        abs(width - page_width) / page_width < 0.05
+        and abs(height - page_height) / page_height < 0.05
+    )
+
+
+def _source_points_from_marks(
+    alignment_marks: list[dict],
+    *,
+    image_width: int,
+    image_height: int,
+    page_width: int,
+    page_height: int,
+) -> np.ndarray:
+    """
+    テンプレート上のトンボ（設計座標）を、撮影画像の四隅に比例マッピングする。
+    設計座標を写真ピクセルとして使うと、高解像度写真の端が切れる。
+    """
+    sorted_marks = sorted(alignment_marks, key=lambda m: CORNER_ORDER.index(m["corner"]))
+    if _image_matches_template_size(image_width, image_height, page_width, page_height):
+        pts = [[m["x"], m["y"]] for m in sorted_marks]
+    else:
+        pw = max(page_width - 1, 1)
+        ph = max(page_height - 1, 1)
+        pts = [
+            [
+                m["x"] / pw * (image_width - 1),
+                m["y"] / ph * (image_height - 1),
+            ]
+            for m in sorted_marks
+        ]
+        logger.info(
+            "Scaled alignment marks from design %sx%s to image %sx%s",
+            page_width,
+            page_height,
+            image_width,
+            image_height,
+        )
+    return np.array(pts, dtype="float32")
+
+
 def align_sheet(
     image_bytes: bytes,
     alignment_marks: list[dict],
@@ -33,13 +78,17 @@ def align_sheet(
     if image is None:
         raise ValueError("Invalid image data")
 
+    h, w = image.shape[:2]
+
     if len(alignment_marks) >= 4:
-        src_pts = np.array(
-            [[m["x"], m["y"]] for m in sorted(alignment_marks, key=lambda m: CORNER_ORDER.index(m["corner"]))],
-            dtype="float32",
+        src_pts = _source_points_from_marks(
+            alignment_marks,
+            image_width=w,
+            image_height=h,
+            page_width=page_width,
+            page_height=page_height,
         )
     else:
-        h, w = image.shape[:2]
         src_pts = np.array([[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]], dtype="float32")
 
     dst_pts = np.array(
@@ -47,8 +96,15 @@ def align_sheet(
         dtype="float32",
     )
 
-    matrix = cv2.getPerspectiveTransform(_order_points(src_pts), dst_pts)
-    warped = cv2.warpPerspective(image, matrix, (page_width, page_height))
+    matrix = cv2.getPerspectiveTransform(_order_points(src_pts), _order_points(dst_pts))
+    warped = cv2.warpPerspective(
+        image,
+        matrix,
+        (page_width, page_height),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=(255, 255, 255),
+    )
 
     _, encoded = cv2.imencode(".jpg", warped, [cv2.IMWRITE_JPEG_QUALITY, 92])
     return encoded.tobytes()

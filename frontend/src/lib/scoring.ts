@@ -7,7 +7,7 @@ export function toScoreOutOf100(totalScore: number, maxScore: number): number {
   return Math.round((totalScore / maxScore) * SCORE_SCALE);
 }
 
-export function sumResultScores(results: Pick<QuestionResult, "score" | "maxPoints">[]) {
+export function sumResultScores(results: QuestionResult[]) {
   return results.reduce(
     (acc, r) => ({
       totalScore: acc.totalScore + (r.score ?? 0),
@@ -31,5 +31,5 @@ export function formatTotalScoreLabel(
 }
 
 export function formatQuestionScore(r: Pick<QuestionResult, "score" | "maxPoints">): string {
-  return `${r.score} / ${r.maxPoints}点`;
+  return `${r.score ?? 0} / ${r.maxPoints}点`;
 }

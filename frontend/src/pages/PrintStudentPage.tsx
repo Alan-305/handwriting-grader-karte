@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Check, Edit3, Printer } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
@@ -14,6 +14,11 @@ import {
   useUpdateQuestionResults,
 } from "@/hooks/useSession";
 import { exportElementToPdf, printElement } from "@/lib/pdf-export";
+import {
+  modelAnswerForPrint,
+  sortQuestionResults,
+  studentAnswerForPrint,
+} from "@/lib/question-results";
 import { sumResultScores, toScoreOutOf100 } from "@/lib/scoring";
 import type { GradeLevel, QuestionResult } from "@/types/firestore";
 
@@ -27,6 +32,7 @@ function resultLabel(r: QuestionResult): string {
 
 export function PrintStudentPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
   const { session, results, loading } = useSession(sessionId);
   const { saveResults, setPrintFinalized, syncSessionScores } = useUpdateQuestionResults(sessionId);
   const { saveArtifact } = useSavePrintArtifact(sessionId ?? "");
@@ -35,16 +41,29 @@ export function PrintStudentPage() {
   const [mode, setMode] = useState<PrintMode>("edit");
   const [drafts, setDrafts] = useState<QuestionResult[]>([]);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
-    setDrafts(results);
+    setDrafts(sortQuestionResults(results));
   }, [results]);
+
+  const sortedDrafts = useMemo(
+    () => sortQuestionResults(drafts),
+    [drafts],
+  );
 
   useEffect(() => {
     if (session?.studentPrintFinalizedAt) {
       setMode("preview");
     }
   }, [session?.studentPrintFinalizedAt]);
+
+  useEffect(() => {
+    if (!session || loading) return;
+    if (!session.gradingConfirmedAt) {
+      navigate(`/sessions/${sessionId}/grading-review`, { replace: true });
+    }
+  }, [session, loading, navigate, sessionId]);
 
   const isDirty = useMemo(
     () => drafts.some((d) => {
@@ -59,48 +78,49 @@ export function PrintStudentPage() {
     setSaveState("idle");
   };
 
+  const persistDrafts = async () => {
+    await saveResults(
+      drafts.map((d) => ({
+        id: d.id,
+        studentAnswerText: d.studentAnswerText,
+        explanation: d.explanation,
+        modelAnswer: d.modelAnswer,
+        grade: d.grade,
+        score: d.score,
+        maxPoints: d.maxPoints,
+        feedback: d.feedback,
+        contentEvaluation: d.contentEvaluation,
+        grammarEvaluation: d.grammarEvaluation,
+        polishedAnswer: d.polishedAnswer,
+      })),
+    );
+    await syncSessionScores(drafts);
+  };
+
   const handleSaveDraft = async () => {
     setSaveState("saving");
+    setSaveError("");
     try {
-      await saveResults(
-        drafts.map(({ id, studentAnswerText, explanation, modelAnswer, grade, score, feedback }) => ({
-          id,
-          studentAnswerText,
-          explanation,
-          modelAnswer,
-          grade,
-          score,
-          feedback,
-        })),
-      );
-      await syncSessionScores(drafts);
+      await persistDrafts();
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
-    } catch {
+    } catch (e) {
       setSaveState("error");
+      setSaveError(e instanceof Error ? e.message : "保存に失敗しました");
     }
   };
 
   const handleFinalize = async () => {
     setSaveState("saving");
+    setSaveError("");
     try {
-      await saveResults(
-        drafts.map(({ id, studentAnswerText, explanation, modelAnswer, grade, score, feedback }) => ({
-          id,
-          studentAnswerText,
-          explanation,
-          modelAnswer,
-          grade,
-          score,
-          feedback,
-        })),
-      );
-      await syncSessionScores(drafts);
+      await persistDrafts();
       await setPrintFinalized(true);
       setMode("preview");
       setSaveState("idle");
-    } catch {
+    } catch (e) {
       setSaveState("error");
+      setSaveError(e instanceof Error ? e.message : "保存に失敗しました");
     }
   };
 
@@ -120,14 +140,14 @@ export function PrintStudentPage() {
       sections: drafts.map((r) => ({
         questionOrder: r.order,
         studentAnswer: r.studentAnswerText ?? "",
-        grade: r.grade,
-        explanation: r.explanation,
+        grade: r.grade ?? "良",
+        explanation: r.explanation ?? "",
         modelAnswer: r.modelAnswer,
       })),
     });
   };
 
-  const activeResults = drafts.length ? drafts : results;
+  const activeResults = sortedDrafts.length ? sortedDrafts : sortQuestionResults(results);
   const { totalScore, maxScore } = sumResultScores(activeResults);
   const totalScore100 = session
     ? (mode === "preview" && session.totalScore100 != null
@@ -174,11 +194,19 @@ export function PrintStudentPage() {
               <p className="font-ja text-sm text-green-700">下書きを保存しました</p>
             )}
             {saveState === "error" && (
-              <p className="font-ja text-sm text-red-600">保存に失敗しました</p>
+              <p className="font-ja text-sm text-red-600">
+                {saveError || "保存に失敗しました"}
+              </p>
             )}
 
             <div className="space-y-4">
-              {drafts.map((r) => (
+              {sortedDrafts.map((r) => {
+                const modelText = modelAnswerForPrint(r, sortedDrafts);
+                const studentText = studentAnswerForPrint(r, sortedDrafts);
+                const isComposition = Boolean(
+                  r.contentEvaluation || r.grammarEvaluation || r.polishedAnswer,
+                );
+                return (
                 <Card key={r.id} className="space-y-3 p-4">
                   <h3 className="font-ja font-semibold">{resultLabel(r)}</h3>
                   <div className="grid gap-3 md:grid-cols-3">
@@ -210,6 +238,9 @@ export function PrintStudentPage() {
                     </div>
                     <div className="flex items-end font-ja text-sm text-slate-500">
                       / {r.maxPoints}点
+                      {sortedDrafts.filter((x) => x.order === r.order && x.questionId === r.questionId).length > 1 && (
+                        <span className="ml-1 text-xs">（小問配分）</span>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -217,30 +248,69 @@ export function PrintStudentPage() {
                     <Textarea
                       className="font-en mt-1"
                       rows={2}
-                      value={r.studentAnswerText ?? ""}
+                      value={studentText}
                       onChange={(e) => updateDraft(r.id, { studentAnswerText: e.target.value })}
                     />
                   </div>
-                  <div>
-                    <label className="font-ja text-sm">解説</label>
-                    <Textarea
-                      className="mt-1 font-ja"
-                      rows={4}
-                      value={r.explanation}
-                      onChange={(e) => updateDraft(r.id, { explanation: e.target.value })}
-                    />
-                  </div>
+                  {isComposition ? (
+                    <>
+                      <div>
+                        <label className="font-ja text-sm">内容の評価・解説</label>
+                        <Textarea
+                          className="mt-1 font-ja"
+                          rows={3}
+                          value={r.contentEvaluation ?? ""}
+                          onChange={(e) =>
+                            updateDraft(r.id, { contentEvaluation: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="font-ja text-sm">文法・語法の評価・解説</label>
+                        <Textarea
+                          className="mt-1 font-ja"
+                          rows={3}
+                          value={r.grammarEvaluation ?? ""}
+                          onChange={(e) =>
+                            updateDraft(r.id, { grammarEvaluation: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="font-ja text-sm">完成版英文</label>
+                        <Textarea
+                          className="font-en mt-1"
+                          rows={3}
+                          value={r.polishedAnswer ?? ""}
+                          onChange={(e) =>
+                            updateDraft(r.id, { polishedAnswer: e.target.value })
+                          }
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div>
+                      <label className="font-ja text-sm">解説</label>
+                      <Textarea
+                        className="mt-1 font-ja"
+                        rows={4}
+                        value={r.explanation ?? ""}
+                        onChange={(e) => updateDraft(r.id, { explanation: e.target.value })}
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="font-ja text-sm">模範解答（プリント掲載）</label>
                     <Textarea
                       className="font-en mt-1"
                       rows={2}
-                      value={r.modelAnswer}
+                      value={modelText}
                       onChange={(e) => updateDraft(r.id, { modelAnswer: e.target.value })}
                     />
                   </div>
                 </Card>
-              ))}
+              );
+              })}
             </div>
           </>
         ) : (
@@ -266,7 +336,7 @@ export function PrintStudentPage() {
       {mode === "preview" && (
         <div ref={printRef} className="bg-slate-100 p-8 print:bg-white print:p-0">
           <StudentPrintLayout
-            results={drafts.length ? drafts : results}
+            results={activeResults}
             totalScore100={totalScore100}
           />
         </div>

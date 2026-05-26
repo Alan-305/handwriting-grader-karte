@@ -3,7 +3,13 @@ import type {
   ExamYearDetailResponse,
   ExamYearSummary,
   GradeSessionResponse,
+  PatchTranscriptionsRequest,
   PastExamCommitResponse,
+  CropPreviewResponse,
+  CropTargetsResponse,
+  SaveManualCropRequest,
+  SaveManualCropResponse,
+  TranscribeSessionResponse,
   PastExamImportResponse,
   SessionProgressResponse,
   TeacherExamMaterialResponse,
@@ -61,11 +67,52 @@ export const apiClient = {
       { method: "POST", token },
     ),
 
+  getCropPreview: (token: string, sessionId: string) =>
+    request<CropPreviewResponse>(`/api/sessions/${sessionId}/crop-preview`, { token }),
+
+  getCropTargets: (token: string, sessionId: string) =>
+    request<CropTargetsResponse>(`/api/sessions/${sessionId}/crop-targets`, { token }),
+
+  saveManualCrop: (token: string, sessionId: string, body: SaveManualCropRequest) =>
+    request<SaveManualCropResponse>(`/api/sessions/${sessionId}/manual-crops`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
+  transcribeSession: (token: string, sessionId: string) =>
+    request<TranscribeSessionResponse>(`/api/sessions/${sessionId}/transcribe`, {
+      method: "POST",
+      token,
+    }),
+
+  patchTranscriptions: (
+    token: string,
+    sessionId: string,
+    body: PatchTranscriptionsRequest,
+  ) =>
+    request<{ sessionId: string; results: Array<Record<string, unknown>> }>(
+      `/api/sessions/${sessionId}/transcriptions`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        token,
+      },
+    ),
+
   gradeSession: (token: string, sessionId: string) =>
     request<GradeSessionResponse>(`/api/sessions/${sessionId}/grade`, {
       method: "POST",
       token,
     }),
+
+  confirmGrading: (token: string, sessionId: string) =>
+    request<{ status: string; sessionId: string }>(
+      `/api/sessions/${sessionId}/confirm-grading`,
+      { method: "POST", token },
+    ),
 
   getSessionProgress: (token: string, sessionId: string) =>
     request<SessionProgressResponse>(`/api/sessions/${sessionId}/progress`, { token }),

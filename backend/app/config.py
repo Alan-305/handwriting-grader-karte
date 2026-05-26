@@ -30,6 +30,8 @@ class Config:
     GOOGLE_APPLICATION_CREDENTIALS = resolve_credentials_path(
         os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
     )
+    # Secret Manager から注入（Cloud Run --set-secrets）。ローカルは未使用で ADC / ファイル可
+    FIREBASE_SERVICE_ACCOUNT_JSON = os.getenv("HGK_FIREBASE_SERVICE_ACCOUNT_JSON", "")
 
     # HGK_  prefix avoids collisions with shell/global ANTHROPIC_API_KEY etc.
     ANTHROPIC_API_KEY = os.getenv("HGK_ANTHROPIC_API_KEY") or os.getenv(
@@ -37,4 +39,4 @@ class Config:
     )
     GEMINI_API_KEY = os.getenv("HGK_GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
     ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")

@@ -90,25 +90,28 @@ firebase deploy --only firestore:rules,storage:rules,firestore:indexes
 
 | 機能 | 説明 |
 |------|------|
-| 生徒管理 | 志望校・コース情報の登録 |
-| 問題セット | 英/日/記号問題、模範解答、crop 座標 |
-| 答案添削 | トンボ位置合わせ → Claude Vision 添削 |
+| 生徒管理 | 氏名・コース（プルダウン）、過去の添削・面談へのアクセス |
+| 面談記録 | 回ごとの相談・アドバイス・志望・共通テスト（AI 分析の入力） |
+| 問題セット | 英/日/記号問題、模範解答、crop 座標、テンプレート紐付け |
+| 答案添削 | アップロード（枚数不足可）→ 位置合わせ → **手動で設問ごと切り出し** → 転記確認 → AI 添削 → 教師確認 |
 | プリント | 生徒用返却 / 教師用指導資料（PDF） |
-| カルテ | 得点推移グラフ、弱点分析、Gemini アドバイス |
+| カルテ | 得点推移、弱点分析、Gemini アドバイス（面談・志望校コンテキスト） |
 
 ## 1セッションのワークフロー
 
 ```
 【ステップ1: 事前準備】
-  先生 → 問題・模範解答・配点を登録（Firebase 保存）
-  生徒 → トンボ付き専用解答用紙（A4×2枚）に手書き解答
+  先生 → 問題・模範解答・配点・解答用紙テンプレートを登録
+  生徒 → トンボ付き答案用紙に手書き（想定枚数より少ない枚数でもアップロード可）
 
-【ステップ2: 読み込み・補正】
-  2枚を D&D アップロード → OpenCV でトンボ検出・射影変換 → 第1〜4問を crop
-  処理中は「添削中」「考えてます」を表示
+【ステップ2: 読み込み・位置合わせ・切り出し】
+  画像を D&D アップロード → OpenCV でトンボ検出・射影変換（位置合わせ）
+  → 教師が画面上で**手動**に設問ごとの切り出し領域を指定 → Storage に保存
 
-【ステップ3: 評価・フィードバック】
-  crop 画像4枚を Claude Vision に1リクエスト送信 → 全問採点・講評・解説
+【ステップ3: 転記・添削】
+  Gemini 等で手書きをテキスト化 → 教師が転記を確認
+  → Claude で採点・講評・解説（設問構成に応じてリクエスト分割の場合あり）
+  → 教師が添削内容を確認・確定
 
 【ステップ4: 資料出力】
   生徒用返却プリント / 教師用指導資料 → 画面表示・PDF → セッション完了
@@ -209,14 +212,15 @@ handwriting-grader-karte/
 teachers/{teacherId}
 students/{studentId}
   ├── karte_snapshots/{snapshotId}    # Gemini 生成のカルテスナップショット
-  └── stats/{statId}                  # 集計統計（得点推移など）
+  ├── stats/{statId}                   # 集計統計（得点推移など）
+  └── interview_records/{recordId}    # 面談の回ごとの記録（相談・アドバイス等）
 target_universities/{universityId}    # 志望校マスタ（難易度・出題傾向）
 answer_sheet_templates/{templateId}   # 解答用紙テンプレート（トンボ座標）
 tests/{testId}
   └── questions/{questionId}          # 大問・小問・crop 座標・模範解答
 sessions/{sessionId}
-  ├── question_results/{resultId}       # 各問の採点結果
-  └── print_artifacts/{artifactId}    # 生徒用/教師用プリントデータ
+  ├── question_results/{resultId}     # 各問の採点結果
+  └── print_artifacts/{artifactId}   # 生徒用/教師用プリントデータ
 ```
 
 ### 主要ドキュメント
@@ -229,6 +233,7 @@ sessions/{sessionId}
 | name | string | 生徒名 |
 | course | string | 受講コース |
 | targetUniversities | array | 志望大学・学部（priority 付き） |
+| interviewProfile | object? | 面談で確定した志望・共通テスト等のスナップショット（AI 分析参照） |
 | memo | string? | メモ |
 
 #### `target_universities`
@@ -258,11 +263,13 @@ sessions/{sessionId}
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
 | studentId, testId | string | 生徒・テスト参照 |
-| status | uploaded → aligning → grading → review → completed | 進行状態 |
-| sourceImagePath | string | Storage 上の原画像 |
-| alignedImagePath | string? | 補正後画像 |
+| status | uploaded → aligned → crop_review → transcribing → transcription_review → grading → review → completed など | 進行状態 |
+| sourceImagePath / sourceImagePaths | string / string[] | 原画像（複数ページ可） |
+| alignedImagePath / alignedImagePaths | string / string[]? | 補正後画像 |
+| manualCrops | object? | 手動切り出し結果（設問キーごと） |
+| gradingConfirmedAt | timestamp? | 教師による添削確定 |
 | totalScore, maxScore | number | 合計得点 |
-| gradingProgress | {current, total, message} | 「添削中」「考えてます」 |
+| gradingProgress | {current, total, message} | 「添削中」「考えてます」など |
 
 #### `question_results`（sessions サブコレクション）
 
@@ -289,7 +296,7 @@ sessions/{sessionId}
 | エンジン | 読み取り | 書き込み |
 |---------|---------|---------|
 | Claude Vision | tests/questions, sessions | question_results, sessions.status/score |
-| Gemini | students, sessions/question_results, target_universities, stats | karte_snapshots, stats |
+| Gemini | students（面談・志望）, sessions/question_results, target_universities, stats | karte_snapshots, stats、転記など |
 
 ---
 
@@ -361,11 +368,24 @@ cd backend
 pytest
 ```
 
+## デプロイ（試験運用）
+
+**画面**: Firebase Hosting（`https://handwriting-grader-karte.web.app`）  
+**API**: Cloud Run `hgk-api`（東京リージョン）
+
+詳細手順: [docs/DEPLOY_GCP.md](docs/DEPLOY_GCP.md)
+
+```bash
+chmod +x scripts/deploy-trial.sh scripts/setup-gcp-secrets.sh scripts/gcp-secrets-lib.sh
+npm run setup:gcp-secrets   # .env の AI キーを Secret Manager に登録（初回・キー更新時）
+npm run deploy:trial        # デプロイ時も自動で Secret を同期
+```
+
 ## デプロイ方針
 
-- **Frontend**: Firebase Hosting または Vercel
-- **Backend**: Cloud Run または Railway
-- **Firebase Rules**: `firebase/` からデプロイ
+- **Frontend**: Firebase Hosting（推奨）
+- **Backend**: Cloud Run（`backend/Dockerfile`）
+- **Firebase Rules**: `firebase deploy` で Hosting と同時
 
 ## Cursor ルール
 

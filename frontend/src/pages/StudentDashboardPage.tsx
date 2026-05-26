@@ -78,9 +78,27 @@ export function StudentDashboardPage() {
         description="成績推移・弱点分析・志望校対策アドバイス"
       />
       <div className="space-y-6 p-8">
-        <div className="flex justify-end gap-2">
+        {student &&
+          !student.targetUniversities?.length &&
+          !student.interviewProfile?.targetUniversities?.length && (
+            <Card className="border-amber-200 bg-amber-50/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="font-ja text-base text-amber-900">面談内容が未登録です</CardTitle>
+                <CardDescription className="font-ja text-amber-800">
+                  志望校・共通テスト・確定事項を登録してから AI 分析すると、関係のない学部の話が混ざりにくくなります。
+                </CardDescription>
+              </CardHeader>
+              <Button variant="outline" asChild className="mx-6 mb-4">
+                <Link to={`/students/${studentId}/interview`}>面談内容を入力する</Link>
+              </Button>
+            </Card>
+          )}
+        <div className="flex flex-wrap justify-end gap-2">
           <Button variant="outline" asChild>
             <Link to="/students">一覧に戻る</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to={`/students/${studentId}/interview`}>面談内容を編集</Link>
           </Button>
           <Button onClick={runAnalysis}>
             <RefreshCw className="h-4 w-4" />

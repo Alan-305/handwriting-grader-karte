@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   addDoc,
@@ -11,7 +11,8 @@ import {
   serverTimestamp,
   where,
 } from "firebase/firestore";
-import { Check, Plus, Save } from "lucide-react";
+import { Check, Plus, Save, Sparkles } from "lucide-react";
+import { UNIVERSITY_PRESETS } from "@/constants/university-presets";
 import { PageHeader } from "@/components/layout/AppShell";
 import { SafeForm } from "@/components/forms/SafeForm";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  countRedundantTemplates,
+  mergeDuplicateAnswerSheetTemplates,
+  templateFingerprint,
+} from "@/lib/answer-sheet-template-dedupe";
 import { getDb } from "@/lib/firebase";
 import type { AnswerSheetTemplate, TargetUniversity } from "@/types/firestore";
 
@@ -38,6 +44,11 @@ export function UniversitiesPage() {
     examTrends: "",
   });
   const [tplForm, setTplForm] = useState(A4_PRESET);
+  const [addingPresets, setAddingPresets] = useState(false);
+  const [presetMessage, setPresetMessage] = useState("");
+  const [tplFormError, setTplFormError] = useState("");
+  const [mergingTemplates, setMergingTemplates] = useState(false);
+  const [mergeResult, setMergeResult] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(getDb(), "target_universities"), orderBy("name"));
@@ -66,25 +77,79 @@ export function UniversitiesPage() {
     setShowUniForm(false);
   };
 
+  const addPresetUniversities = async () => {
+    setAddingPresets(true);
+    setPresetMessage("");
+    try {
+      const existing = new Set(universities.map((u) => `${u.name}\0${u.faculty}`));
+      let added = 0;
+      for (const preset of UNIVERSITY_PRESETS) {
+        const key = `${preset.name}\0${preset.faculty}`;
+        if (existing.has(key)) continue;
+        await addDoc(collection(getDb(), "target_universities"), {
+          ...preset,
+          updatedAt: serverTimestamp(),
+        });
+        existing.add(key);
+        added += 1;
+      }
+      setPresetMessage(added > 0 ? `${added} 件の志望校を追加しました` : "追加する新しい志望校はありませんでした");
+    } finally {
+      setAddingPresets(false);
+    }
+  };
+
+  const duplicateTemplateStats = useMemo(() => countRedundantTemplates(templates), [templates]);
+
   const addTemplate = async () => {
     if (!user || !tplForm.name.trim()) return;
+    const alignmentMarks = [
+      { corner: "tl" as const, x: 0, y: 0 },
+      { corner: "tr" as const, x: tplForm.pageWidth - 1, y: 0 },
+      { corner: "br" as const, x: tplForm.pageWidth - 1, y: tplForm.pageHeight - 1 },
+      { corner: "bl" as const, x: 0, y: tplForm.pageHeight - 1 },
+    ];
+    const fp = templateFingerprint({
+      pageWidth: tplForm.pageWidth,
+      pageHeight: tplForm.pageHeight,
+      alignmentMarks,
+    });
+    if (templates.some((t) => templateFingerprint(t) === fp)) {
+      setTplFormError(
+        "この用紙サイズ・トンボ設定のテンプレートは既に登録されています。新規作成せず一覧の「重複をまとめる」で整理してください。",
+      );
+      return;
+    }
+    setTplFormError("");
     await addDoc(collection(getDb(), "answer_sheet_templates"), {
       teacherId: user.uid,
       name: tplForm.name.trim(),
       pageWidth: tplForm.pageWidth,
       pageHeight: tplForm.pageHeight,
-      alignmentMarks: [
-        { corner: "tl", x: 0, y: 0 },
-        { corner: "tr", x: tplForm.pageWidth - 1, y: 0 },
-        { corner: "br", x: tplForm.pageWidth - 1, y: tplForm.pageHeight - 1 },
-        { corner: "bl", x: 0, y: tplForm.pageHeight - 1 },
-      ],
+      alignmentMarks,
       createdAt: serverTimestamp(),
     });
     setTplForm(A4_PRESET);
     setShowTplForm(false);
     setTplSaved(true);
     setTimeout(() => setTplSaved(false), 4000);
+  };
+
+  const runMergeTemplates = async () => {
+    if (!user || duplicateTemplateStats.removableCount === 0) return;
+    setMergingTemplates(true);
+    setMergeResult(null);
+    setTplFormError("");
+    try {
+      const r = await mergeDuplicateAnswerSheetTemplates(user.uid, templates);
+      setMergeResult(
+        `統合しました。同一設定 ${r.mergedGroups} 組・テンプレート ${r.removedTemplates} 件を削除し、問題セット ${r.reassignedTests} 件の紐付けを更新しました。`,
+      );
+    } catch (e) {
+      setMergeResult(e instanceof Error ? e.message : "統合に失敗しました");
+    } finally {
+      setMergingTemplates(false);
+    }
   };
 
   return (
@@ -95,8 +160,29 @@ export function UniversitiesPage() {
       />
       <div className="space-y-8 p-8">
         <section className="space-y-4">
+          <Card className="border-blue-100 bg-blue-50/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="font-ja text-base text-blue-900">面談画面のプルダウンについて</CardTitle>
+              <CardDescription className="font-ja leading-relaxed text-blue-800">
+                生徒の「面談」画面で選べる志望校は、<strong>ここに登録した大学名・学部の組み合わせだけ</strong>です。
+                1行＝1つの選択肢（例: 東京大学＋理科三類、東京大学＋医学部は別々に登録）。
+              </CardDescription>
+            </CardHeader>
+            <div className="flex flex-wrap gap-2 px-6 pb-4">
+              <Button type="button" variant="default" disabled={addingPresets} onClick={addPresetUniversities}>
+                <Sparkles className="h-4 w-4" />
+                {addingPresets ? "登録中..." : "よく使う志望校を一括登録"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setShowUniForm(true)}>
+                <Plus className="h-4 w-4" />
+                1件ずつ追加
+              </Button>
+            </div>
+            {presetMessage && <p className="px-6 pb-4 font-ja text-sm text-green-800">{presetMessage}</p>}
+          </Card>
+
           <div className="flex items-center justify-between">
-            <h2 className="font-ja text-xl font-semibold">志望校マスタ</h2>
+            <h2 className="font-ja text-xl font-semibold">志望校マスタ（{universities.length} 件）</h2>
             <Button onClick={() => setShowUniForm(!showUniForm)}>
               <Plus className="h-4 w-4" />
               追加
@@ -130,13 +216,42 @@ export function UniversitiesPage() {
         </section>
 
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-ja text-xl font-semibold">解答用紙テンプレート</h2>
-            <Button onClick={() => setShowTplForm(!showTplForm)}>
-              <Plus className="h-4 w-4" />
-              テンプレートを作成
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={mergingTemplates || duplicateTemplateStats.removableCount === 0}
+                onClick={runMergeTemplates}
+              >
+                {mergingTemplates ? "統合中…" : "重複をまとめる"}
+              </Button>
+              <Button onClick={() => setShowTplForm(!showTplForm)}>
+                <Plus className="h-4 w-4" />
+                テンプレートを作成
+              </Button>
+            </div>
           </div>
+
+          {duplicateTemplateStats.removableCount > 0 && (
+            <p className="font-ja text-sm text-amber-800">
+              用紙サイズとトンボ位置が同じテンプレートが{" "}
+              <strong>{duplicateTemplateStats.duplicateGroups}</strong> 組あります（余分な登録{" "}
+              <strong>{duplicateTemplateStats.removableCount}</strong> 件）。「重複をまとめる」で1件ずつに統合し、問題セットの紐付けを自動で付け替えます。
+            </p>
+          )}
+          {mergeResult && (
+            <div
+              className={`rounded-lg border px-4 py-3 font-ja text-sm ${
+                mergeResult.startsWith("統合しました")
+                  ? "border-green-200 bg-green-50 text-green-900"
+                  : "border-red-200 bg-red-50 text-red-900"
+              }`}
+            >
+              {mergeResult}
+            </div>
+          )}
 
           <Card className="border-blue-100 bg-blue-50/40">
             <CardHeader className="pb-2">
@@ -180,7 +295,10 @@ export function UniversitiesPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setTplForm(A4_PRESET)}
+                  onClick={() => {
+                    setTplForm(A4_PRESET);
+                    setTplFormError("");
+                  }}
                 >
                   A4 標準をセット（おすすめ）
                 </Button>
@@ -190,7 +308,10 @@ export function UniversitiesPage() {
                   <label className="font-ja text-sm text-slate-600">テンプレート名</label>
                   <Input
                     value={tplForm.name}
-                    onChange={(e) => setTplForm({ ...tplForm, name: e.target.value })}
+                    onChange={(e) => {
+                      setTplForm({ ...tplForm, name: e.target.value });
+                      setTplFormError("");
+                    }}
                     placeholder="例: A4標準"
                   />
                 </div>
@@ -199,7 +320,10 @@ export function UniversitiesPage() {
                   <Input
                     type="number"
                     value={tplForm.pageWidth}
-                    onChange={(e) => setTplForm({ ...tplForm, pageWidth: Number(e.target.value) })}
+                    onChange={(e) => {
+                      setTplForm({ ...tplForm, pageWidth: Number(e.target.value) });
+                      setTplFormError("");
+                    }}
                   />
                   <p className="font-ja text-xs text-slate-400">A4 の場合: 2480</p>
                 </div>
@@ -208,7 +332,10 @@ export function UniversitiesPage() {
                   <Input
                     type="number"
                     value={tplForm.pageHeight}
-                    onChange={(e) => setTplForm({ ...tplForm, pageHeight: Number(e.target.value) })}
+                    onChange={(e) => {
+                      setTplForm({ ...tplForm, pageHeight: Number(e.target.value) });
+                      setTplFormError("");
+                    }}
                   />
                   <p className="font-ja text-xs text-slate-400">A4 の場合: 3508</p>
                 </div>
@@ -219,6 +346,7 @@ export function UniversitiesPage() {
                   </Button>
                 </div>
               </SafeForm>
+              {tplFormError && <p className="font-ja text-sm text-red-600">{tplFormError}</p>}
             </Card>
           )}
 

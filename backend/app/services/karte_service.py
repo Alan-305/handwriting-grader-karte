@@ -105,11 +105,22 @@ class KarteService:
         error_stats = self.aggregate_error_tags(student_id, teacher_id)
         summaries, session_ids = self.build_session_summaries(student_id, teacher_id)
 
+        interview = student.get("interviewProfile") or {}
+        interview_records = self.firebase.get_subcollection(
+            ["students", student_id, "interview_records"]
+        )
+        interview_records.sort(key=lambda r: r.get("recordNumber") or 0)
+
+        target_refs = interview.get("targetUniversities") or student.get("targetUniversities", [])
+        if not target_refs and interview_records:
+            target_refs = interview_records[-1].get("targetUniversities", [])
+
         target_unis = []
-        for tu in student.get("targetUniversities", []):
+        for tu in target_refs:
             uni = self.firebase.get_doc("target_universities", tu.get("universityId", ""))
             if uni:
-                target_unis.append(uni)
+                merged = {**uni, "priority": tu.get("priority", 1)}
+                target_unis.append(merged)
             else:
                 target_unis.append(tu)
 
@@ -119,6 +130,8 @@ class KarteService:
             target_universities=target_unis,
             session_summaries=summaries,
             error_stats=error_stats,
+            interview_profile=interview or None,
+            interview_records=interview_records or None,
         )
 
         result: KarteAdviceResponse = self.gemini.complete_structured(
