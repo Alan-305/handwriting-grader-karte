@@ -21,6 +21,10 @@ COVERAGE_LABELS = {
     "insufficient": "不足",
 }
 
+# 参照過去問をプロンプトに載せる上限（読解長文を含めるため modelAnswer より長め）
+REFERENCE_PROMPT_MAX_CHARS = 8000
+REFERENCE_MODEL_ANSWER_MAX_CHARS = 2000
+
 
 def format_type_label(major_order: int, part_label: str | None = None) -> str:
     base = f"第{major_order}問"
@@ -112,8 +116,8 @@ class QuestionDesignService:
             f"answerFormat: {q.get('answerFormat', '')}\n"
             f"type: {q.get('type', '')}\n"
             f"points: {q.get('points', '')}\n"
-            f"prompt:\n{q.get('prompt', '')[:4000]}\n"
-            f"modelAnswer:\n{(q.get('modelAnswer') or '')[:2000]}\n"
+            f"prompt:\n{q.get('prompt', '')[:REFERENCE_PROMPT_MAX_CHARS]}\n"
+            f"modelAnswer:\n{(q.get('modelAnswer') or '')[:REFERENCE_MODEL_ANSWER_MAX_CHARS]}\n"
             f"scoringFocus: {profile.get('scoringFocus', '')}\n"
             f"commonTraps: {', '.join(profile.get('commonTraps') or [])}\n"
         )

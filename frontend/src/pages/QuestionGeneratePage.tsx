@@ -9,11 +9,10 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
+import { usePastExamUniversities } from "@/hooks/usePastExamUniversities";
 import { apiClient } from "@/lib/api-client";
 import type { ExamYearSummary } from "@/types/api";
 import type { QuestionTypeCatalogItem } from "@/types/question-design";
-
-const UNIVERSITY_OPTIONS = [{ slug: "todai", name: "東京大学" }];
 
 function typeSelectionKey(item: QuestionTypeCatalogItem) {
   return `${item.majorOrder}:${item.partLabel ?? ""}`;
@@ -22,6 +21,7 @@ function typeSelectionKey(item: QuestionTypeCatalogItem) {
 export function QuestionGeneratePage() {
   const { getIdToken } = useAuth();
   const navigate = useNavigate();
+  const { displayList: universityOptions } = usePastExamUniversities();
 
   const [slug, setSlug] = useState("todai");
   const [examYears, setExamYears] = useState<ExamYearSummary[]>([]);
@@ -61,12 +61,18 @@ export function QuestionGeneratePage() {
   }, [getIdToken, slug]);
 
   useEffect(() => {
+    if (universityOptions.length > 0 && !universityOptions.some((u) => u.slug === slug)) {
+      setSlug(universityOptions[0].slug);
+    }
+  }, [universityOptions, slug]);
+
+  useEffect(() => {
     void loadCatalog();
   }, [loadCatalog]);
 
   const universityName = useMemo(
-    () => UNIVERSITY_OPTIONS.find((u) => u.slug === slug)?.name ?? slug,
-    [slug],
+    () => universityOptions.find((u) => u.slug === slug)?.name ?? slug,
+    [universityOptions, slug],
   );
 
   const toggleYear = (year: number) => {
@@ -161,7 +167,7 @@ export function QuestionGeneratePage() {
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                 >
-                  {UNIVERSITY_OPTIONS.map((u) => (
+                  {universityOptions.map((u) => (
                     <option key={u.slug} value={u.slug}>
                       {u.name}
                     </option>

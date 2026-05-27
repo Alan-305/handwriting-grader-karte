@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useInterviewRecords, useSessionsForStudent } from "@/hooks/useSession";
+import { dedupeSessionsByTest } from "@/lib/session-list";
 import { getDb } from "@/lib/firebase";
 import type { Session, SessionStatus, Test } from "@/types/firestore";
 
@@ -59,13 +60,7 @@ export function StudentHistoryModal({ open, onClose, studentId, studentName }: S
     });
   }, [open, user]);
 
-  const sessionsChrono = useMemo(() => {
-    return [...sessions].sort((a, b) => {
-      const ta = a.sessionDate?.toMillis?.() ?? 0;
-      const tb = b.sessionDate?.toMillis?.() ?? 0;
-      return ta - tb;
-    });
-  }, [sessions]);
+  const sessionsChrono = useMemo(() => dedupeSessionsByTest(sessions), [sessions]);
 
   useEffect(() => {
     if (!open) return;

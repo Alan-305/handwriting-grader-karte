@@ -1,6 +1,7 @@
 """自由英作文向け添削プロンプト（内容・文法・完成版英文）。"""
 
 from app.ai.prompts.grading_common import USER_PROMPT_ALTERNATIVE_NOTE, USER_PROMPT_SCORING_NOTE
+from app.services.error_tags import ERROR_TAGS_INSTRUCTION
 
 COMPOSITION_SYSTEM = """あなたは高校生向け英語自由英作文の添削専門家です。
 教師確認済みの生徒解答テキストを採点し、次の3部構成で解説してください。
@@ -22,8 +23,10 @@ JSON フィールド（すべて必須）:
 - grammarEvaluation: 文法・語法の評価＆解説（誤りと改善の理由。日本語でやさく）
 - polishedAnswer: 完成版英文（アドバイスを盛り込み、80語前後を目安に整えた模範的な英文。Century書体想定の英語のみ）
 - explanation: 上記2解説の要約（1段落・日本語）
-- errorTags: 例 ["内容不足", "時制ミス", "スペルミス"]
-- teacherNotes: 対面指導のポイント（簡潔）"""
+- {error_tags_instruction}
+- teacherNotes: 対面指導のポイント（簡潔）""".format(
+    error_tags_instruction=ERROR_TAGS_INSTRUCTION
+)
 
 
 def build_composition_text_prompt(

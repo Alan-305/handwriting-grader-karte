@@ -1,7 +1,10 @@
 import logging
 from datetime import datetime, timezone
 
+from google.cloud.firestore import DELETE_FIELD
+
 from app.services.firebase_admin_service import FirebaseAdminService
+from app.services.karte_aggregation import session_activity_time
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,57 @@ class SessionService:
             },
         )
         return session_id
+
+    def find_latest_session(
+        self,
+        *,
+        teacher_id: str,
+        student_id: str,
+        test_id: str,
+    ) -> str | None:
+        """同一生徒・同一テストの最新セッション（再添削=上書き用）。"""
+        sessions = self.firebase.query_collection("sessions", "studentId", "==", student_id)
+        matches = [
+            s
+            for s in sessions
+            if s.get("teacherId") == teacher_id and s.get("testId") == test_id
+        ]
+        if not matches:
+            return None
+        matches.sort(key=session_activity_time, reverse=True)
+        return matches[0]["id"]
+
+    def _clear_subcollection(self, session_id: str, name: str) -> None:
+        db = self.firebase.db()
+        if not db:
+            return
+        ref = db.collection("sessions").document(session_id).collection(name)
+        for doc in ref.stream():
+            doc.reference.delete()
+
+    def reset_session_for_regrade(self, session_id: str, *, max_score: float) -> None:
+        """同一テストの再添削: 既存セッションを初期化（sessionDate は維持）。"""
+        self.clear_question_results(session_id)
+        self._clear_subcollection(session_id, "print_artifacts")
+        self.firebase.update_doc(
+            "sessions",
+            session_id,
+            {
+                "status": "uploaded",
+                "totalScore": 0,
+                "maxScore": max_score,
+                "totalScore100": DELETE_FIELD,
+                "gradingProgress": DELETE_FIELD,
+                "gradingConfirmedAt": DELETE_FIELD,
+                "completedAt": DELETE_FIELD,
+                "studentPrintFinalizedAt": DELETE_FIELD,
+                "alignedImagePath": DELETE_FIELD,
+                "alignedImagePaths": DELETE_FIELD,
+                "manualCrops": DELETE_FIELD,
+                "pastExamAdvice": DELETE_FIELD,
+                "pageCount": DELETE_FIELD,
+            },
+        )
 
     def update_status(self, session_id: str, status: str, **extra):
         data = {"status": status, **extra}
@@ -120,15 +174,16 @@ class SessionService:
     def confirm_grading(self, session_id: str):
         """教師が添削内容を確定したあとに呼ぶ。"""
         now = datetime.now(timezone.utc)
-        self.firebase.update_doc(
-            "sessions",
-            session_id,
-            {
-                "status": "completed",
-                "gradingConfirmedAt": now,
-                "completedAt": now,
-            },
-        )
+        existing = self.get_session(session_id) or {}
+        data: dict = {
+            "status": "completed",
+            "gradingConfirmedAt": now,
+            "completedAt": now,
+        }
+        # orderBy("sessionDate") 一覧で除外されないよう、欠損時は確定日時で補完
+        if not existing.get("sessionDate"):
+            data["sessionDate"] = now
+        self.firebase.update_doc("sessions", session_id, data)
 
     def complete_session(
         self,

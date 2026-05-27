@@ -135,6 +135,26 @@ export const apiClient = {
       token,
     }),
 
+  listPastExamUniversities: (token: string) =>
+    request<{ universities: Array<{ id: string; slug: string; name: string; nameEn?: string }> }>(
+      "/api/universities",
+      { token },
+    ),
+
+  registerPastExamUniversity: (
+    token: string,
+    body: { slug: string; name: string; nameEn?: string },
+  ) =>
+    request<{ university: { id: string; slug: string; name: string; nameEn?: string } }>(
+      "/api/universities",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        token,
+      },
+    ),
+
   importPastExam: (token: string, slug: string, formData: FormData) =>
     request<PastExamImportResponse>(`/api/universities/${slug}/past-exams/import`, {
       method: "POST",

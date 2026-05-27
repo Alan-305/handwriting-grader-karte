@@ -669,6 +669,9 @@ class PastExamService:
         return parsed
 
     def ensure_university(self, university_slug: str) -> None:
+        existing = self.firebase.get_doc("universities", university_slug)
+        if existing and existing.get("name"):
+            return
         meta = UNIVERSITY_REGISTRY.get(university_slug, {"name": university_slug, "nameEn": ""})
         self.firebase.set_doc(
             "universities",
@@ -681,6 +684,35 @@ class PastExamService:
             },
             merge=True,
         )
+
+    def register_university(
+        self,
+        *,
+        slug: str,
+        name: str,
+        name_en: str = "",
+    ) -> dict:
+        slug = slug.strip().lower()
+        name = name.strip()
+        if not slug or not name:
+            raise ValueError("slug と大学名は必須です")
+        if not slug.replace("-", "").replace("_", "").isalnum():
+            raise ValueError("slug は英数字・ハイフン・アンダースコアのみ使用できます")
+
+        now = datetime.now(timezone.utc)
+        self.firebase.set_doc(
+            "universities",
+            slug,
+            {
+                "slug": slug,
+                "name": name,
+                "nameEn": name_en.strip(),
+                "status": "active",
+                "createdAt": now,
+            },
+            merge=False,
+        )
+        return {"id": slug, "slug": slug, "name": name, "nameEn": name_en.strip(), "status": "active"}
 
     def write_to_firestore(
         self,

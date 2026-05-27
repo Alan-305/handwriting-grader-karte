@@ -49,6 +49,8 @@ export interface TargetUniversityRef {
   name: string;
   faculty: string;
   priority: number;
+  /** 過去問コーパス universities/{slug} との連動用 */
+  pastExamSlug?: string;
 }
 
 /** 共通テスト得点（科目キー → 得点帯コード。constants/student-interview 参照） */
@@ -299,5 +301,11 @@ export interface AggregatedStats {
     symbol: number[];
   };
   topErrorTags: Array<{ tag: string; count: number }>;
+  /** 時系列順・テストごとの一般化ミス傾向（第1回が先頭、下に増える） */
+  errorTagsBySession?: Array<{
+    order: number;
+    sessionId: string;
+    tags: Array<{ tag: string; count: number }>;
+  }>;
   lastUpdated: Timestamp;
 }

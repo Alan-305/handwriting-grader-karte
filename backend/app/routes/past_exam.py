@@ -5,6 +5,8 @@ from pathlib import Path
 from flask import Blueprint, g, jsonify, request
 from pydantic import ValidationError
 
+from pydantic import BaseModel, Field
+
 from app.ai.schemas.past_exam import PastExamParseResponse
 from app.services.past_exam_service import UNIVERSITY_REGISTRY, PastExamService
 from app.utils.auth_decorator import require_auth
@@ -12,6 +14,14 @@ from app.utils.auth_decorator import require_auth
 logger = logging.getLogger(__name__)
 
 past_exam_bp = Blueprint("past_exam", __name__)
+
+
+class RegisterUniversityBody(BaseModel):
+    slug: str
+    name: str
+    name_en: str = Field(default="", alias="nameEn")
+
+    model_config = {"populate_by_name": True}
 
 
 def _validate_year(year: int | None) -> tuple[int | None, tuple | None]:
@@ -34,6 +44,31 @@ def list_universities():
     service = PastExamService()
     universities = service.list_universities()
     return jsonify({"universities": universities})
+
+
+@past_exam_bp.post("/universities")
+@require_auth
+def register_university():
+    try:
+        body = RegisterUniversityBody.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"error": str(exc.errors()[0]["msg"])}), 400
+
+    slug_error = _validate_slug(body.slug)
+    if slug_error:
+        return slug_error
+
+    service = PastExamService()
+    try:
+        row = service.register_university(
+            slug=body.slug,
+            name=body.name,
+            name_en=body.name_en,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify({"university": row}), 201
 
 
 @past_exam_bp.get("/universities/<slug>/exam-years")

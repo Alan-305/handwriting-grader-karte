@@ -41,13 +41,30 @@ def upload_session():
     if not test or test.get("teacherId") != g.teacher_id:
         return jsonify({"error": "テストが見つかりません"}), 404
 
-    session_id = session_svc.create_session(
+    session_id = session_svc.find_latest_session(
         teacher_id=g.teacher_id,
         student_id=student_id,
         test_id=test_id,
-        source_image_path="",
-        max_score=test.get("totalPoints", 0),
     )
+    if session_id:
+        session_svc.reset_session_for_regrade(
+            session_id,
+            max_score=test.get("totalPoints", 0),
+        )
+        logger.info(
+            "Reusing session %s for student=%s test=%s (overwrite regrade)",
+            session_id,
+            student_id,
+            test_id,
+        )
+    else:
+        session_id = session_svc.create_session(
+            teacher_id=g.teacher_id,
+            student_id=student_id,
+            test_id=test_id,
+            source_image_path="",
+            max_score=test.get("totalPoints", 0),
+        )
 
     firebase = FirebaseAdminService()
     source_paths: list[str] = []

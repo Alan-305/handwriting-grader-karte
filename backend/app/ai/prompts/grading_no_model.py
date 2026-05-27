@@ -5,6 +5,7 @@
 """
 
 from app.ai.prompts.grading_common import USER_PROMPT_SCORING_NOTE
+from app.services.error_tags import ERROR_TAGS_INSTRUCTION
 
 GRADING_SYSTEM_NO_MODEL = """あなたは高校生向け英語・国語添削の専門家です。
 模範解答が用意されていない問題（自由英作文、意見論述、要約など）の手書き答案を読み取り、
@@ -40,8 +41,10 @@ GRADING_SYSTEM_NO_MODEL = """あなたは高校生向け英語・国語添削の
 grade, score, maxPoints, studentAnswerText, feedback, explanation, errorTags, teacherNotes
 
 explanation は高校生にわかるやさしくコンパクトな解説。
-errorTags 例: 時制ミス, スペルミス, 文構造の誤り, 語彙ミス, 指示未達, 構成の弱さ
-teacherNotes は対面指導で突くべきポイント（簡潔に）。"""
+{error_tags_instruction}
+teacherNotes は対面指導で突くべきポイント（簡潔に）。""".format(
+    error_tags_instruction=ERROR_TAGS_INSTRUCTION
+)
 
 
 def build_no_model_prompt(

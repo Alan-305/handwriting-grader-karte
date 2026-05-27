@@ -6,17 +6,33 @@ import { SafeForm } from "@/components/forms/SafeForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { COURSE_OPTIONS } from "@/constants/student-interview";
 import { useStudents } from "@/hooks/useStudent";
 import { StudentHistoryModal } from "@/components/students/StudentHistoryModal";
+import { profileFromStudent } from "@/components/students/StudentProfileFields";
+import type { Student } from "@/types/firestore";
 
-const courseSelectClass =
-  "mt-1 flex h-11 w-full rounded-lg border border-slate-200 bg-white px-3 font-ja text-sm text-slate-900";
+const studentActionBtn =
+  "min-h-11 w-full flex-1 border font-ja text-xs shadow-none hover:opacity-90 sm:text-sm";
+
+const studentActionStyles = {
+  karte: `${studentActionBtn} border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100`,
+  profile: `${studentActionBtn} border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100`,
+  interview: `${studentActionBtn} border-violet-200 bg-violet-50 text-violet-900 hover:bg-violet-100`,
+  history: `${studentActionBtn} border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100`,
+} as const;
+
+function targetSummary(s: Student) {
+  const refs = profileFromStudent(s.interviewProfile, s.targetUniversities).targetUniversities;
+  if (!refs.length) return null;
+  return refs
+    .sort((a, b) => a.priority - b.priority)
+    .map((u) => `${u.name} ${u.faculty}`)
+    .join(" / ");
+}
 
 export function StudentsPage() {
   const { students, loading, createStudent, removeStudent } = useStudents();
   const [name, setName] = useState("");
-  const [course, setCourse] = useState("医学部受験コース");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -32,7 +48,7 @@ export function StudentsPage() {
     setError("");
     setSaved(false);
     try {
-      await createStudent({ name: name.trim(), course, targetUniversities: [] });
+      await createStudent({ name: name.trim(), course: "", targetUniversities: [] });
       setName("");
       setSaved(true);
       setShowForm(false);
@@ -65,32 +81,16 @@ export function StudentsPage() {
         {showForm && (
           <Card>
             <SafeForm className="space-y-4" onSafeSubmit={handleSave}>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="font-ja text-sm text-slate-600">氏名</label>
-                  <Input
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      setError("");
-                    }}
-                    placeholder="例: 山田 太郎"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-ja text-sm text-slate-600">コース</label>
-                  <select
-                    className={courseSelectClass}
-                    value={course}
-                    onChange={(e) => setCourse(e.target.value)}
-                  >
-                    {COURSE_OPTIONS.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="space-y-1">
+                <label className="font-ja text-sm text-slate-600">氏名</label>
+                <Input
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setError("");
+                  }}
+                  placeholder="例: 山田 太郎"
+                />
               </div>
               {error && <p className="font-ja text-sm text-red-600">{error}</p>}
               <div className="flex justify-end gap-2">
@@ -114,39 +114,46 @@ export function StudentsPage() {
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {students.map((s) => (
-              <Card key={s.id} className="flex flex-col justify-between">
-                <div>
-                  <h3 className="font-ja text-lg font-semibold">{s.name}</h3>
-                  <p className="font-ja text-sm text-slate-500">{s.course}</p>
-                  {s.targetUniversities?.length > 0 && (
-                    <p className="mt-2 font-ja text-xs text-slate-400">
-                      志望: {s.targetUniversities.map((u) => u.name).join("、")}
-                    </p>
-                  )}
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button asChild variant="outline" size="sm">
-                    <Link to={`/students/${s.id}/dashboard`}>カルテ</Link>
-                  </Button>
-                  <Button asChild variant="outline" size="sm">
-                    <Link to={`/students/${s.id}/interview`}>面談</Link>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="min-h-9"
-                    onClick={() => setHistoryStudent({ id: s.id, name: s.name })}
-                  >
-                    過去の結果
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => removeStudent(s.id)}>
-                    削除
-                  </Button>
-                </div>
-              </Card>
-            ))}
+            {students.map((s) => {
+              const targets = targetSummary(s);
+              return (
+                <Card key={s.id} className="flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-ja text-lg font-semibold">{s.name}</h3>
+                    {targets ? (
+                      <p className="mt-2 font-ja text-xs text-slate-600">志望: {targets}</p>
+                    ) : (
+                      <p className="mt-2 font-ja text-xs text-slate-400">基本情報未登録</p>
+                    )}
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <Button asChild variant="outline" size="sm" className={studentActionStyles.karte}>
+                      <Link to={`/students/${s.id}/dashboard`}>カルテ</Link>
+                    </Button>
+                    <Button asChild variant="outline" size="sm" className={studentActionStyles.profile}>
+                      <Link to={`/students/${s.id}/profile`}>基本情報</Link>
+                    </Button>
+                    <Button asChild variant="outline" size="sm" className={studentActionStyles.interview}>
+                      <Link to={`/students/${s.id}/interview`}>面談</Link>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={studentActionStyles.history}
+                      onClick={() => setHistoryStudent({ id: s.id, name: s.name })}
+                    >
+                      過去の結果
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex justify-end">
+                    <Button variant="ghost" size="sm" className="min-h-10 font-ja text-slate-500" onClick={() => removeStudent(s.id)}>
+                      削除
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

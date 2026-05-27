@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
+import { usePastExamUniversities } from "@/hooks/usePastExamUniversities";
 import { apiClient } from "@/lib/api-client";
 
 const UNIVERSITY_NAMES: Record<string, string> = {
@@ -16,6 +17,7 @@ const UNIVERSITY_NAMES: Record<string, string> = {
 
 export function PastExamImportPage() {
   const { slug = "" } = useParams();
+  const { displayList } = usePastExamUniversities();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { getIdToken } = useAuth();
@@ -28,7 +30,7 @@ export function PastExamImportPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const displayName = UNIVERSITY_NAMES[slug] ?? slug;
+  const displayName = displayList.find((u) => u.slug === slug)?.name ?? UNIVERSITY_NAMES[slug] ?? slug;
 
   const handleImport = async () => {
     setError(null);

@@ -12,6 +12,7 @@ import { SessionGradingReviewPage } from "@/pages/SessionGradingReviewPage";
 import { SessionManualCropPage } from "@/pages/SessionManualCropPage";
 import { SessionTranscriptionReviewPage } from "@/pages/SessionTranscriptionReviewPage";
 import { StudentDashboardPage } from "@/pages/StudentDashboardPage";
+import { StudentBasicInfoPage } from "@/pages/StudentBasicInfoPage";
 import { StudentInterviewPage } from "@/pages/StudentInterviewPage";
 import { StudentsPage } from "@/pages/StudentsPage";
 import { TestEditorPage } from "@/pages/TestEditorPage";
@@ -52,6 +53,7 @@ export function AppRoutes() {
         <Route index element={<Navigate to="/students" replace />} />
         <Route path="students" element={<StudentsPage />} />
         <Route path="students/:studentId/dashboard" element={<StudentDashboardPage />} />
+        <Route path="students/:studentId/profile" element={<StudentBasicInfoPage />} />
         <Route path="students/:studentId/interview" element={<StudentInterviewPage />} />
         <Route path="tests" element={<TestsPage />} />
         <Route path="tests/:testId" element={<TestEditorPage />} />

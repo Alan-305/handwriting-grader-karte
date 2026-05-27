@@ -6,6 +6,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  where,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -134,22 +135,50 @@ export function useSavePrintArtifact(sessionId: string) {
   return { saveArtifact };
 }
 
+/** 新しい日付が先頭（一覧・モーダル用） */
+function sortSessionsByDateDesc(rows: Session[]): Session[] {
+  return [...rows].sort((a, b) => {
+    const ta = a.sessionDate?.toMillis?.() ?? 0;
+    const tb = b.sessionDate?.toMillis?.() ?? 0;
+    return tb - ta;
+  });
+}
+
+/**
+ * 生徒に紐づくセッション一覧。
+ * Firestore は orderBy("sessionDate") があると sessionDate 欠損ドキュメントを結果から除外するため、
+ * orderBy は使わずクライアントで並べ替える（複合 index: teacherId + studentId で十分）。
+ */
 export function useSessionsForStudent(studentId: string | undefined) {
   const { user } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
 
   useEffect(() => {
-    if (!user || !studentId) return;
+    if (!user || !studentId) {
+      setSessions([]);
+      return;
+    }
+
     const q = query(
       collection(getDb(), "sessions"),
-      orderBy("sessionDate", "desc"),
+      where("teacherId", "==", user.uid),
+      where("studentId", "==", studentId),
     );
-    return onSnapshot(q, (snap) => {
-      const all = snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }) as Session)
-        .filter((s) => s.teacherId === user.uid && s.studentId === studentId);
-      setSessions(all);
-    });
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setSessions(
+          sortSessionsByDateDesc(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Session)),
+        );
+      },
+      (err) => {
+        console.error("sessions query for student failed", err);
+        setSessions([]);
+      },
+    );
+
+    return () => unsub();
   }, [user, studentId]);
 
   return sessions;

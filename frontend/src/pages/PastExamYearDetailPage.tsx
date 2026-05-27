@@ -6,8 +6,10 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { usePastExamUniversities } from "@/hooks/usePastExamUniversities";
 import { apiClient } from "@/lib/api-client";
 import { ANSWER_FORMAT_LABELS, resolveAnswerFormat } from "@/lib/past-exam-answer-format";
+import { QuestionPromptBlock } from "@/lib/question-text-format";
 import { TeacherExamMaterialsPanel } from "@/components/past-exams/TeacherExamMaterialsPanel";
 import type { ExamYearSummary, PastQuestionSummary } from "@/types/api";
 import type { AnswerFormat } from "@/types/past-exam";
@@ -18,6 +20,7 @@ const UNIVERSITY_NAMES: Record<string, string> = {
 
 export function PastExamYearDetailPage() {
   const { slug = "", year: yearParam = "" } = useParams();
+  const { displayList } = usePastExamUniversities();
   const year = Number(yearParam);
   const { getIdToken } = useAuth();
 
@@ -51,7 +54,7 @@ export function PastExamYearDetailPage() {
     void loadDetail();
   }, [loadDetail]);
 
-  const displayName = UNIVERSITY_NAMES[slug] ?? slug;
+  const displayName = displayList.find((u) => u.slug === slug)?.name ?? UNIVERSITY_NAMES[slug] ?? slug;
   const listeningScripts = examYear?.listeningScripts ?? [];
 
   const statusText = useMemo(() => {
@@ -136,11 +139,25 @@ export function PastExamYearDetailPage() {
                     {ANSWER_FORMAT_LABELS[resolveAnswerFormat(q.answerFormat as AnswerFormat | undefined, q.prompt)]}
                   </span>
                 </div>
-                <p className="mt-3 line-clamp-4 whitespace-pre-wrap font-ja text-sm text-slate-700">{q.prompt}</p>
+                {q.prompt ? (
+                  <details className="mt-3" open={q.prompt.length < 400}>
+                    <summary className="cursor-pointer font-ja text-sm text-blue-800">
+                      問題文を表示
+                      {q.prompt.length >= 400 ? `（${q.prompt.length} 文字）` : ""}
+                    </summary>
+                    <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50/80 p-4">
+                      <QuestionPromptBlock prompt={q.prompt} />
+                    </div>
+                  </details>
+                ) : (
+                  <p className="mt-3 font-ja text-sm text-slate-400">（問題文未入力）</p>
+                )}
                 {q.modelAnswer && (
                   <details className="mt-4">
                     <summary className="cursor-pointer font-ja text-sm text-blue-800">模範解答を表示</summary>
-                    <p className="mt-2 whitespace-pre-wrap font-ja text-sm text-slate-600">{q.modelAnswer}</p>
+                    <p className="mt-2 whitespace-pre-wrap font-en text-sm leading-relaxed text-slate-700">
+                      {q.modelAnswer}
+                    </p>
                   </details>
                 )}
               </Card>

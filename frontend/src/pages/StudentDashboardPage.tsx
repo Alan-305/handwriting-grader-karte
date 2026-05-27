@@ -44,6 +44,19 @@ export function StudentDashboardPage() {
 
   useEffect(() => {
     if (!studentId) return;
+    void (async () => {
+      const token = await getIdToken();
+      if (!token) return;
+      try {
+        await apiClient.refreshStats(token, studentId);
+      } catch {
+        /* 集計更新失敗時はキャッシュ表示 */
+      }
+    })();
+  }, [studentId, getIdToken]);
+
+  useEffect(() => {
+    if (!studentId) return;
     const q = query(
       collection(getDb(), "students", studentId, "karte_snapshots"),
       orderBy("generatedAt", "desc"),
@@ -85,11 +98,11 @@ export function StudentDashboardPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="font-ja text-base text-amber-900">面談内容が未登録です</CardTitle>
                 <CardDescription className="font-ja text-amber-800">
-                  志望校・共通テスト・確定事項を登録してから AI 分析すると、関係のない学部の話が混ざりにくくなります。
+                  志望校・共通テスト・確定事項を基本情報に登録してから AI 分析すると、関係のない学部の話が混ざりにくくなります。
                 </CardDescription>
               </CardHeader>
               <Button variant="outline" asChild className="mx-6 mb-4">
-                <Link to={`/students/${studentId}/interview`}>面談内容を入力する</Link>
+                <Link to={`/students/${studentId}/profile`}>基本情報を入力する</Link>
               </Button>
             </Card>
           )}
@@ -98,7 +111,10 @@ export function StudentDashboardPage() {
             <Link to="/students">一覧に戻る</Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link to={`/students/${studentId}/interview`}>面談内容を編集</Link>
+            <Link to={`/students/${studentId}/profile`}>基本情報</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to={`/students/${studentId}/interview`}>面談記録</Link>
           </Button>
           <Button onClick={runAnalysis}>
             <RefreshCw className="h-4 w-4" />
@@ -106,18 +122,22 @@ export function StudentDashboardPage() {
           </Button>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>得点推移</CardTitle>
-              <CardDescription>セッションごとの正答率</CardDescription>
+              <CardDescription>
+                テストごと1点（同一テストの再添削は上書き）。正答率の推移です。
+              </CardDescription>
             </CardHeader>
             <ScoreTrendChart stats={stats} />
           </Card>
           <Card>
             <CardHeader>
               <CardTitle>ミス傾向</CardTitle>
-              <CardDescription>エラータグの出現頻度</CardDescription>
+              <CardDescription>
+                第1回の棒グラフの下に第2回、さらに第3回…と、テストごとに一般カテゴリのミス傾向が積み上がります。同一テストの再添削は上書きです。
+              </CardDescription>
             </CardHeader>
             <ErrorFrequencyChart stats={stats} />
           </Card>

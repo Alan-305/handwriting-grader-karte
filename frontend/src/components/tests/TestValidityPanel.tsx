@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ClipboardCheck, X } from "lucide-react";
 import { LoadingOverlay } from "@/components/feedback/LoadingOverlay";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { usePastExamUniversities } from "@/hooks/usePastExamUniversities";
 import { apiClient } from "@/lib/api-client";
 import type { Question } from "@/types/firestore";
 import type { ValidityReport } from "@/types/question-design";
@@ -29,11 +30,18 @@ interface TestValidityPanelProps {
 
 export function TestValidityPanel({ testId, draftQuestions, onApplyRevision }: TestValidityPanelProps) {
   const { getIdToken } = useAuth();
+  const { displayList: universityOptions } = usePastExamUniversities();
   const [open, setOpen] = useState(false);
-  const [universitySlug] = useState("todai");
+  const [universitySlug, setUniversitySlug] = useState("todai");
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<ValidityReport | null>(null);
+
+  useEffect(() => {
+    if (universityOptions.length > 0 && !universityOptions.some((u) => u.slug === universitySlug)) {
+      setUniversitySlug(universityOptions[0].slug);
+    }
+  }, [universityOptions, universitySlug]);
 
   const runCheck = async () => {
     if (draftQuestions.length === 0) {
@@ -71,10 +79,26 @@ export function TestValidityPanel({ testId, draftQuestions, onApplyRevision }: T
   return (
     <>
       <LoadingOverlay visible={checking} message="考えてます" />
-      <Button variant="outline" className="min-h-11 gap-2" onClick={() => void runCheck()} disabled={checking}>
-        <ClipboardCheck className="h-4 w-4" />
-        過去問と照合
-      </Button>
+      <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="min-w-[12rem] flex-1">
+          <label className="font-ja text-xs text-slate-600">参照する過去問（大学）</label>
+          <select
+            className="mt-1 flex h-11 w-full rounded-lg border border-slate-200 px-3 font-ja text-sm"
+            value={universitySlug}
+            onChange={(e) => setUniversitySlug(e.target.value)}
+          >
+            {universityOptions.map((u) => (
+              <option key={u.slug} value={u.slug}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Button variant="outline" className="min-h-11 gap-2 sm:shrink-0" onClick={() => void runCheck()} disabled={checking}>
+          <ClipboardCheck className="h-4 w-4" />
+          過去問と照合
+        </Button>
+      </div>
 
       {error && !open && <p className="w-full font-ja text-sm text-red-700">{error}</p>}
 

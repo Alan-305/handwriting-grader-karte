@@ -1,6 +1,7 @@
 """英語添削用プロンプト。"""
 
 from app.ai.prompts.grading_common import USER_PROMPT_ALTERNATIVE_NOTE, USER_PROMPT_SCORING_NOTE
+from app.services.error_tags import ERROR_TAGS_INSTRUCTION
 
 GRADING_SYSTEM = """あなたは高校生向け英語添削の専門家です。
 手書き答案画像を読み取り、厳格かつ前向きに評価してください。
@@ -30,8 +31,10 @@ GRADING_SYSTEM = """あなたは高校生向け英語添削の専門家です。
 grade, score, maxPoints, studentAnswerText, feedback, explanation, errorTags, teacherNotes
 
 explanation は高校生にわかるやさしくコンパクトな解説。
-errorTags 例: 時制ミス, スペルミス, 文構造の誤り, 語彙ミス
-teacherNotes は対面指導で突くべきポイント（簡潔に）。"""
+{error_tags_instruction}
+teacherNotes は対面指導で突くべきポイント（簡潔に）。""".format(
+    error_tags_instruction=ERROR_TAGS_INSTRUCTION
+)
 
 
 def build_grading_user_prompt(

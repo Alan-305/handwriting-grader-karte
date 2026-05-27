@@ -160,10 +160,13 @@ export function PastExamImportReviewPage() {
                     </div>
                     <div>
                       <label className="font-ja text-sm text-slate-600">問題文</label>
+                      <p className="mt-1 font-ja text-xs text-slate-500">
+                        読解・リスニング設問は、指示に加え英語本文を省略せず含めてください。
+                      </p>
                       <Textarea
                         value={q.prompt}
                         onChange={(e) => updateQuestion(index, "prompt", e.target.value)}
-                        rows={6}
+                        rows={12}
                         className="mt-1 font-ja"
                       />
                     </div>
