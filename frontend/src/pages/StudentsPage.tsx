@@ -60,6 +60,18 @@ export function StudentsPage() {
     }
   };
 
+  const handleRemoveStudent = async (student: Student) => {
+    const ok = window.confirm(
+      `「${student.name}」を削除しますか？\n\nカルテ・基本情報・面談記録・添削履歴との紐付けが失われます。この操作は取り消せません。`,
+    );
+    if (!ok) return;
+    try {
+      await removeStudent(student.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "削除に失敗しました");
+    }
+  };
+
   return (
     <div>
       <PageHeader title="生徒管理" description="生徒を追加したら「保存」を押してください" />
@@ -68,6 +80,12 @@ export function StudentsPage() {
           <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 font-ja text-sm text-green-800">
             <Check className="h-4 w-4" />
             生徒を保存しました
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-ja text-sm text-red-800">
+            {error}
           </div>
         )}
 
@@ -147,7 +165,13 @@ export function StudentsPage() {
                     </Button>
                   </div>
                   <div className="mt-2 flex justify-end">
-                    <Button variant="ghost" size="sm" className="min-h-10 font-ja text-slate-500" onClick={() => removeStudent(s.id)}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="min-h-10 font-ja text-slate-500 hover:text-red-700"
+                      onClick={() => void handleRemoveStudent(s)}
+                    >
                       削除
                     </Button>
                   </div>

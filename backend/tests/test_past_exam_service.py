@@ -97,6 +97,16 @@ def test_is_listening_pdf():
     assert not _is_listening_pdf(Path("2026東大問題.pdf"))
 
 
+def test_is_analysis_pdf():
+    from app.services.past_exam_service import _is_analysis_pdf
+    from pathlib import Path
+
+    assert _is_analysis_pdf(Path("2026東大分析シート.pdf"))
+    assert _is_analysis_pdf(Path("analysis.pdf"))
+    assert not _is_analysis_pdf(Path("2026東大問題.pdf"))
+    assert not _is_analysis_pdf(Path("2026東大解答.pdf"))
+
+
 def test_discover_sources_finds_listening(tmp_path, monkeypatch):
     service = PastExamService()
     year_dir = tmp_path / "universities" / "todai" / "2026"

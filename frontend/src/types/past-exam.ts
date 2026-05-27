@@ -39,6 +39,7 @@ export interface ExamYear {
   sourcePdfPaths?: string[];
   sourceAnswersPdfPath?: string;
   sourceListeningPdfPath?: string;
+  sourceAnalysisPdfPath?: string;
   importStatus: ProfileStatus;
   listeningImportStatus?: ProfileStatus;
   questionCount?: number;

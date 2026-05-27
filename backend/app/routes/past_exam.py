@@ -167,6 +167,7 @@ def import_past_exam(slug: str):
 
     answers_file = request.files.get("answersPdf")
     listening_file = request.files.get("listeningPdf")
+    analysis_file = request.files.get("analysisPdf")
 
     service = PastExamService()
     temp_dir = Path(tempfile.mkdtemp(prefix="hgk-past-exam-"))
@@ -190,10 +191,16 @@ def import_past_exam(slug: str):
             listening_path = temp_dir / "listening.pdf"
             listening_file.save(listening_path)
 
+        analysis_path: Path | None = None
+        if analysis_file and analysis_file.filename:
+            analysis_path = temp_dir / "analysis.pdf"
+            analysis_file.save(analysis_path)
+
         sources = service.build_sources_from_paths(
             exam_paths,
             answers_pdf=answers_path,
             listening_pdf=listening_path,
+            analysis_pdf=analysis_path,
         )
 
         logger.info(

@@ -37,6 +37,7 @@ class ImportSources:
     exam_pdfs: list[Path]
     answers_pdf: Path | None = None
     listening_pdf: Path | None = None
+    analysis_pdf: Path | None = None
 
     @property
     def primary_exam_pdf(self) -> Path:
@@ -76,6 +77,24 @@ def _is_exam_pdf(path: Path) -> bool:
 def _is_answers_pdf(path: Path) -> bool:
     name = _nfc(path.name)
     return name.lower() == "answers.pdf" or "解答" in name
+
+
+def _is_analysis_pdf(path: Path) -> bool:
+    name = _nfc(path.name)
+    lower = name.lower()
+    if _is_listening_pdf(path) or _is_exam_pdf(path) or _is_answers_pdf(path):
+        return False
+    return lower == "analysis.pdf" or lower.startswith("analysis") or "分析" in name
+
+
+def _find_analysis_pdf(folder: Path) -> Path | None:
+    analysis = folder / "analysis.pdf"
+    if analysis.is_file():
+        return analysis
+    for p in _pdf_files(folder):
+        if _is_analysis_pdf(p):
+            return p
+    return None
 
 
 def _find_listening_pdf(folder: Path) -> Path | None:
@@ -123,6 +142,7 @@ class PastExamService:
         問題用紙: exam.pdf / exam_*.pdf / *問題*.pdf
         模範解答: answers.pdf / *解答*.pdf（任意）
         リスニング: listening.pdf / *リスニング*.pdf（任意・東大など）
+        分析シート: analysis.pdf / *分析*.pdf（任意）
         """
         folder = self.year_dir(university_slug, year)
         if not folder.is_dir():
@@ -133,13 +153,19 @@ class PastExamService:
             raise FileNotFoundError(
                 f"No exam PDF found in {folder}. "
                 "Add exam.pdf, exam_01.pdf, or *問題*.pdf. "
-                "Optional: answers.pdf, listening.pdf or *リスニング*.pdf."
+                "Optional: answers.pdf, listening.pdf or *リスニング*.pdf, analysis.pdf or *分析*.pdf."
             )
 
         answers_pdf = _find_answers_pdf(folder)
         listening_pdf = _find_listening_pdf(folder)
+        analysis_pdf = _find_analysis_pdf(folder)
 
-        return ImportSources(exam_pdfs=exam_pdfs, answers_pdf=answers_pdf, listening_pdf=listening_pdf)
+        return ImportSources(
+            exam_pdfs=exam_pdfs,
+            answers_pdf=answers_pdf,
+            listening_pdf=listening_pdf,
+            analysis_pdf=analysis_pdf,
+        )
 
     def resolve_sources(
         self,
@@ -148,6 +174,7 @@ class PastExamService:
         exam_pdf_paths: list[str] | None = None,
         answers_pdf_path: str | None = None,
         listening_pdf_path: str | None = None,
+        analysis_pdf_path: str | None = None,
         *,
         listening_only: bool = False,
     ) -> ImportSources:
@@ -165,7 +192,7 @@ class PastExamService:
                 )
             return ImportSources(exam_pdfs=[], answers_pdf=None, listening_pdf=discovered.listening_pdf)
 
-        if not exam_pdf_paths and not answers_pdf_path and not listening_pdf_path:
+        if not exam_pdf_paths and not answers_pdf_path and not listening_pdf_path and not analysis_pdf_path:
             return self.discover_sources(university_slug, year)
 
         if exam_pdf_paths:
@@ -190,7 +217,19 @@ class PastExamService:
         else:
             listening_pdf = self.discover_sources(university_slug, year).listening_pdf
 
-        return ImportSources(exam_pdfs=exam_pdfs, answers_pdf=answers_pdf, listening_pdf=listening_pdf)
+        if analysis_pdf_path:
+            analysis_pdf = Path(analysis_pdf_path)
+            if not analysis_pdf.is_file():
+                raise FileNotFoundError(f"Analysis PDF not found: {analysis_pdf}")
+        else:
+            analysis_pdf = self.discover_sources(university_slug, year).analysis_pdf
+
+        return ImportSources(
+            exam_pdfs=exam_pdfs,
+            answers_pdf=answers_pdf,
+            listening_pdf=listening_pdf,
+            analysis_pdf=analysis_pdf,
+        )
 
     def import_session_dir(self, session_id: str) -> Path:
         return self.project_root() / "data" / self.YEAR_DIR_NAME / self.SESSION_DIR_NAME / session_id
@@ -200,6 +239,7 @@ class PastExamService:
         exam_pdfs: list[Path],
         answers_pdf: Path | None = None,
         listening_pdf: Path | None = None,
+        analysis_pdf: Path | None = None,
     ) -> ImportSources:
         if not exam_pdfs:
             raise ValueError("At least one exam PDF is required")
@@ -210,7 +250,14 @@ class PastExamService:
             raise FileNotFoundError(f"Answers PDF not found: {answers_pdf}")
         if listening_pdf and not listening_pdf.is_file():
             raise FileNotFoundError(f"Listening PDF not found: {listening_pdf}")
-        return ImportSources(exam_pdfs=exam_pdfs, answers_pdf=answers_pdf, listening_pdf=listening_pdf)
+        if analysis_pdf and not analysis_pdf.is_file():
+            raise FileNotFoundError(f"Analysis PDF not found: {analysis_pdf}")
+        return ImportSources(
+            exam_pdfs=exam_pdfs,
+            answers_pdf=answers_pdf,
+            listening_pdf=listening_pdf,
+            analysis_pdf=analysis_pdf,
+        )
 
     def create_import_session(
         self,
@@ -242,6 +289,12 @@ class PastExamService:
             shutil.copy2(sources.listening_pdf, dest)
             stored_listening = str(dest.resolve())
 
+        stored_analysis: str | None = None
+        if sources.analysis_pdf:
+            dest = session_dir / "analysis.pdf"
+            shutil.copy2(sources.analysis_pdf, dest)
+            stored_analysis = str(dest.resolve())
+
         manifest = {
             "sessionId": session_id,
             "universitySlug": university_slug,
@@ -249,6 +302,7 @@ class PastExamService:
             "sourceExamPdfs": stored_exam_paths,
             "sourceAnswersPdf": stored_answers,
             "sourceListeningPdf": stored_listening,
+            "sourceAnalysisPdf": stored_analysis,
             "parsedAt": datetime.now(timezone.utc).isoformat(),
             "parsed": parsed.model_dump(by_alias=True),
         }
@@ -270,10 +324,12 @@ class PastExamService:
         exam_pdfs = [Path(p) for p in data.get("sourceExamPdfs") or []]
         answers_raw = data.get("sourceAnswersPdf")
         listening_raw = data.get("sourceListeningPdf")
+        analysis_raw = data.get("sourceAnalysisPdf")
         sources = ImportSources(
             exam_pdfs=exam_pdfs,
             answers_pdf=Path(answers_raw) if answers_raw else None,
             listening_pdf=Path(listening_raw) if listening_raw else None,
+            analysis_pdf=Path(analysis_raw) if analysis_raw else None,
         )
         return data["universitySlug"], int(data["year"]), parsed, sources
 
@@ -563,6 +619,7 @@ class PastExamService:
             "sourceExamPdfs": [str(p.resolve()) for p in sources.exam_pdfs],
             "sourceAnswersPdf": str(sources.answers_pdf.resolve()) if sources.answers_pdf else None,
             "sourceListeningPdf": str(sources.listening_pdf.resolve()) if sources.listening_pdf else None,
+            "sourceAnalysisPdf": str(sources.analysis_pdf.resolve()) if sources.analysis_pdf else None,
             "parsedAt": datetime.now(timezone.utc).isoformat(),
             "parsed": parsed.model_dump(by_alias=True),
         }
@@ -582,10 +639,12 @@ class PastExamService:
             exam_pdfs = [Path(data["sourcePdf"])]
         answers_raw = data.get("sourceAnswersPdf")
         listening_raw = data.get("sourceListeningPdf")
+        analysis_raw = data.get("sourceAnalysisPdf")
         sources = ImportSources(
             exam_pdfs=exam_pdfs,
             answers_pdf=Path(answers_raw) if answers_raw else None,
             listening_pdf=Path(listening_raw) if listening_raw else None,
+            analysis_pdf=Path(analysis_raw) if analysis_raw else None,
         )
         return parsed, sources
 
@@ -730,6 +789,7 @@ class PastExamService:
         exam_storage_paths: list[str] = []
         answers_storage_path: str | None = None
         listening_storage_path: str | None = None
+        analysis_storage_path: str | None = None
 
         if upload_pdf and self.firebase.bucket():
             for index, exam_pdf in enumerate(sources.exam_pdfs):
@@ -762,6 +822,16 @@ class PastExamService:
                     content_type="application/pdf",
                 )
 
+            if sources.analysis_pdf:
+                analysis_storage_path = (
+                    f"platform/universities/{university_slug}/past-exams/{year}/analysis.pdf"
+                )
+                self.firebase.upload_bytes(
+                    analysis_storage_path,
+                    sources.analysis_pdf.read_bytes(),
+                    content_type="application/pdf",
+                )
+
         exam_year_path = ["universities", university_slug, "exam_years", str(year)]
         listening_scripts = [s.model_dump() for s in parsed.listening_scripts]
         self.firebase.set_nested_doc(
@@ -772,6 +842,7 @@ class PastExamService:
                 "sourcePdfPaths": exam_storage_paths,
                 "sourceAnswersPdfPath": answers_storage_path,
                 "sourceListeningPdfPath": listening_storage_path,
+                "sourceAnalysisPdfPath": analysis_storage_path,
                 "importStatus": profile_status,
                 "questionCount": len(parsed.questions),
                 "listeningScriptCount": len(listening_scripts),
@@ -826,6 +897,7 @@ class PastExamService:
             "examPdfStoragePaths": exam_storage_paths,
             "answersPdfStoragePath": answers_storage_path,
             "listeningPdfStoragePath": listening_storage_path,
+            "analysisPdfStoragePath": analysis_storage_path,
             "profileStatus": profile_status,
         }
 

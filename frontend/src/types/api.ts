@@ -122,6 +122,7 @@ export interface PastExamCommitResponse {
   examPdfStoragePaths: string[];
   answersPdfStoragePath: string | null;
   listeningPdfStoragePath: string | null;
+  analysisPdfStoragePath?: string | null;
   profileStatus: string;
 }
 
@@ -133,6 +134,7 @@ export interface ExamYearSummary {
   questionCount?: number;
   listeningScriptCount?: number;
   listeningScripts?: Array<{ title?: string; content: string; notes?: string }>;
+  sourceAnalysisPdfPath?: string;
   parseNotes?: string;
 }
 

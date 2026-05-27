@@ -15,6 +15,37 @@ const UNIVERSITY_NAMES: Record<string, string> = {
   todai: "東京大学",
 };
 
+const PDF_SLOTS = [
+  {
+    key: "exam",
+    label: "問題",
+    required: true,
+    multiple: true,
+    description: "問題用紙 PDF。脚本ページは除き、リスニングは別枠でアップロードしてください。",
+  },
+  {
+    key: "answers",
+    label: "模範解答",
+    required: false,
+    multiple: false,
+    description: "解答・解説 PDF。AI が大問ごとの模範解答を読み取ります。",
+  },
+  {
+    key: "listening",
+    label: "リスニングスクリプト",
+    required: false,
+    multiple: false,
+    description: "リスニング音声用の脚本 PDF（東大二次など）。",
+  },
+  {
+    key: "analysis",
+    label: "分析シート",
+    required: false,
+    multiple: false,
+    description: "入試分析シート・解説冊子などの PDF。原本として保存されます（大問一覧の教師分析資料とは別です）。",
+  },
+] as const;
+
 export function PastExamImportPage() {
   const { slug = "" } = useParams();
   const { displayList } = usePastExamUniversities();
@@ -24,6 +55,14 @@ export function PastExamImportPage() {
   const examInputRef = useRef<HTMLInputElement>(null);
   const answersInputRef = useRef<HTMLInputElement>(null);
   const listeningInputRef = useRef<HTMLInputElement>(null);
+  const analysisInputRef = useRef<HTMLInputElement>(null);
+
+  const inputRefs = {
+    exam: examInputRef,
+    answers: answersInputRef,
+    listening: listeningInputRef,
+    analysis: analysisInputRef,
+  };
 
   const defaultYear = searchParams.get("year") ?? String(new Date().getFullYear());
   const [year, setYear] = useState(defaultYear);
@@ -42,7 +81,7 @@ export function PastExamImportPage() {
 
     const examFiles = examInputRef.current?.files;
     if (!examFiles?.length) {
-      setError("問題用紙 PDF を選択してください");
+      setError("問題 PDF を選択してください");
       return;
     }
 
@@ -61,6 +100,8 @@ export function PastExamImportPage() {
     if (answersFile) formData.append("answersPdf", answersFile);
     const listeningFile = listeningInputRef.current?.files?.[0];
     if (listeningFile) formData.append("listeningPdf", listeningFile);
+    const analysisFile = analysisInputRef.current?.files?.[0];
+    if (analysisFile) formData.append("analysisPdf", analysisFile);
 
     setLoading(true);
     try {
@@ -80,7 +121,7 @@ export function PastExamImportPage() {
       <LoadingOverlay visible={loading} message="取り込み中" />
       <PageHeader
         title={`${displayName} — 過去問取り込み`}
-        description="問題・解答・リスニング脚本の PDF をアップロードして解析します（数分かかることがあります）"
+        description="問題・模範解答・リスニングスクリプト・分析シートの PDF をアップロードして解析します"
       />
       <div className="page-content mx-auto max-w-2xl space-y-6">
         <Button asChild variant="ghost" className="min-h-11 gap-2">
@@ -113,26 +154,38 @@ export function PastExamImportPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="font-ja text-base">PDF ファイル</CardTitle>
+            <CardTitle className="font-ja text-base">PDF ファイル（4種類）</CardTitle>
             <CardDescription className="font-ja leading-relaxed">
-              東大など脚本がある入試は、問題・解答・脚本の 3 ファイルに分けると精度が上がります。
+              東大などは 4 ファイルに分けると精度が上がります。問題のみ必須です。
+              大問一覧の「教師分析資料」は取り込み後に別途入力できます。
             </CardDescription>
           </CardHeader>
-          <SafeForm className="space-y-5 px-6 pb-6" onSafeSubmit={handleImport}>
-            <div className="space-y-2">
-              <label className="font-ja text-sm font-medium text-slate-700">
-                問題用紙 PDF <span className="text-red-600">*</span>
-              </label>
-              <Input ref={examInputRef} type="file" accept="application/pdf,.pdf" multiple />
-            </div>
-            <div className="space-y-2">
-              <label className="font-ja text-sm font-medium text-slate-700">模範解答 PDF（任意）</label>
-              <Input ref={answersInputRef} type="file" accept="application/pdf,.pdf" />
-            </div>
-            <div className="space-y-2">
-              <label className="font-ja text-sm font-medium text-slate-700">リスニング脚本 PDF（任意）</label>
-              <Input ref={listeningInputRef} type="file" accept="application/pdf,.pdf" />
-            </div>
+          <SafeForm className="space-y-4 px-6 pb-6" onSafeSubmit={handleImport}>
+            {PDF_SLOTS.map((slot, index) => (
+              <div
+                key={slot.key}
+                className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-4"
+              >
+                <label className="font-ja text-sm font-medium text-slate-800">
+                  <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-800">
+                    {index + 1}
+                  </span>
+                  {slot.label}
+                  {slot.required ? (
+                    <span className="ml-1 text-red-600">*</span>
+                  ) : (
+                    <span className="ml-2 font-normal text-slate-500">（任意）</span>
+                  )}
+                </label>
+                <p className="font-ja text-xs leading-relaxed text-slate-600">{slot.description}</p>
+                <Input
+                  ref={inputRefs[slot.key]}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  multiple={slot.multiple}
+                />
+              </div>
+            ))}
 
             {error && (
               <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-ja text-sm text-red-800">
