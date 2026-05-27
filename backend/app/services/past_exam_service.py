@@ -8,6 +8,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.ai.gemini_client import GeminiAnalysisClient
+from app.ai.prompts.past_exam_answers_import import (
+    PAST_EXAM_ANSWERS_IMPORT_SYSTEM,
+    build_answers_import_prompt,
+)
 from app.ai.prompts.past_exam_import import PAST_EXAM_IMPORT_SYSTEM, build_past_exam_import_prompt
 from app.ai.prompts.past_exam_listening_import import (
     LISTENING_SCRIPT_IMPORT_SYSTEM,
@@ -15,13 +19,19 @@ from app.ai.prompts.past_exam_listening_import import (
 )
 from app.ai.schemas.past_exam import (
     ListeningScriptParseResponse,
+    ParsedPastQuestion,
+    PastExamAnswersUpdateResponse,
     PastExamParseResponse,
     PastQuestionProfile,
 )
 from app.services.firebase_admin_service import FirebaseAdminService
+from app.services.past_exam_question_utils import consolidate_parsed_questions
 from app.services.pdf_text_extractor import extract_text_from_pdf, extract_text_from_pdfs
 
 logger = logging.getLogger(__name__)
+
+# 過去問の構造化は lite より flash の方が長文・JSON が安定
+PAST_EXAM_GEMINI_MODEL = "gemini-2.5-flash"
 
 UNIVERSITY_REGISTRY: dict[str, dict] = {
     "todai": {
@@ -41,7 +51,49 @@ class ImportSources:
 
     @property
     def primary_exam_pdf(self) -> Path:
+        if not self.exam_pdfs:
+            raise ValueError("No exam PDF in import sources")
         return self.exam_pdfs[0]
+
+    def has_any_pdf(self) -> bool:
+        return bool(
+            self.exam_pdfs
+            or self.answers_pdf
+            or self.listening_pdf
+            or self.analysis_pdf
+        )
+
+
+@dataclass
+class ProvidedSources:
+    """今回のアップロードで教師が選択した PDF 種別（未選択は保存時に上書きしない）。"""
+
+    exam: bool = False
+    answers: bool = False
+    listening: bool = False
+    analysis: bool = False
+
+    def any_provided(self) -> bool:
+        return self.exam or self.answers or self.listening or self.analysis
+
+    def to_manifest(self) -> dict[str, bool]:
+        return {
+            "exam": self.exam,
+            "answers": self.answers,
+            "listening": self.listening,
+            "analysis": self.analysis,
+        }
+
+    @classmethod
+    def from_manifest(cls, data: dict | None) -> "ProvidedSources":
+        if not data:
+            return cls(exam=True, answers=True, listening=True, analysis=True)
+        return cls(
+            exam=bool(data.get("exam")),
+            answers=bool(data.get("answers")),
+            listening=bool(data.get("listening")),
+            analysis=bool(data.get("analysis")),
+        )
 
 
 def _nfc(text: str) -> str:
@@ -241,8 +293,14 @@ class PastExamService:
         listening_pdf: Path | None = None,
         analysis_pdf: Path | None = None,
     ) -> ImportSources:
-        if not exam_pdfs:
-            raise ValueError("At least one exam PDF is required")
+        sources = ImportSources(
+            exam_pdfs=exam_pdfs,
+            answers_pdf=answers_pdf,
+            listening_pdf=listening_pdf,
+            analysis_pdf=analysis_pdf,
+        )
+        if not sources.has_any_pdf():
+            raise ValueError("At least one PDF is required")
         for path in exam_pdfs:
             if not path.is_file():
                 raise FileNotFoundError(f"Exam PDF not found: {path}")
@@ -252,12 +310,172 @@ class PastExamService:
             raise FileNotFoundError(f"Listening PDF not found: {listening_pdf}")
         if analysis_pdf and not analysis_pdf.is_file():
             raise FileNotFoundError(f"Analysis PDF not found: {analysis_pdf}")
-        return ImportSources(
-            exam_pdfs=exam_pdfs,
-            answers_pdf=answers_pdf,
-            listening_pdf=listening_pdf,
-            analysis_pdf=analysis_pdf,
+        return sources
+
+    @staticmethod
+    def _parsed_questions_from_firestore(rows: list[dict]) -> list[ParsedPastQuestion]:
+        questions: list[ParsedPastQuestion] = []
+        for row in rows:
+            questions.append(
+                ParsedPastQuestion(
+                    major_order=int(row.get("majorOrder") or 0),
+                    part_label=row.get("partLabel"),
+                    type=row.get("type") or "english",
+                    answer_format=row.get("answerFormat"),
+                    prompt=row.get("prompt") or "",
+                    model_answer=row.get("modelAnswer") or "",
+                    points=row.get("points"),
+                    notes=row.get("importNotes") or "",
+                )
+            )
+        return sorted(
+            questions,
+            key=lambda q: (q.major_order, str(q.part_label or "")),
         )
+
+    @staticmethod
+    def _question_match_key(major_order: int, part_label: str | None) -> tuple[int, str]:
+        return major_order, (part_label or "").strip()
+
+    def _merge_answer_updates(
+        self,
+        existing: list[ParsedPastQuestion],
+        updates: PastExamAnswersUpdateResponse,
+    ) -> list[ParsedPastQuestion]:
+        update_map = {
+            self._question_match_key(u.major_order, u.part_label): u.model_answer
+            for u in updates.questions
+        }
+        merged: list[ParsedPastQuestion] = []
+        for q in existing:
+            key = self._question_match_key(q.major_order, q.part_label)
+            model_answer = update_map.get(key, q.model_answer)
+            merged.append(q.model_copy(update={"model_answer": model_answer}))
+        return merged
+
+    def parse_answers_only(
+        self,
+        *,
+        university_slug: str,
+        year: int,
+        answers_pdf: Path,
+        existing_questions: list[dict],
+    ) -> PastExamParseResponse:
+        if not existing_questions:
+            raise ValueError(
+                "模範解答のみの取り込みには、先に問題 PDF を取り込むか、"
+                "既存の大問データが必要です"
+            )
+
+        existing_parsed = self._parsed_questions_from_firestore(existing_questions)
+        answers_text = extract_text_from_pdf(answers_pdf, gemini_client=self.gemini)
+        prompt = build_answers_import_prompt(
+            university_slug=university_slug,
+            year=year,
+            existing_questions=existing_questions,
+            answers_text=answers_text,
+        )
+        updates: PastExamAnswersUpdateResponse = self.gemini.complete_structured(
+            system=PAST_EXAM_ANSWERS_IMPORT_SYSTEM,
+            user_text=prompt,
+            response_schema=PastExamAnswersUpdateResponse,
+            model_name=PAST_EXAM_GEMINI_MODEL,
+            max_output_tokens=16384,
+        )
+        merged_questions = self._merge_answer_updates(existing_parsed, updates)
+        existing_year = self.get_exam_year(university_slug, year) or {}
+        return PastExamParseResponse(
+            university_name=UNIVERSITY_REGISTRY.get(university_slug, {}).get("name", ""),
+            year=year,
+            exam_type=existing_year.get("examType") or "secondary",
+            questions=merged_questions,
+            listening_scripts=[],
+            parse_notes=updates.parse_notes,
+        )
+
+    def parse_partial_sources(
+        self,
+        *,
+        university_slug: str,
+        year: int,
+        sources: ImportSources,
+        provided: ProvidedSources,
+    ) -> PastExamParseResponse:
+        if not provided.any_provided():
+            raise ValueError("At least one PDF type must be provided")
+
+        existing_year = self.get_exam_year(university_slug, year) or {}
+        existing_questions = self.list_past_questions(university_slug, year)
+        university_name = UNIVERSITY_REGISTRY.get(university_slug, {}).get("name", "")
+        exam_type = existing_year.get("examType") or "secondary"
+
+        if provided.exam:
+            return self.parse_sources(
+                university_slug=university_slug,
+                year=year,
+                sources=sources,
+            )
+
+        result: PastExamParseResponse | None = None
+        note_parts: list[str] = []
+
+        if provided.answers:
+            if not sources.answers_pdf:
+                raise ValueError("Answers PDF is required for answers-only import")
+            result = self.parse_answers_only(
+                university_slug=university_slug,
+                year=year,
+                answers_pdf=sources.answers_pdf,
+                existing_questions=existing_questions,
+            )
+            note_parts.append(result.parse_notes)
+
+        if provided.listening:
+            if not sources.listening_pdf:
+                raise ValueError("Listening PDF is required for listening-only import")
+            listening = self.parse_listening_pdf(
+                university_slug=university_slug,
+                year=year,
+                listening_pdf=sources.listening_pdf,
+            )
+            if result is None:
+                result = PastExamParseResponse(
+                    university_name=university_name,
+                    year=year,
+                    exam_type=exam_type,
+                    questions=self._parsed_questions_from_firestore(existing_questions),
+                    listening_scripts=listening.listening_scripts,
+                    parse_notes=listening.parse_notes,
+                )
+            else:
+                result = result.model_copy(
+                    update={"listening_scripts": listening.listening_scripts}
+                )
+            note_parts.append(listening.parse_notes)
+
+        if provided.analysis:
+            analysis_note = "分析シート PDF を追加します（AI による大問分解は行いません）。"
+            if result is None:
+                result = PastExamParseResponse(
+                    university_name=university_name,
+                    year=year,
+                    exam_type=exam_type,
+                    questions=self._parsed_questions_from_firestore(existing_questions),
+                    listening_scripts=[],
+                    parse_notes=analysis_note,
+                )
+            else:
+                note_parts.append(analysis_note)
+
+        if result is None:
+            raise ValueError("Unsupported partial import combination")
+
+        if len(note_parts) > 1:
+            result = result.model_copy(
+                update={"parse_notes": "\n".join(n.strip() for n in note_parts if n.strip())}
+            )
+
+        return result
 
     def create_import_session(
         self,
@@ -266,6 +484,7 @@ class PastExamService:
         year: int,
         sources: ImportSources,
         parsed: PastExamParseResponse,
+        provided: ProvidedSources | None = None,
     ) -> str:
         session_id = uuid.uuid4().hex
         session_dir = self.import_session_dir(session_id)
@@ -295,6 +514,14 @@ class PastExamService:
             shutil.copy2(sources.analysis_pdf, dest)
             stored_analysis = str(dest.resolve())
 
+        if provided is None:
+            provided = ProvidedSources(
+                exam=bool(sources.exam_pdfs),
+                answers=bool(sources.answers_pdf),
+                listening=bool(sources.listening_pdf),
+                analysis=bool(sources.analysis_pdf),
+            )
+
         manifest = {
             "sessionId": session_id,
             "universitySlug": university_slug,
@@ -303,6 +530,7 @@ class PastExamService:
             "sourceAnswersPdf": stored_answers,
             "sourceListeningPdf": stored_listening,
             "sourceAnalysisPdf": stored_analysis,
+            "providedSources": provided.to_manifest(),
             "parsedAt": datetime.now(timezone.utc).isoformat(),
             "parsed": parsed.model_dump(by_alias=True),
         }
@@ -313,7 +541,9 @@ class PastExamService:
         logger.info("Created import session %s for %s/%s", session_id, university_slug, year)
         return session_id
 
-    def load_import_session(self, session_id: str) -> tuple[str, int, PastExamParseResponse, ImportSources]:
+    def load_import_session(
+        self, session_id: str
+    ) -> tuple[str, int, PastExamParseResponse, ImportSources, ProvidedSources]:
         session_dir = self.import_session_dir(session_id)
         manifest_path = session_dir / "manifest.json"
         if not manifest_path.is_file():
@@ -331,7 +561,8 @@ class PastExamService:
             listening_pdf=Path(listening_raw) if listening_raw else None,
             analysis_pdf=Path(analysis_raw) if analysis_raw else None,
         )
-        return data["universitySlug"], int(data["year"]), parsed, sources
+        provided = ProvidedSources.from_manifest(data.get("providedSources"))
+        return data["universitySlug"], int(data["year"]), parsed, sources, provided
 
     def update_import_session_parsed(self, session_id: str, parsed: PastExamParseResponse) -> None:
         session_dir = self.import_session_dir(session_id)
@@ -535,6 +766,8 @@ class PastExamService:
             system=LISTENING_SCRIPT_IMPORT_SYSTEM,
             user_text=prompt,
             response_schema=ListeningScriptParseResponse,
+            model_name=PAST_EXAM_GEMINI_MODEL,
+            max_output_tokens=16384,
         )
         if result.year != year:
             result = result.model_copy(update={"year": year})
@@ -553,6 +786,11 @@ class PastExamService:
         exam_text = extract_text_from_pdfs(
             sources.exam_pdfs, label_prefix="問題用紙", gemini_client=self.gemini
         )
+        logger.info(
+            "Past exam OCR text: exam=%s chars (latin=%s)",
+            len(exam_text),
+            sum(1 for c in exam_text if c.isascii() and c.isalpha()),
+        )
         answers_text = None
         if sources.answers_pdf:
             answers_text = extract_text_from_pdf(sources.answers_pdf, gemini_client=self.gemini)
@@ -568,6 +806,8 @@ class PastExamService:
             system=PAST_EXAM_IMPORT_SYSTEM,
             user_text=prompt,
             response_schema=PastExamParseResponse,
+            model_name=PAST_EXAM_GEMINI_MODEL,
+            max_output_tokens=65536,
         )
         if result.year != year:
             result = result.model_copy(update={"year": year})
@@ -584,7 +824,25 @@ class PastExamService:
                     enriched.type,
                 )
             normalized_questions.append(enriched)
-        result = result.model_copy(update={"questions": normalized_questions})
+
+        consolidated = consolidate_parsed_questions(normalized_questions)
+        if len(consolidated) < len(normalized_questions):
+            logger.info(
+                "Consolidated %s parsed questions down to %s",
+                len(normalized_questions),
+                len(consolidated),
+            )
+        result = result.model_copy(update={"questions": consolidated})
+
+        empty_prompts = sum(1 for q in consolidated if not q.prompt.strip())
+        if empty_prompts:
+            note = (
+                f"警告: {empty_prompts} 件の大問で問題文が空です。"
+                " PDF の画質・OCR を確認し、確認画面で手入力してください。"
+            )
+            result = result.model_copy(
+                update={"parse_notes": f"{result.parse_notes}\n{note}".strip()}
+            )
 
         if len(result.questions) > 15:
             logger.warning(
@@ -773,6 +1031,14 @@ class PastExamService:
         )
         return {"id": slug, "slug": slug, "name": name, "nameEn": name_en.strip(), "status": "active"}
 
+    @staticmethod
+    def _append_parse_notes(existing: str, new: str) -> str:
+        if not new.strip():
+            return existing
+        if not existing.strip():
+            return new.strip()
+        return f"{existing.strip()}\n{new.strip()}"
+
     def write_to_firestore(
         self,
         *,
@@ -782,27 +1048,42 @@ class PastExamService:
         sources: ImportSources,
         upload_pdf: bool = True,
         profile_status: str = "draft",
+        provided: ProvidedSources | None = None,
     ) -> dict:
         self.ensure_university(university_slug)
         now = datetime.now(timezone.utc)
 
-        exam_storage_paths: list[str] = []
-        answers_storage_path: str | None = None
-        listening_storage_path: str | None = None
-        analysis_storage_path: str | None = None
+        if provided is None:
+            provided = ProvidedSources(
+                exam=bool(sources.exam_pdfs),
+                answers=bool(sources.answers_pdf),
+                listening=bool(sources.listening_pdf),
+                analysis=bool(sources.analysis_pdf),
+            )
+
+        existing_year = self.get_exam_year(university_slug, year) or {}
+
+        exam_storage_paths: list[str] = list(existing_year.get("sourcePdfPaths") or [])
+        answers_storage_path: str | None = existing_year.get("sourceAnswersPdfPath")
+        listening_storage_path: str | None = existing_year.get("sourceListeningPdfPath")
+        analysis_storage_path: str | None = existing_year.get("sourceAnalysisPdfPath")
 
         if upload_pdf and self.firebase.bucket():
-            for index, exam_pdf in enumerate(sources.exam_pdfs):
-                suffix = "" if index == 0 else f"_{index + 1}"
-                storage_path = f"platform/universities/{university_slug}/past-exams/{year}/exam{suffix}.pdf"
-                self.firebase.upload_bytes(
-                    storage_path,
-                    exam_pdf.read_bytes(),
-                    content_type="application/pdf",
-                )
-                exam_storage_paths.append(storage_path)
+            if provided.exam and sources.exam_pdfs:
+                exam_storage_paths = []
+                for index, exam_pdf in enumerate(sources.exam_pdfs):
+                    suffix = "" if index == 0 else f"_{index + 1}"
+                    storage_path = (
+                        f"platform/universities/{university_slug}/past-exams/{year}/exam{suffix}.pdf"
+                    )
+                    self.firebase.upload_bytes(
+                        storage_path,
+                        exam_pdf.read_bytes(),
+                        content_type="application/pdf",
+                    )
+                    exam_storage_paths.append(storage_path)
 
-            if sources.answers_pdf:
+            if provided.answers and sources.answers_pdf:
                 answers_storage_path = (
                     f"platform/universities/{university_slug}/past-exams/{year}/answers.pdf"
                 )
@@ -812,7 +1093,7 @@ class PastExamService:
                     content_type="application/pdf",
                 )
 
-            if sources.listening_pdf:
+            if provided.listening and sources.listening_pdf:
                 listening_storage_path = (
                     f"platform/universities/{university_slug}/past-exams/{year}/listening.pdf"
                 )
@@ -822,7 +1103,7 @@ class PastExamService:
                     content_type="application/pdf",
                 )
 
-            if sources.analysis_pdf:
+            if provided.analysis and sources.analysis_pdf:
                 analysis_storage_path = (
                     f"platform/universities/{university_slug}/past-exams/{year}/analysis.pdf"
                 )
@@ -833,62 +1114,116 @@ class PastExamService:
                 )
 
         exam_year_path = ["universities", university_slug, "exam_years", str(year)]
-        listening_scripts = [s.model_dump() for s in parsed.listening_scripts]
-        self.firebase.set_nested_doc(
-            exam_year_path,
-            {
-                "year": year,
-                "examType": parsed.exam_type,
-                "sourcePdfPaths": exam_storage_paths,
-                "sourceAnswersPdfPath": answers_storage_path,
-                "sourceListeningPdfPath": listening_storage_path,
-                "sourceAnalysisPdfPath": analysis_storage_path,
-                "importStatus": profile_status,
-                "questionCount": len(parsed.questions),
-                "listeningScriptCount": len(listening_scripts),
-                "listeningScripts": listening_scripts,
-                "parseNotes": parsed.parse_notes,
-                "createdAt": now,
-            },
-            merge=True,
-        )
+        exam_year_patch: dict = {"year": year, "updatedAt": now}
+        if not existing_year:
+            exam_year_patch["createdAt"] = now
+
+        if provided.exam:
+            listening_scripts = [s.model_dump() for s in parsed.listening_scripts]
+            exam_year_patch.update(
+                {
+                    "examType": parsed.exam_type,
+                    "sourcePdfPaths": exam_storage_paths,
+                    "importStatus": profile_status,
+                    "questionCount": len(parsed.questions),
+                    "listeningScriptCount": len(listening_scripts),
+                    "listeningScripts": listening_scripts,
+                    "parseNotes": parsed.parse_notes,
+                }
+            )
+            if provided.answers:
+                exam_year_patch["sourceAnswersPdfPath"] = answers_storage_path
+            if provided.listening:
+                exam_year_patch["sourceListeningPdfPath"] = listening_storage_path
+            if provided.analysis:
+                exam_year_patch["sourceAnalysisPdfPath"] = analysis_storage_path
+        else:
+            if provided.answers:
+                exam_year_patch["sourceAnswersPdfPath"] = answers_storage_path
+                exam_year_patch["parseNotes"] = self._append_parse_notes(
+                    existing_year.get("parseNotes") or "",
+                    parsed.parse_notes,
+                )
+            if provided.listening:
+                listening_scripts = [s.model_dump() for s in parsed.listening_scripts]
+                exam_year_patch.update(
+                    {
+                        "sourceListeningPdfPath": listening_storage_path,
+                        "listeningScriptCount": len(listening_scripts),
+                        "listeningScripts": listening_scripts,
+                        "listeningImportStatus": profile_status,
+                        "listeningParseNotes": parsed.parse_notes,
+                    }
+                )
+            if provided.analysis:
+                exam_year_patch["sourceAnalysisPdfPath"] = analysis_storage_path
+                exam_year_patch["parseNotes"] = self._append_parse_notes(
+                    exam_year_patch.get("parseNotes") or existing_year.get("parseNotes") or "",
+                    parsed.parse_notes,
+                )
+
+        if len(exam_year_patch) > 2 or "createdAt" in exam_year_patch:
+            self.firebase.set_nested_doc(exam_year_path, exam_year_patch, merge=True)
 
         question_ids: list[str] = []
-        for q in parsed.questions:
-            enriched = self._enrich_parsed_question(q, exam_type=parsed.exam_type)
-            qtype = enriched.type
-            answer_format = enriched.answer_format or self._infer_answer_format(q.prompt)
-            doc_id = self._question_doc_id(q.major_order, q.part_label)
-            profile = PastQuestionProfile(
-                archetype=self._guess_archetype(qtype, q.prompt, answer_format=answer_format),
-                required_skills=[],
-                common_traps=[],
-            )
-            has_answer = bool(q.model_answer.strip())
-            model_source = "official" if has_answer and sources.answers_pdf else (
-                "official" if has_answer else "none"
-            )
-            self.firebase.set_nested_doc(
-                ["universities", university_slug, "past_questions", f"{year}_{doc_id}"],
-                {
-                    "year": year,
-                    "majorOrder": q.major_order,
-                    "partLabel": q.part_label,
-                    "type": qtype,
-                    "answerFormat": answer_format,
-                    "prompt": q.prompt,
+        if provided.exam:
+            for q in parsed.questions:
+                enriched = self._enrich_parsed_question(q, exam_type=parsed.exam_type)
+                qtype = enriched.type
+                answer_format = enriched.answer_format or self._infer_answer_format(q.prompt)
+                doc_id = self._question_doc_id(q.major_order, q.part_label)
+                profile = PastQuestionProfile(
+                    archetype=self._guess_archetype(qtype, q.prompt, answer_format=answer_format),
+                    required_skills=[],
+                    common_traps=[],
+                )
+                has_answer = bool(q.model_answer.strip())
+                model_source = "official" if has_answer and sources.answers_pdf else (
+                    "official" if has_answer else "none"
+                )
+                self.firebase.set_nested_doc(
+                    ["universities", university_slug, "past_questions", f"{year}_{doc_id}"],
+                    {
+                        "year": year,
+                        "majorOrder": q.major_order,
+                        "partLabel": q.part_label,
+                        "type": qtype,
+                        "answerFormat": answer_format,
+                        "prompt": q.prompt,
+                        "modelAnswer": q.model_answer,
+                        "modelAnswerSource": model_source,
+                        "modelAnswerStatus": "draft" if has_answer else "draft",
+                        "points": q.points,
+                        "profile": profile.model_dump(by_alias=True),
+                        "profileStatus": profile_status,
+                        "importNotes": q.notes,
+                        "createdAt": now,
+                    },
+                    merge=False,
+                )
+                question_ids.append(f"{year}_{doc_id}")
+        elif provided.answers:
+            for q in parsed.questions:
+                doc_id = self._question_doc_id(q.major_order, q.part_label)
+                has_answer = bool(q.model_answer.strip())
+                patch = {
                     "modelAnswer": q.model_answer,
-                    "modelAnswerSource": model_source,
+                    "modelAnswerSource": "official" if has_answer else "none",
                     "modelAnswerStatus": "draft" if has_answer else "draft",
-                    "points": q.points,
-                    "profile": profile.model_dump(by_alias=True),
-                    "profileStatus": profile_status,
-                    "importNotes": q.notes,
-                    "createdAt": now,
-                },
-                merge=False,
-            )
-            question_ids.append(f"{year}_{doc_id}")
+                    "updatedAt": now,
+                }
+                self.firebase.set_nested_doc(
+                    ["universities", university_slug, "past_questions", f"{year}_{doc_id}"],
+                    patch,
+                    merge=True,
+                )
+                question_ids.append(f"{year}_{doc_id}")
+            if question_ids:
+                self.firebase.set_nested_doc(
+                    exam_year_path,
+                    {"questionCount": len(self.list_past_questions(university_slug, year))},
+                    merge=True,
+                )
 
         return {
             "universitySlug": university_slug,
@@ -899,6 +1234,7 @@ class PastExamService:
             "listeningPdfStoragePath": listening_storage_path,
             "analysisPdfStoragePath": analysis_storage_path,
             "profileStatus": profile_status,
+            "uploadedSlots": [k for k, v in provided.to_manifest().items() if v],
         }
 
     @staticmethod

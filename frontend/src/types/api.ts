@@ -112,6 +112,7 @@ export interface PastExamImportResponse {
   questionCount: number;
   listeningScriptCount: number;
   parseNotes: string;
+  uploadedSlots?: Array<"exam" | "answers" | "listening" | "analysis">;
   parsed: PastExamParseDraft;
 }
 

@@ -250,16 +250,45 @@ class GeminiAnalysisClient:
         response_schema: type[BaseModel],
         image_base64: str | None = None,
         media_type: str = "image/jpeg",
+        images_jpeg: list[bytes] | None = None,
+        max_output_tokens: int = 16384,
+        model_name: str | None = None,
     ) -> BaseModel:
         if not self.model:
             return self._mock_response(response_schema)
 
         prompt = f"{system}\n\n{user_text}\n\nRespond with valid JSON only."
+        gen_cfg = GenerationConfig(
+            temperature=0.1,
+            max_output_tokens=max_output_tokens,
+        )
+        active_model = self._model_for(
+            normalize_gemini_model(model_name or self.model_name),
+            system_instruction=system,
+        )
 
         def call():
-            response = self._generate_content(prompt)
+            parts: list = [prompt]
+            if image_base64:
+                import base64
+
+                raw = base64.b64decode(image_base64)
+                prepared = prepare_image_for_gemini(raw)
+                parts.append(Image.open(BytesIO(prepared)))
+            if images_jpeg:
+                for raw in images_jpeg:
+                    prepared = prepare_image_for_gemini(raw)
+                    parts.append(Image.open(BytesIO(prepared)))
+            response = self._generate_content(
+                parts,
+                model=active_model,
+                generation_config=gen_cfg,
+            )
             text = _extract_response_text(response) or "{}"
-            logger.info("Gemini analysis completed")
+            logger.info(
+                "Gemini analysis completed (model=%s)",
+                model_name or self.model_name,
+            )
             return parse_json_response(text, response_schema)
 
         return with_retry(call)

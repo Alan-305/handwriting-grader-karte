@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from pydantic import BaseModel, Field
 
 from app.ai.schemas.past_exam import PastExamParseResponse
-from app.services.past_exam_service import UNIVERSITY_REGISTRY, PastExamService
+from app.services.past_exam_service import UNIVERSITY_REGISTRY, PastExamService, ProvidedSources
 from app.utils.auth_decorator import require_auth
 
 logger = logging.getLogger(__name__)
@@ -162,12 +162,24 @@ def import_past_exam(slug: str):
         single = request.files.get("examPdf")
         exam_files = [single] if single and single.filename else []
 
-    if not exam_files:
-        return jsonify({"error": "問題用紙 PDF（examPdf）が必要です"}), 400
-
     answers_file = request.files.get("answersPdf")
     listening_file = request.files.get("listeningPdf")
     analysis_file = request.files.get("analysisPdf")
+
+    has_answers = bool(answers_file and answers_file.filename)
+    has_listening = bool(listening_file and listening_file.filename)
+    has_analysis = bool(analysis_file and analysis_file.filename)
+    has_exam = bool(exam_files)
+
+    if not (has_exam or has_answers or has_listening or has_analysis):
+        return jsonify({"error": "いずれか1つ以上の PDF を選択してください"}), 400
+
+    provided = ProvidedSources(
+        exam=has_exam,
+        answers=has_answers,
+        listening=has_listening,
+        analysis=has_analysis,
+    )
 
     service = PastExamService()
     temp_dir = Path(tempfile.mkdtemp(prefix="hgk-past-exam-"))
@@ -211,12 +223,18 @@ def import_past_exam(slug: str):
             len(sources.exam_pdfs),
         )
 
-        parsed = service.parse_sources(university_slug=slug, year=year, sources=sources)
+        parsed = service.parse_partial_sources(
+            university_slug=slug,
+            year=year,
+            sources=sources,
+            provided=provided,
+        )
         session_id = service.create_import_session(
             university_slug=slug,
             year=year,
             sources=sources,
             parsed=parsed,
+            provided=provided,
         )
 
         registry = UNIVERSITY_REGISTRY.get(slug, {})
@@ -229,6 +247,7 @@ def import_past_exam(slug: str):
                 "questionCount": len(parsed.questions),
                 "listeningScriptCount": len(parsed.listening_scripts),
                 "parseNotes": parsed.parse_notes,
+                "uploadedSlots": [k for k, v in provided.to_manifest().items() if v],
                 "parsed": parsed.model_dump(by_alias=True),
             }
         ), 201
@@ -260,7 +279,7 @@ def commit_past_exam_import(slug: str, session_id: str):
     service = PastExamService()
 
     try:
-        session_slug, year, parsed, sources = service.load_import_session(session_id)
+        session_slug, year, parsed, sources, provided = service.load_import_session(session_id)
     except FileNotFoundError:
         return jsonify({"error": "取り込みセッションが見つかりません。再度 PDF をアップロードしてください。"}), 404
 
@@ -282,6 +301,7 @@ def commit_past_exam_import(slug: str, session_id: str):
             sources=sources,
             upload_pdf=True,
             profile_status=profile_status,
+            provided=provided,
         )
         service.delete_import_session(session_id)
         logger.info(

@@ -7,8 +7,11 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-OCR_BATCH_SIZE = 8
-OCR_DPI = 150
+OCR_BATCH_SIZE = 6
+OCR_DPI = 200
+# 埋め込みテキストがメタデータのみの PDF（英語本文が取れない）を検出
+MIN_LATIN_LETTERS_PER_PAGE = 40
+MIN_CHARS_PER_PAGE = 100
 
 
 def extract_text_from_pdfs(
@@ -28,6 +31,23 @@ def extract_text_from_pdfs(
     return "\n\n".join(sections).strip()
 
 
+def count_latin_letters(text: str) -> int:
+    return sum(1 for c in text if c.isascii() and c.isalpha())
+
+
+def is_embedded_pdf_text_insufficient(text: str, page_count: int) -> bool:
+    """PyMuPDF の埋め込みテキストが実質空・英語欠落のとき True（Vision OCR へ）。"""
+    pages = max(page_count, 1)
+    stripped = text.strip()
+    if not stripped:
+        return True
+    if len(stripped) < MIN_CHARS_PER_PAGE * pages:
+        return True
+    if count_latin_letters(stripped) < MIN_LATIN_LETTERS_PER_PAGE * pages:
+        return True
+    return False
+
+
 def extract_text_from_pdf(pdf_path: str | Path, *, gemini_client=None) -> str:
     path = Path(pdf_path)
     if not path.is_file():
@@ -41,6 +61,7 @@ def extract_text_from_pdf(pdf_path: str | Path, *, gemini_client=None) -> str:
         ) from exc
 
     doc = fitz.open(path)
+    page_count = doc.page_count
     pages: list[str] = []
     try:
         for i, page in enumerate(doc):
@@ -51,8 +72,16 @@ def extract_text_from_pdf(pdf_path: str | Path, *, gemini_client=None) -> str:
         doc.close()
 
     combined = "\n\n".join(pages).strip()
-    if combined:
+    if combined and not is_embedded_pdf_text_insufficient(combined, page_count):
         return combined
+
+    if combined:
+        logger.info(
+            "Embedded text in %s looks insufficient (%s chars, %s latin letters); using Vision OCR",
+            path.name,
+            len(combined),
+            count_latin_letters(combined),
+        )
 
     if gemini_client is None:
         raise ValueError(

@@ -19,7 +19,7 @@ const PDF_SLOTS = [
   {
     key: "exam",
     label: "問題",
-    required: true,
+    required: false,
     multiple: true,
     description: "問題用紙 PDF。脚本ページは除き、リスニングは別枠でアップロードしてください。",
   },
@@ -65,6 +65,7 @@ export function PastExamImportPage() {
   };
 
   const defaultYear = searchParams.get("year") ?? String(new Date().getFullYear());
+  const supplementYear = searchParams.get("year");
   const [year, setYear] = useState(defaultYear);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,8 +81,13 @@ export function PastExamImportPage() {
     }
 
     const examFiles = examInputRef.current?.files;
-    if (!examFiles?.length) {
-      setError("問題 PDF を選択してください");
+    const answersFile = answersInputRef.current?.files?.[0];
+    const listeningFile = listeningInputRef.current?.files?.[0];
+    const analysisFile = analysisInputRef.current?.files?.[0];
+    const hasAny =
+      (examFiles?.length ?? 0) > 0 || answersFile || listeningFile || analysisFile;
+    if (!hasAny) {
+      setError("いずれか1つ以上の PDF を選択してください");
       return;
     }
 
@@ -93,14 +99,13 @@ export function PastExamImportPage() {
 
     const formData = new FormData();
     formData.append("year", String(yearNum));
-    for (const file of Array.from(examFiles)) {
-      formData.append("examPdf", file);
+    if (examFiles?.length) {
+      for (const file of Array.from(examFiles)) {
+        formData.append("examPdf", file);
+      }
     }
-    const answersFile = answersInputRef.current?.files?.[0];
     if (answersFile) formData.append("answersPdf", answersFile);
-    const listeningFile = listeningInputRef.current?.files?.[0];
     if (listeningFile) formData.append("listeningPdf", listeningFile);
-    const analysisFile = analysisInputRef.current?.files?.[0];
     if (analysisFile) formData.append("analysisPdf", analysisFile);
 
     setLoading(true);
@@ -134,8 +139,9 @@ export function PastExamImportPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-ja text-base">取り込む年度</CardTitle>
-            <CardDescription className="font-ja">
-              任意の年度を指定できます。すでに登録済みの年度を再取り込みすると、内容が上書きされます。
+            <CardDescription className="font-ja leading-relaxed">
+              任意の年度を指定できます。すでに登録済みの年度に追加する場合は、選んだ PDF だけが更新され、
+              ファイルを選んでいない種類は上書きされません。
             </CardDescription>
           </CardHeader>
           <div className="px-6 pb-6">
@@ -156,11 +162,17 @@ export function PastExamImportPage() {
           <CardHeader>
             <CardTitle className="font-ja text-base">PDF ファイル（4種類）</CardTitle>
             <CardDescription className="font-ja leading-relaxed">
-              東大などは 4 ファイルに分けると精度が上がります。問題のみ必須です。
+              東大などは 4 ファイルに分けると精度が上がります。初回は問題 PDF から、
+              あとから模範解答・リスニング・分析シートだけを追加することもできます（いずれか1つ以上を選択）。
               大問一覧の「教師分析資料」は取り込み後に別途入力できます。
             </CardDescription>
           </CardHeader>
           <SafeForm className="space-y-4 px-6 pb-6" onSafeSubmit={handleImport}>
+            {supplementYear && (
+              <p className="rounded-lg border border-blue-200 bg-blue-50/80 px-4 py-3 font-ja text-sm leading-relaxed text-blue-900">
+                {supplementYear} 年度への追加取り込みです。今回選択した PDF だけが保存され、未選択のファイルはそのまま残ります。
+              </p>
+            )}
             {PDF_SLOTS.map((slot, index) => (
               <div
                 key={slot.key}

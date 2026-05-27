@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.past_exam_service import ImportSources, PastExamService
+from app.services.past_exam_service import ImportSources, PastExamService, ProvidedSources
 
 
 def test_question_doc_id_major_only():
@@ -126,6 +126,40 @@ def test_discover_sources_finds_listening(tmp_path, monkeypatch):
     assert "問題" in sources.exam_pdfs[0].name
 
 
+def test_build_sources_allows_answers_only(tmp_path):
+    answers = tmp_path / "answers.pdf"
+    answers.write_bytes(b"%PDF-1.4")
+    sources = PastExamService.build_sources_from_paths([], answers_pdf=answers)
+    assert sources.answers_pdf == answers
+    assert sources.exam_pdfs == []
+
+
+def test_provided_sources_from_manifest():
+    provided = ProvidedSources.from_manifest({"answers": True, "listening": False})
+    assert provided.answers is True
+    assert provided.exam is False
+
+
+def test_merge_answer_updates():
+    from app.ai.schemas.past_exam import ParsedAnswerUpdate, PastExamAnswersUpdateResponse, ParsedPastQuestion
+
+    service = PastExamService()
+    existing = [
+        ParsedPastQuestion(majorOrder=1, type="english", prompt="Q1", modelAnswer="old"),
+        ParsedPastQuestion(majorOrder=2, type="english", prompt="Q2", modelAnswer=""),
+    ]
+    updates = PastExamAnswersUpdateResponse(
+        questions=[
+            ParsedAnswerUpdate(majorOrder=1, modelAnswer="new answer"),
+            ParsedAnswerUpdate(majorOrder=2, modelAnswer="ans2"),
+        ],
+        parseNotes="ok",
+    )
+    merged = service._merge_answer_updates(existing, updates)
+    assert merged[0].model_answer == "new answer"
+    assert merged[1].model_answer == "ans2"
+
+
 def test_import_session_roundtrip(tmp_path, monkeypatch):
     from app.ai.schemas.past_exam import ParsedPastQuestion, PastExamParseResponse
 
@@ -150,11 +184,14 @@ def test_import_session_roundtrip(tmp_path, monkeypatch):
         parsed=parsed,
     )
 
-    slug, year, loaded_parsed, loaded_sources = service.load_import_session(session_id)
+    slug, year, loaded_parsed, loaded_sources, loaded_provided = service.load_import_session(
+        session_id
+    )
     assert slug == "todai"
     assert year == 2027
     assert len(loaded_parsed.questions) == 1
     assert loaded_sources.exam_pdfs[0].name == "exam.pdf"
+    assert loaded_provided.exam is True
 
     service.delete_import_session(session_id)
     assert not (session_root / session_id).exists()

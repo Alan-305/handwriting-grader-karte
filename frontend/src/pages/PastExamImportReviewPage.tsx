@@ -42,6 +42,21 @@ export function PastExamImportReviewPage() {
     [parsed, meta],
   );
 
+  const SLOT_LABELS: Record<string, string> = {
+    exam: "問題",
+    answers: "模範解答",
+    listening: "リスニング",
+    analysis: "分析シート",
+  };
+  const uploadedSlots = meta?.uploadedSlots ?? [];
+  const uploadedSlotLabels = uploadedSlots.map((s) => SLOT_LABELS[s] ?? s);
+  const isSupplementOnly =
+    uploadedSlots.length > 0 &&
+    !uploadedSlots.includes("exam") &&
+    (uploadedSlots.includes("answers") ||
+      uploadedSlots.includes("listening") ||
+      uploadedSlots.includes("analysis"));
+
   if (!parsed || !meta) {
     return (
       <div className="p-8">
@@ -109,6 +124,18 @@ export function PastExamImportReviewPage() {
           </Link>
         </Button>
 
+        {isSupplementOnly && (
+          <Card className="border-blue-200 bg-blue-50/50">
+            <CardHeader>
+              <CardTitle className="font-ja text-base">追加取り込み</CardTitle>
+              <CardDescription className="font-ja leading-relaxed text-slate-700">
+                今回アップロードした PDF（{uploadedSlotLabels.join("・")}）だけが保存されます。
+                選んでいないファイルは上書きされません。
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+
         {meta.parseNotes && (
           <Card className="border-amber-200 bg-amber-50/50">
             <CardHeader>
@@ -117,6 +144,14 @@ export function PastExamImportReviewPage() {
                 {meta.parseNotes}
               </CardDescription>
             </CardHeader>
+          </Card>
+        )}
+
+        {questions.length === 0 && !parsed.listeningScripts?.length && (
+          <Card className="p-6">
+            <p className="font-ja text-sm text-slate-600">
+              大問の編集項目はありません。内容を確認して保存してください。
+            </p>
           </Card>
         )}
 
