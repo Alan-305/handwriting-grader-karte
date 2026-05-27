@@ -11,6 +11,29 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePastExamUniversities } from "@/hooks/usePastExamUniversities";
 import { apiClient } from "@/lib/api-client";
 
+function formatPastExamImportError(err: unknown): string {
+  if (err instanceof TypeError) {
+    const msg = err.message.toLowerCase();
+    if (msg.includes("fetch") || msg.includes("network") || msg.includes("load")) {
+      return (
+        "サーバーとの通信が途切れました。スキャン PDF では数分かかることがあります。" +
+        " Wi‑Fi を確認するか、ページ数を減らした PDF に分けて、もう一度「解析を開始」を押してください。"
+      );
+    }
+  }
+  if (err instanceof Error) {
+    const m = err.message;
+    if (/aborted|timeout|504|gateway|timed out/i.test(m)) {
+      return (
+        "処理が長くなりタイムアウトした可能性があります。問題用紙だけ先に取り込む、PDF を分割する、" +
+        "通信の良い環境で再試行してください。"
+      );
+    }
+    return m;
+  }
+  return "取り込みに失敗しました";
+}
+
 const UNIVERSITY_NAMES: Record<string, string> = {
   todai: "東京大学",
 };
@@ -115,7 +138,7 @@ export function PastExamImportPage() {
         state: { importResult: result },
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "取り込みに失敗しました");
+      setError(formatPastExamImportError(err));
     } finally {
       setLoading(false);
     }
@@ -168,6 +191,11 @@ export function PastExamImportPage() {
             </CardDescription>
           </CardHeader>
           <SafeForm className="space-y-4 px-6 pb-6" onSafeSubmit={handleImport}>
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 font-ja text-sm leading-relaxed text-slate-700">
+              画像中心の PDF（スキャン版）では、ページ数に応じて{" "}
+              <strong className="font-medium">5〜15 分ほど</strong>{" "}
+              かかることがあります。この画面を閉じずにお待ちください。途中で止まった場合は、通信を確認のうえ再度お試しください。
+            </p>
             {supplementYear && (
               <p className="rounded-lg border border-blue-200 bg-blue-50/80 px-4 py-3 font-ja text-sm leading-relaxed text-blue-900">
                 {supplementYear} 年度への追加取り込みです。今回選択した PDF だけが保存され、未選択のファイルはそのまま残ります。
