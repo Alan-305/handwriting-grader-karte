@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { addDoc, collection, onSnapshot, query, serverTimestamp, where } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  where,
+} from "firebase/firestore";
 import { Archive, Plus } from "lucide-react";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -23,6 +33,7 @@ export function TestsPage() {
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -53,6 +64,22 @@ export function TestsPage() {
       updatedAt: serverTimestamp(),
     });
     window.location.href = `/tests/${ref.id}`;
+  };
+
+  const deleteTest = async (testId: string, title: string) => {
+    if (!window.confirm(`「${title}」を削除します。よろしいですか？`)) return;
+    setDeletingId(testId);
+    setLoadError(null);
+    try {
+      const questionsRef = collection(getDb(), "tests", testId, "questions");
+      const questionsSnap = await getDocs(questionsRef);
+      await Promise.all(questionsSnap.docs.map((qDoc) => deleteDoc(qDoc.ref)));
+      await deleteDoc(doc(getDb(), "tests", testId));
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "問題セットの削除に失敗しました");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -117,9 +144,28 @@ export function TestsPage() {
                 <p className="font-ja text-sm text-slate-500">
                   {t.questionCount}問 / {t.totalPoints}点満点
                 </p>
-                <Button asChild variant="outline" size="sm" className="mt-4 min-h-11">
-                  <Link to={`/tests/${t.id}`}>編集</Link>
-                </Button>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="min-h-11 border-emerald-200 bg-emerald-50 font-ja text-emerald-900 hover:bg-emerald-100"
+                  >
+                    <Link to={`/tests/${t.id}`}>編集</Link>
+                  </Button>
+                </div>
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="min-h-10 font-ja text-slate-500 hover:text-red-700"
+                    disabled={deletingId === t.id}
+                    onClick={() => void deleteTest(t.id, t.title)}
+                  >
+                    {deletingId === t.id ? "削除中..." : "削除"}
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>

@@ -87,7 +87,7 @@ export function AppShell() {
         </Button>
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <LayoutDashboard className="h-5 w-5 shrink-0 text-blue-800" />
-          <span className="truncate font-ja text-sm font-semibold text-slate-900">添削カルテ</span>
+          <span className="truncate font-ja text-sm font-semibold text-slate-900">大学別個人指導カルテ</span>
         </div>
       </header>
 
@@ -142,7 +142,7 @@ export function AppShell() {
         <div className="border-b border-slate-200 p-6">
           <div className="flex items-center gap-2">
             <LayoutDashboard className="h-6 w-6 text-blue-800" />
-            <span className="font-ja text-sm font-semibold text-slate-900">添削カルテ</span>
+            <span className="font-ja text-sm font-semibold text-slate-900">大学別個人指導カルテ</span>
           </div>
           <p className="mt-1 truncate font-ja text-xs text-slate-500">{user?.email}</p>
         </div>
