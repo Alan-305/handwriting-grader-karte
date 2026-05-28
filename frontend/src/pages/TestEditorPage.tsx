@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   onSnapshot,
   orderBy,
@@ -164,6 +165,55 @@ export function TestEditorPage() {
     setDraftQuestions((prev) => [...prev, newQ]);
   };
 
+  const removeQuestion = async (index: number) => {
+    if (!testId) return;
+    const target = draftQuestions[index];
+    if (!target) return;
+    if (!window.confirm(`「第${target.order}問」を削除します。よろしいですか？`)) return;
+
+    setSaveState("saving");
+    setSaveError("");
+    try {
+      const batch = writeBatch(getDb());
+      batch.delete(doc(getDb(), "tests", testId, "questions", target.id));
+
+      const remaining = draftQuestions.filter((_, i) => i !== index);
+      const reOrdered = remaining.map((q, i) => {
+        const newOrder = i + 1;
+        if (q.order === newOrder) return q;
+        return {
+          ...q,
+          order: newOrder,
+          cropRegion: {
+            ...q.cropRegion,
+            y: DEFAULT_REGION.y + (newOrder - 1) * 140,
+          },
+        };
+      });
+
+      for (const q of reOrdered) {
+        const { id, ...data } = q;
+        batch.update(doc(getDb(), "tests", testId, "questions", id), data);
+      }
+
+      const totalPoints = reOrdered.reduce((s, q) => s + q.points, 0);
+      batch.update(doc(getDb(), "tests", testId), {
+        totalPoints,
+        questionCount: reOrdered.length,
+        updatedAt: serverTimestamp(),
+      });
+
+      await batch.commit();
+      setDraftQuestions(reOrdered);
+      setSelectedQ((prev) => Math.max(0, Math.min(prev, reOrdered.length - 1)));
+      setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 1500);
+    } catch (e) {
+      setSaveState("error");
+      setSaveError(e instanceof Error ? e.message : "設問の削除に失敗しました");
+    }
+  };
+
   const handleSave = async () => {
     if (!testId) return;
     setSaveState("saving");
@@ -303,7 +353,9 @@ export function TestEditorPage() {
         </Card>
 
         <div className="flex flex-wrap gap-2">
-          <Button onClick={addQuestion}>設問を追加</Button>
+          <Button onClick={addQuestion} className="min-h-11">
+            第{draftQuestions.length + 1}問として設問を追加
+          </Button>
           {testId && draftQuestions.length > 0 && (
             <TestValidityPanel
               testId={testId}
@@ -381,9 +433,20 @@ export function TestEditorPage() {
             <Card key={q.id} className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-ja font-semibold">第{q.order}問</h3>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedQ(i)}>
-                  crop 選択
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedQ(i)}>
+                    crop 選択
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="font-ja text-slate-500 hover:text-red-700"
+                    onClick={() => void removeQuestion(i)}
+                  >
+                    第{q.order}問を削除
+                  </Button>
+                </div>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
