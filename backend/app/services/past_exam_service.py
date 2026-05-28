@@ -25,7 +25,10 @@ from app.ai.schemas.past_exam import (
     PastQuestionProfile,
 )
 from app.services.firebase_admin_service import FirebaseAdminService
-from app.services.past_exam_question_utils import consolidate_parsed_questions
+from app.services.past_exam_question_utils import (
+    consolidate_parsed_questions,
+    ensure_majors_from_exam_text,
+)
 from app.services.pdf_text_extractor import extract_text_from_pdf, extract_text_from_pdfs
 
 logger = logging.getLogger(__name__)
@@ -832,6 +835,13 @@ class PastExamService:
                 len(normalized_questions),
                 len(consolidated),
             )
+        consolidated, recovered_notes = ensure_majors_from_exam_text(consolidated, exam_text)
+        if recovered_notes:
+            logger.info("Recovered majors from exam OCR text: %s", recovered_notes)
+            merged_parse_notes = result.parse_notes
+            for note in recovered_notes:
+                merged_parse_notes = f"{merged_parse_notes}\n{note}".strip()
+            result = result.model_copy(update={"parse_notes": merged_parse_notes})
         result = result.model_copy(update={"questions": consolidated})
 
         empty_prompts = sum(1 for q in consolidated if not q.prompt.strip())
@@ -1039,6 +1049,12 @@ class PastExamService:
             return new.strip()
         return f"{existing.strip()}\n{new.strip()}"
 
+    def _existing_questions_by_firestore_id(
+        self, university_slug: str, year: int
+    ) -> dict[str, dict]:
+        rows = self.list_past_questions(university_slug, year)
+        return {row["id"]: row for row in rows if row.get("id")}
+
     def write_to_firestore(
         self,
         *,
@@ -1119,22 +1135,29 @@ class PastExamService:
             exam_year_patch["createdAt"] = now
 
         if provided.exam:
-            listening_scripts = [s.model_dump() for s in parsed.listening_scripts]
             exam_year_patch.update(
                 {
                     "examType": parsed.exam_type,
                     "sourcePdfPaths": exam_storage_paths,
                     "importStatus": profile_status,
                     "questionCount": len(parsed.questions),
-                    "listeningScriptCount": len(listening_scripts),
-                    "listeningScripts": listening_scripts,
-                    "parseNotes": parsed.parse_notes,
+                    "parseNotes": (
+                        self._append_parse_notes(
+                            existing_year.get("parseNotes") or "",
+                            parsed.parse_notes,
+                        )
+                        if existing_year.get("parseNotes")
+                        else parsed.parse_notes
+                    ),
                 }
             )
+            if provided.listening:
+                listening_scripts = [s.model_dump() for s in parsed.listening_scripts]
+                exam_year_patch["listeningScriptCount"] = len(listening_scripts)
+                exam_year_patch["listeningScripts"] = listening_scripts
+                exam_year_patch["sourceListeningPdfPath"] = listening_storage_path
             if provided.answers:
                 exam_year_patch["sourceAnswersPdfPath"] = answers_storage_path
-            if provided.listening:
-                exam_year_patch["sourceListeningPdfPath"] = listening_storage_path
             if provided.analysis:
                 exam_year_patch["sourceAnalysisPdfPath"] = analysis_storage_path
         else:
@@ -1166,58 +1189,79 @@ class PastExamService:
             self.firebase.set_nested_doc(exam_year_path, exam_year_patch, merge=True)
 
         question_ids: list[str] = []
+        existing_questions = self._existing_questions_by_firestore_id(university_slug, year)
+
         if provided.exam:
             for q in parsed.questions:
                 enriched = self._enrich_parsed_question(q, exam_type=parsed.exam_type)
                 qtype = enriched.type
                 answer_format = enriched.answer_format or self._infer_answer_format(q.prompt)
                 doc_id = self._question_doc_id(q.major_order, q.part_label)
+                firestore_id = f"{year}_{doc_id}"
+                existing_row = existing_questions.get(firestore_id) or {}
+
                 profile = PastQuestionProfile(
                     archetype=self._guess_archetype(qtype, q.prompt, answer_format=answer_format),
                     required_skills=[],
                     common_traps=[],
                 )
-                has_answer = bool(q.model_answer.strip())
-                model_source = "official" if has_answer and sources.answers_pdf else (
-                    "official" if has_answer else "none"
-                )
+                patch: dict = {
+                    "year": year,
+                    "majorOrder": q.major_order,
+                    "partLabel": q.part_label,
+                    "type": qtype,
+                    "answerFormat": answer_format,
+                    "prompt": enriched.prompt,
+                    "points": q.points,
+                    "profileStatus": profile_status,
+                    "importNotes": q.notes,
+                    "updatedAt": now,
+                }
+                if existing_row.get("createdAt"):
+                    patch["createdAt"] = existing_row["createdAt"]
+                else:
+                    patch["createdAt"] = now
+
+                if provided.answers:
+                    has_answer = bool(q.model_answer.strip())
+                    patch["modelAnswer"] = q.model_answer
+                    patch["modelAnswerSource"] = "official" if has_answer else "none"
+                    patch["modelAnswerStatus"] = "draft"
+                    patch["profile"] = profile.model_dump(by_alias=True)
+                elif not existing_row:
+                    patch["modelAnswer"] = ""
+                    patch["modelAnswerSource"] = "none"
+                    patch["modelAnswerStatus"] = "draft"
+                    patch["profile"] = profile.model_dump(by_alias=True)
+                else:
+                    # 問題のみ再取り込み: 模範解答・profile は既存を維持（patch に含めない）
+                    pass
+
                 self.firebase.set_nested_doc(
-                    ["universities", university_slug, "past_questions", f"{year}_{doc_id}"],
-                    {
-                        "year": year,
-                        "majorOrder": q.major_order,
-                        "partLabel": q.part_label,
-                        "type": qtype,
-                        "answerFormat": answer_format,
-                        "prompt": q.prompt,
-                        "modelAnswer": q.model_answer,
-                        "modelAnswerSource": model_source,
-                        "modelAnswerStatus": "draft" if has_answer else "draft",
-                        "points": q.points,
-                        "profile": profile.model_dump(by_alias=True),
-                        "profileStatus": profile_status,
-                        "importNotes": q.notes,
-                        "createdAt": now,
-                    },
-                    merge=False,
+                    ["universities", university_slug, "past_questions", firestore_id],
+                    patch,
+                    merge=True,
                 )
-                question_ids.append(f"{year}_{doc_id}")
+                question_ids.append(firestore_id)
         elif provided.answers:
             for q in parsed.questions:
                 doc_id = self._question_doc_id(q.major_order, q.part_label)
                 has_answer = bool(q.model_answer.strip())
+                if not has_answer:
+                    continue
+                firestore_id = f"{year}_{doc_id}"
                 patch = {
                     "modelAnswer": q.model_answer,
-                    "modelAnswerSource": "official" if has_answer else "none",
-                    "modelAnswerStatus": "draft" if has_answer else "draft",
+                    "modelAnswerSource": "official",
+                    "modelAnswerStatus": "draft",
                     "updatedAt": now,
                 }
                 self.firebase.set_nested_doc(
-                    ["universities", university_slug, "past_questions", f"{year}_{doc_id}"],
+                    ["universities", university_slug, "past_questions", firestore_id],
                     patch,
                     merge=True,
                 )
-                question_ids.append(f"{year}_{doc_id}")
+                question_ids.append(firestore_id)
             if question_ids:
                 self.firebase.set_nested_doc(
                     exam_year_path,

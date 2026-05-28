@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiClient } from "@/lib/api-client";
 import { getDb } from "@/lib/firebase";
 import type { Test } from "@/types/firestore";
+import { QUESTION_TEXT_HINT, QuestionPromptBlock } from "@/lib/question-text-format";
 import type { GeneratedQuestionDraft } from "@/types/question-design";
 
 function defaultTestTitle(draft: GeneratedQuestionDraft) {
@@ -133,8 +134,8 @@ export function QuestionDraftsPage() {
   return (
     <div>
       <PageHeader
-        title="生成問題の下書き"
-        description="新規問題セットとして使うのが基本です。必要なときだけ既存セットに追加できます"
+        title="生成下書き（問題・模範解答）"
+        description="生成した問題文と模範解答の下書きです。新規問題セットとして使うのが基本で、必要なときだけ既存セットに追加できます"
       />
       <div className="page-content space-y-6">
         <div className="flex flex-wrap gap-3">
@@ -166,7 +167,7 @@ export function QuestionDraftsPage() {
             <Button asChild className="mt-4 min-h-11 gap-2">
               <Link to="/questions/generate">
                 <Plus className="h-4 w-4" />
-                問題を生成する
+                問題と模範解答を生成する
               </Link>
             </Button>
           </Card>
@@ -186,9 +187,10 @@ export function QuestionDraftsPage() {
                   </CardHeader>
                   <div>
                     <p className="font-ja text-xs font-medium text-slate-500">問題文</p>
-                    <pre className="mt-1 whitespace-pre-wrap font-ja text-sm leading-relaxed text-slate-800">
-                      {draft.prompt}
-                    </pre>
+                    <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <QuestionPromptBlock prompt={draft.prompt} />
+                    </div>
+                    <p className="mt-2 font-ja text-xs text-slate-500">{QUESTION_TEXT_HINT}</p>
                   </div>
                   <div>
                     <p className="font-ja text-xs font-medium text-slate-500">模範解答</p>

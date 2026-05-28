@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Save } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Plus, Save } from "lucide-react";
 import { LoadingOverlay } from "@/components/feedback/LoadingOverlay";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { apiClient } from "@/lib/api-client";
@@ -19,6 +20,24 @@ import type { AnswerFormat, ParsedPastQuestionDraft } from "@/types/past-exam";
 function questionTitle(q: ParsedPastQuestionDraft) {
   const part = q.partLabel ? ` ${q.partLabel}` : "";
   return `第${q.majorOrder}問${part}`;
+}
+
+function nextMajorOrder(questions: ParsedPastQuestionDraft[]): number {
+  if (questions.length === 0) return 1;
+  return Math.max(...questions.map((q) => q.majorOrder), 0) + 1;
+}
+
+function createBlankQuestion(majorOrder: number): ParsedPastQuestionDraft {
+  return {
+    majorOrder,
+    partLabel: null,
+    type: "english",
+    answerFormat: "english_writing",
+    prompt: "",
+    modelAnswer: "",
+    points: null,
+    notes: "",
+  };
 }
 
 export function PastExamImportReviewPage() {
@@ -73,7 +92,7 @@ export function PastExamImportReviewPage() {
   const updateQuestion = (
     index: number,
     field: keyof ParsedPastQuestionDraft,
-    value: string | AnswerFormat,
+    value: string | AnswerFormat | number | null,
   ) => {
     setParsed((prev) => {
       if (!prev) return prev;
@@ -81,6 +100,16 @@ export function PastExamImportReviewPage() {
       next[index] = { ...next[index], [field]: value };
       return { ...prev, questions: next };
     });
+  };
+
+  const addQuestion = () => {
+    const majorOrder = nextMajorOrder(questions);
+    setParsed((prev) => {
+      if (!prev) return prev;
+      return { ...prev, questions: [...prev.questions, createBlankQuestion(majorOrder)] };
+    });
+    setExpandedIndex(questions.length);
+    setError(null);
   };
 
   const commit = async (profileStatus: "draft" | "approved") => {
@@ -147,11 +176,36 @@ export function PastExamImportReviewPage() {
           </Card>
         )}
 
+        <Card className="border-slate-200">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 space-y-0">
+            <div>
+              <CardTitle className="font-ja text-base">大問一覧</CardTitle>
+              <CardDescription className="font-ja">
+                PDF に無い大問は「大問を追加」から手入力できます（例: 第5問）。
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 shrink-0 gap-2"
+              disabled={loading}
+              onClick={addQuestion}
+            >
+              <Plus className="h-4 w-4" />
+              大問を追加
+            </Button>
+          </CardHeader>
+        </Card>
+
         {questions.length === 0 && !parsed.listeningScripts?.length && (
-          <Card className="p-6">
+          <Card className="p-6 text-center">
             <p className="font-ja text-sm text-slate-600">
-              大問の編集項目はありません。内容を確認して保存してください。
+              大問がまだありません。「大問を追加」で第1問から入力できます。
             </p>
+            <Button type="button" className="mt-4 min-h-11 gap-2" onClick={addQuestion}>
+              <Plus className="h-4 w-4" />
+              大問を追加
+            </Button>
           </Card>
         )}
 
@@ -160,7 +214,7 @@ export function PastExamImportReviewPage() {
             const open = expandedIndex === index;
             const format = resolveAnswerFormat(q.answerFormat, q.prompt);
             return (
-              <Card key={`${q.majorOrder}-${q.partLabel ?? index}`}>
+              <Card key={`q-${index}`}>
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-4 p-6 text-left"
@@ -174,6 +228,33 @@ export function PastExamImportReviewPage() {
                 </button>
                 {open && (
                   <div className="space-y-4 border-t border-slate-100 px-6 pb-6 pt-4">
+                    <div className="flex flex-wrap gap-4">
+                      <div className="min-w-[7rem] flex-1">
+                        <label className="font-ja text-sm text-slate-600">大問番号</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={q.majorOrder}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            updateQuestion(index, "majorOrder", Number.isInteger(n) && n >= 1 ? n : 1);
+                          }}
+                          className="mt-1 max-w-[8rem]"
+                        />
+                      </div>
+                      <div className="min-w-[10rem] flex-[2]">
+                        <label className="font-ja text-sm text-slate-600">小問ラベル（任意）</label>
+                        <Input
+                          value={q.partLabel ?? ""}
+                          onChange={(e) =>
+                            updateQuestion(index, "partLabel", e.target.value.trim() || null)
+                          }
+                          placeholder="例: (1) または空欄"
+                          className="mt-1 font-ja"
+                        />
+                      </div>
+                    </div>
                     <div>
                       <label className="font-ja text-sm text-slate-600">解答方式</label>
                       <select

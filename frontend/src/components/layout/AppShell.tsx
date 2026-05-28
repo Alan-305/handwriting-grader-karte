@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { to: "/students", label: "生徒", icon: Users },
   { to: "/tests", label: "問題", icon: BookOpen },
-  { to: "/questions/generate", label: "問題生成", icon: Sparkles },
+  { to: "/questions/generate", label: "問題・模範解答生成", icon: Sparkles },
   { to: "/question-drafts", label: "下書き", icon: FileEdit },
   { to: "/sessions/new", label: "添削", icon: ClipboardList },
   { to: "/past-exams", label: "過去問", icon: Archive },

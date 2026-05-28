@@ -96,6 +96,13 @@ echo "==> API URL: $API_URL"
 echo "==> Building frontend..."
 export VITE_API_BASE="$API_URL"
 export VITE_FIREBASE_AUTH_DOMAIN="${VITE_FIREBASE_AUTH_DOMAIN:-${PROJECT_ID}.firebaseapp.com}"
+for key in VITE_FIREBASE_API_KEY VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_APP_ID; do
+  if [[ -z "${!key:-}" ]]; then
+    echo "Error: $key is empty. Set it in $ENV_FILE before building the frontend."
+    echo "  Run: firebase apps:sdkconfig WEB --project $PROJECT_ID"
+    exit 1
+  fi
+done
 (cd "$ROOT/frontend" && npm ci && npm run build)
 
 echo "==> Deploying Firebase (Hosting + rules + indexes)..."

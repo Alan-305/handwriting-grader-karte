@@ -3,10 +3,12 @@ PAST_EXAM_IMPORT_SYSTEM = """あなたは大学入試の過去問題PDFから、
 入力はPDFから抽出したテキストです。東京大学二次試験英語を想定します。
 
 【分割単位 — 最重要】
-- 「第1問・第2問・第3問・第4問」の大問単位で分割する
+- 「第1問」から始まる**大問見出しごと**に分割する（東大英語など **第5問まで**ある年度は第5問も必ず含める）
+- **問題用紙に第5問があるのに questions から除外してはならない**（本文が途中で切れていても省略しない）
+- 本文が不完全でも majorOrder=5 のエントリを作り、読めた範囲を prompt に入れ、不足は notes に「要確認（本文途切れ）」と書く
 - OCRのページ区切り（--- Pages 1-8 --- 等）や行単位で分割してはならない
 - 第2問・第3問内の短答 (1)(2)(3)(4) は、必要な場合のみ partLabel 付きで別エントリ
-- 目安: questions は 4〜12 件程度。40件以上に増やさない
+- 目安: questions は 5〜15 件程度（大問＋必要な小問）。40件以上に増やさない
 
 ルール:
 - **必ず `prompt` フィールドに**問題文・指示文・英語本文をすべて入れる（別フィールドだけに書かない）
@@ -17,7 +19,7 @@ PAST_EXAM_IMPORT_SYSTEM = """あなたは大学入試の過去問題PDFから、
 - 和訳・要約・記述の指示（日本語）と英語本文が同じ大問にある場合は、同一の prompt にまとめる
 - modelAnswer は模範解答PDFから対応する解答。なければ ""
 - type: english / japanese / symbol
-- majorOrder は大問番号（1〜4）
+- majorOrder は大問番号（1, 2, 3, 4, 5 …。PDF に現れる最大の大問番号まで）
 - points は明示されていれば数値、なければ null
 - notes は補足のみ。不要なら ""（null 禁止）
 - 文字列フィールドに null を使わない
@@ -60,7 +62,7 @@ def build_past_exam_import_prompt(
     if separate_listening_pdf:
         listening_note = (
             "\n※ リスニング脚本は別PDFで取り込みます。"
-            "listeningScripts は空配列 [] にし、大問（第1〜4問）のみ questions に出力してください。"
+            "listeningScripts は空配列 [] にし、問題用紙上の大問（第5問を含む）を questions に出力してください。"
         )
     return f"""大学スラッグ: {university_slug}
 対象年度: {year}

@@ -122,7 +122,7 @@ export function QuestionGeneratePage() {
       });
       navigate("/question-drafts");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "問題の生成に失敗しました");
+      setError(err instanceof Error ? err.message : "問題・模範解答の生成に失敗しました");
     } finally {
       setGenerating(false);
     }
@@ -132,8 +132,8 @@ export function QuestionGeneratePage() {
     <div>
       <LoadingOverlay visible={generating} message="考えてます" />
       <PageHeader
-        title="問題生成"
-        description="過去問の出題型（第1問(A)など）を選んで、新しいオリジナル問題を生成します"
+        title="問題・模範解答の生成"
+        description="過去問の出題型（第1問(A)など）を選び、新しいオリジナルの問題文と模範解答を生成します"
       />
       <div className="page-content space-y-6">
         <div className="flex flex-wrap gap-3">
@@ -287,7 +287,7 @@ export function QuestionGeneratePage() {
           <div className="flex justify-end">
             <Button type="submit" className="min-h-11 gap-2" disabled={generating || selectedTypes.size === 0}>
               <Sparkles className="h-4 w-4" />
-              選択した型で生成
+              問題と模範解答を生成
             </Button>
           </div>
         </SafeForm>

@@ -164,7 +164,7 @@ export function PastExamImportPage() {
             <CardTitle className="font-ja text-base">取り込む年度</CardTitle>
             <CardDescription className="font-ja leading-relaxed">
               任意の年度を指定できます。すでに登録済みの年度に追加する場合は、選んだ PDF だけが更新され、
-              ファイルを選んでいない種類は上書きされません。
+              選んでいない種類（模範解答・リスニングなど）はそのまま残ります。
             </CardDescription>
           </CardHeader>
           <div className="px-6 pb-6">
@@ -198,7 +198,8 @@ export function PastExamImportPage() {
             </p>
             {supplementYear && (
               <p className="rounded-lg border border-blue-200 bg-blue-50/80 px-4 py-3 font-ja text-sm leading-relaxed text-blue-900">
-                {supplementYear} 年度への追加取り込みです。今回選択した PDF だけが保存され、未選択のファイルはそのまま残ります。
+                {supplementYear} 年度への追加取り込みです。今回選択した PDF だけが保存され、
+                模範解答を選んでいない場合は、すでに登録済みの模範解答は消えません。
               </p>
             )}
             {PDF_SLOTS.map((slot, index) => (

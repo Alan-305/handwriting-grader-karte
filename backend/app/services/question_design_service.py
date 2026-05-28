@@ -6,6 +6,10 @@ from pydantic import BaseModel, Field
 
 from app.ai.gemini_client import GeminiAnalysisClient
 from app.ai.prompts.question_generation import GENERATION_SYSTEM, build_generation_user_prompt
+from app.services.question_prompt_markup import (
+    append_markup_reminder_if_needed,
+    normalize_prompt_markup,
+)
 from app.ai.prompts.question_validity import VALIDITY_CHECK_SYSTEM, build_validity_user_prompt
 from pydantic import BaseModel, Field
 
@@ -312,6 +316,12 @@ class QuestionDesignService:
         drafts_ref = self._drafts_collection(teacher_id)
         for item in raw.questions:
             data = item.model_dump(by_alias=True)
+            data["prompt"] = normalize_prompt_markup(data.get("prompt") or "")
+            data["notes"] = append_markup_reminder_if_needed(
+                data["prompt"],
+                data.get("answerFormat"),
+                data.get("notes") or "",
+            )
             doc = {
                 "teacherId": teacher_id,
                 "universitySlug": university_slug,

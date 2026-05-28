@@ -1,4 +1,17 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _null_to_str(value: object) -> object:
+    return "" if value is None else value
+
+
+def _coerce_int(value: object, default: int) -> int:
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 class RevisionSuggestion(BaseModel):
@@ -43,6 +56,39 @@ class GeneratedQuestionItem(BaseModel):
     reference_examples: list[str] = Field(alias="referenceExamples", default_factory=list)
 
     model_config = {"populate_by_name": True}
+
+    @field_validator("type_label", "prompt", "model_answer", "notes", mode="before")
+    @classmethod
+    def coerce_optional_strings(cls, value: object) -> object:
+        return _null_to_str(value)
+
+    @field_validator("major_order", mode="before")
+    @classmethod
+    def coerce_major_order(cls, value: object) -> int:
+        return _coerce_int(value, 1)
+
+    @field_validator("points", mode="before")
+    @classmethod
+    def coerce_points(cls, value: object) -> int:
+        return _coerce_int(value, 10)
+
+    @field_validator("part_label", mode="before")
+    @classmethod
+    def coerce_part_label(cls, value: object) -> object:
+        if value is None or value == "":
+            return None
+        return str(value).strip() or None
+
+    @field_validator("reference_examples", mode="before")
+    @classmethod
+    def coerce_reference_examples(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [value] if value.strip() else []
+        if isinstance(value, list):
+            return [str(x).strip() for x in value if str(x).strip()]
+        return []
 
 
 class GenerateQuestionsResponse(BaseModel):

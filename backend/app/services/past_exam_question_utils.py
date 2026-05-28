@@ -2,9 +2,124 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 
 from app.ai.schemas.past_exam import ParsedPastQuestion
+
+_MAJOR_HEADING = re.compile(
+    r"第\s*(?P<num>[0-9０-９]{1,2}|[一二三四五六七八九十]+)\s*問",
+)
+
+_KANJI_DIGIT = {
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
+}
+
+
+def _major_order_from_token(token: str) -> int | None:
+    token = token.strip()
+    if not token:
+        return None
+    if token.isdigit():
+        return int(token)
+    if len(token) == 1 and token in _KANJI_DIGIT:
+        return _KANJI_DIGIT[token]
+    if token == "十":
+        return 10
+    # 十一などは今回の入試大問では稀なため省略
+    return None
+
+
+def extract_major_sections(exam_text: str) -> dict[int, str]:
+    """OCR/埋め込みテキストから「第N問」ブロックを抽出する。"""
+    matches = list(_MAJOR_HEADING.finditer(exam_text))
+    if not matches:
+        return {}
+
+    sections: dict[int, str] = {}
+    for index, match in enumerate(matches):
+        major = _major_order_from_token(match.group("num") or "")
+        if major is None:
+            continue
+        start = match.start()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(exam_text)
+        body = exam_text[start:end].strip()
+        if body:
+            sections[major] = body
+    return sections
+
+
+def ensure_majors_from_exam_text(
+    questions: list[ParsedPastQuestion],
+    exam_text: str,
+) -> tuple[list[ParsedPastQuestion], list[str]]:
+    """AI が省略した大問を OCR テキストの見出しから復元する。"""
+    sections = extract_major_sections(exam_text)
+    if not sections:
+        return questions, []
+
+    by_major: dict[int, ParsedPastQuestion] = {}
+    for q in questions:
+        if q.major_order not in by_major or len(q.prompt) > len(by_major[q.major_order].prompt):
+            by_major[q.major_order] = q
+
+    recovered_notes: list[str] = []
+    out: list[ParsedPastQuestion] = list(questions)
+
+    for major in sorted(sections):
+        section_text = sections[major]
+        existing = by_major.get(major)
+        if existing is None:
+            out.append(
+                ParsedPastQuestion(
+                    major_order=major,
+                    type="english",
+                    prompt=section_text,
+                    notes=(
+                        "PDFテキストの見出しから自動復元しました。"
+                        "AI構造化では省略されていた可能性があります。内容を確認してください。"
+                    ),
+                )
+            )
+            recovered_notes.append(f"第{major}問をOCRテキストから復元しました。")
+            continue
+
+        if not existing.prompt.strip() and section_text.strip():
+            for i, q in enumerate(out):
+                if q.major_order == major and (q.part_label or "") == (existing.part_label or ""):
+                    out[i] = q.model_copy(
+                        update={
+                            "prompt": section_text,
+                            "notes": (q.notes + "\nOCRテキストから問題文を補完。").strip(),
+                        }
+                    )
+                    recovered_notes.append(f"第{major}問の問題文をOCRテキストから補完しました。")
+                    break
+        elif existing.prompt.strip() and len(section_text) > len(existing.prompt) + 200:
+            for i, q in enumerate(out):
+                if q.major_order == major and (q.part_label or "") == (existing.part_label or ""):
+                    out[i] = q.model_copy(
+                        update={
+                            "prompt": section_text,
+                            "notes": (q.notes + "\nOCRテキストの方が長いため問題文を差し替え。").strip(),
+                        }
+                    )
+                    recovered_notes.append(
+                        f"第{major}問の問題文をOCRテキストの長い版に差し替えました。"
+                    )
+                    break
+
+    out.sort(key=lambda q: (q.major_order, str(q.part_label or "")))
+    return out, recovered_notes
 
 
 def dedupe_text_blocks(blocks: list[str]) -> list[str]:

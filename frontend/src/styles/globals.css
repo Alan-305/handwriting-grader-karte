@@ -105,7 +105,8 @@ body {
   }
 
   .print-flow-document.print-layout-document[data-page-margin="wide"],
-  .print-flow-document.print-flow-document--answer-sheet.print-layout-document[data-page-margin="wide"] {
+  .print-flow-document.print-flow-document--answer-sheet.print-layout-document[data-page-margin="wide"],
+  .grading-print-document.print-layout-document[data-page-margin="wide"] {
     padding: 6mm 8mm !important;
     box-sizing: border-box;
   }
@@ -133,6 +134,20 @@ body {
   .print-break-avoid {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .grading-print-document {
+    font-size: calc(1rem * var(--grading-print-font-scale, 100%) / 100);
+    line-height: var(--grading-print-line-height, 1.55);
+  }
+
+  .grading-print-document .grading-print-block + .grading-print-block,
+  .grading-print-document .grading-print-question .grading-print-block {
+    margin-top: var(--grading-print-block-gap, 4mm);
+  }
+
+  .grading-print-document .grading-print-question > *:first-child {
+    margin-top: 0;
   }
 
   /* 解答用紙：印刷時各ページ四隅にトンボ */
@@ -180,7 +195,8 @@ body {
   }
 
   .print-flow-document.print-layout-document[data-page-margin="wide"],
-  .print-flow-document.print-flow-document--answer-sheet.print-layout-document[data-page-margin="wide"] {
+  .print-flow-document.print-flow-document--answer-sheet.print-layout-document[data-page-margin="wide"],
+  .grading-print-document.print-layout-document[data-page-margin="wide"] {
     padding: 26mm 32mm;
   }
 

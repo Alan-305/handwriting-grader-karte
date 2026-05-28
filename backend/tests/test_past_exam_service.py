@@ -160,6 +160,75 @@ def test_merge_answer_updates():
     assert merged[1].model_answer == "ans2"
 
 
+def test_write_exam_only_preserves_existing_model_answers(tmp_path, monkeypatch):
+    from app.ai.schemas.past_exam import ParsedPastQuestion, PastExamParseResponse
+
+    service = PastExamService()
+    written: list[tuple[str, dict, bool]] = []
+
+    def fake_set_nested(path, data, merge=False):
+        written.append((path[-1], data, merge))
+
+    exam_pdf = tmp_path / "exam.pdf"
+    exam_pdf.write_bytes(b"%PDF-1.4")
+
+    monkeypatch.setattr(service, "ensure_university", lambda slug: None)
+    monkeypatch.setattr(
+        service,
+        "get_exam_year",
+        lambda slug, year: {"parseNotes": "prior note", "sourceAnswersPdfPath": "gs://answers.pdf"},
+    )
+    monkeypatch.setattr(
+        service,
+        "_existing_questions_by_firestore_id",
+        lambda slug, year: {
+            "2024_1": {
+                "id": "2024_1",
+                "majorOrder": 1,
+                "modelAnswer": "既存の模範解答",
+                "modelAnswerSource": "official",
+                "createdAt": "2024-01-01T00:00:00Z",
+            }
+        },
+    )
+    monkeypatch.setattr(service.firebase, "set_nested_doc", fake_set_nested)
+    monkeypatch.setattr(service.firebase, "bucket", lambda: None)
+
+    parsed = PastExamParseResponse(
+        year=2024,
+        questions=[
+            ParsedPastQuestion(
+                major_order=1,
+                type="english",
+                prompt="更新後の問題文",
+                model_answer="",
+            )
+        ],
+    )
+    service.write_to_firestore(
+        university_slug="todai",
+        year=2024,
+        parsed=parsed,
+        sources=PastExamService.build_sources_from_paths([exam_pdf]),
+        upload_pdf=False,
+        provided=ProvidedSources(exam=True, answers=False),
+    )
+
+    question_writes = [w for w in written if w[0].startswith("2024_")]
+    assert len(question_writes) == 1
+    doc_id, patch, merge = question_writes[0]
+    assert doc_id == "2024_1"
+    assert merge is True
+    assert patch["prompt"] == "更新後の問題文"
+    assert "modelAnswer" not in patch
+
+    year_writes = [w for w in written if w[0] == "2024"]
+    assert year_writes
+    year_patch = year_writes[0][1]
+    assert "sourceAnswersPdfPath" not in year_patch
+    assert "listeningScripts" not in year_patch
+
+
 def test_import_session_roundtrip(tmp_path, monkeypatch):
     from app.ai.schemas.past_exam import ParsedPastQuestion, PastExamParseResponse
 

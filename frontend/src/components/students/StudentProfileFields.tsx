@@ -117,7 +117,7 @@ export function StudentProfileFields({ profile, onChange, readOnly = false }: Pr
               過去問
             </Link>
             に登録した大学から選びます（{loading ? "読み込み中" : `${displayList.length} 校`}）。
-            学部名は手入力してください。問題生成・カルテ分析で志望校の文脈に使われます。
+            学部名は手入力してください。問題・模範解答の生成・カルテ分析で志望校の文脈に使われます。
           </CardDescription>
         </CardHeader>
       </Card>

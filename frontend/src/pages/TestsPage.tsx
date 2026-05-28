@@ -88,7 +88,7 @@ export function TestsPage() {
             <Link to="/question-drafts">下書き一覧</Link>
           </Button>
           <Button asChild variant="outline" className="min-h-11 gap-2">
-            <Link to="/questions/generate">問題を生成</Link>
+            <Link to="/questions/generate">問題・模範解答を生成</Link>
           </Button>
           <Button onClick={createTest} className="min-h-11 gap-2">
             <Plus className="h-4 w-4" />
