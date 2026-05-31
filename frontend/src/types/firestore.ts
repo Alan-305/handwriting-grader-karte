@@ -95,6 +95,8 @@ export interface Student {
   targetUniversities: TargetUniversityRef[];
   interviewProfile?: StudentInterviewProfile;
   memo?: string;
+  /** 閲覧専用で招待したメールアドレス（すべて小文字で保存）。成果物の閲覧のみ可・編集不可 */
+  viewerEmails?: string[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

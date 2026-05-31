@@ -1,7 +1,13 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
+import { ViewerShell } from "@/components/layout/ViewerShell";
 import { useAuth } from "@/hooks/useAuth";
 import { LoginPage } from "@/pages/LoginPage";
+import { ViewerLoginPage } from "@/pages/viewer/ViewerLoginPage";
+import { ViewerFinishPage } from "@/pages/viewer/ViewerFinishPage";
+import { ViewerHomePage } from "@/pages/viewer/ViewerHomePage";
+import { ViewerStudentDashboardPage } from "@/pages/viewer/ViewerStudentDashboardPage";
+import { ViewerSessionResultPage } from "@/pages/viewer/ViewerSessionResultPage";
 import { PrintAnswerSheetPage } from "@/pages/PrintAnswerSheetPage";
 import { PrintTestPaperPage } from "@/pages/PrintTestPaperPage";
 import { PrintStudentPage } from "@/pages/PrintStudentPage";
@@ -26,16 +32,29 @@ import { PastExamYearDetailPage } from "@/pages/PastExamYearDetailPage";
 import { QuestionGeneratePage } from "@/pages/QuestionGeneratePage";
 import { QuestionDraftsPage } from "@/pages/QuestionDraftsPage";
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center font-ja text-slate-600">
-        読み込み中...
-      </div>
-    );
-  }
+function AuthLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center font-ja text-slate-600">
+      読み込み中...
+    </div>
+  );
+}
+
+/** 教師（編集者）専用ルート。閲覧者は閲覧ホームへ送る */
+function RequireTeacher({ children }: { children: React.ReactNode }) {
+  const { user, role, loading } = useAuth();
+  if (loading) return <AuthLoading />;
   if (!user) return <Navigate to="/login" replace />;
+  if (role === "viewer") return <Navigate to="/viewer" replace />;
+  return <>{children}</>;
+}
+
+/** 閲覧者専用ルート。教師は通常画面へ送る */
+function RequireViewer({ children }: { children: React.ReactNode }) {
+  const { user, role, loading } = useAuth();
+  if (loading) return <AuthLoading />;
+  if (!user) return <Navigate to="/viewer/login" replace />;
+  if (role === "teacher") return <Navigate to="/students" replace />;
   return <>{children}</>;
 }
 
@@ -43,11 +62,25 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/viewer/login" element={<ViewerLoginPage />} />
+      <Route path="/viewer/finish" element={<ViewerFinishPage />} />
+      <Route
+        path="/viewer"
+        element={
+          <RequireViewer>
+            <ViewerShell />
+          </RequireViewer>
+        }
+      >
+        <Route index element={<ViewerHomePage />} />
+        <Route path="students/:studentId" element={<ViewerStudentDashboardPage />} />
+        <Route path="sessions/:sessionId" element={<ViewerSessionResultPage />} />
+      </Route>
       <Route
         element={
-          <ProtectedRoute>
+          <RequireTeacher>
             <AppShell />
-          </ProtectedRoute>
+          </RequireTeacher>
         }
       >
         <Route index element={<Navigate to="/students" replace />} />

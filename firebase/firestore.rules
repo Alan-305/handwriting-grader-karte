@@ -5,6 +5,19 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == teacherId;
     }
 
+    // 招待された閲覧者か（生徒ドキュメントの viewerEmails に小文字メールが含まれるか）
+    function isViewerOfStudentData(studentData) {
+      return request.auth != null
+        && request.auth.token.email != null
+        && (request.auth.token.email.lower() in studentData.get('viewerEmails', []));
+    }
+
+    function isViewerOfStudent(studentId) {
+      return isViewerOfStudentData(
+        get(/databases/$(database)/documents/students/$(studentId)).data
+      );
+    }
+
     match /teachers/{teacherId} {
       allow read, write: if request.auth != null && request.auth.uid == teacherId;
 
@@ -18,17 +31,25 @@ service cloud.firestore {
     }
 
     match /students/{studentId} {
-      allow read, write: if isTeacher(resource.data.teacherId);
+      // 閲覧者は read のみ。書き込みは担当教師だけ
+      allow read: if isTeacher(resource.data.teacherId) || isViewerOfStudentData(resource.data);
+      allow write: if isTeacher(resource.data.teacherId);
       allow create: if isTeacher(request.resource.data.teacherId);
 
+      // 成果物（カルテ）は閲覧者にも公開（read のみ）
       match /karte_snapshots/{snapshotId} {
-        allow read, write: if isTeacher(get(/databases/$(database)/documents/students/$(studentId)).data.teacherId);
+        allow read: if isTeacher(get(/databases/$(database)/documents/students/$(studentId)).data.teacherId)
+          || isViewerOfStudent(studentId);
+        allow write: if isTeacher(get(/databases/$(database)/documents/students/$(studentId)).data.teacherId);
       }
 
       match /stats/{statId} {
-        allow read, write: if isTeacher(get(/databases/$(database)/documents/students/$(studentId)).data.teacherId);
+        allow read: if isTeacher(get(/databases/$(database)/documents/students/$(studentId)).data.teacherId)
+          || isViewerOfStudent(studentId);
+        allow write: if isTeacher(get(/databases/$(database)/documents/students/$(studentId)).data.teacherId);
       }
 
+      // 面談記録は教師内部資料。閲覧者には公開しない
       match /interview_records/{recordId} {
         allow read, write: if isTeacher(get(/databases/$(database)/documents/students/$(studentId)).data.teacherId);
       }
@@ -69,15 +90,22 @@ service cloud.firestore {
     }
 
     match /sessions/{sessionId} {
-      allow read, write: if isTeacher(resource.data.teacherId);
+      // 閲覧者は対象生徒の成果物のみ read 可。書き込みは担当教師だけ
+      allow read: if isTeacher(resource.data.teacherId)
+        || isViewerOfStudent(resource.data.studentId);
+      allow write: if isTeacher(resource.data.teacherId);
       allow create: if isTeacher(request.resource.data.teacherId);
 
       match /question_results/{resultId} {
-        allow read, write: if isTeacher(get(/databases/$(database)/documents/sessions/$(sessionId)).data.teacherId);
+        allow read: if isTeacher(get(/databases/$(database)/documents/sessions/$(sessionId)).data.teacherId)
+          || isViewerOfStudent(get(/databases/$(database)/documents/sessions/$(sessionId)).data.studentId);
+        allow write: if isTeacher(get(/databases/$(database)/documents/sessions/$(sessionId)).data.teacherId);
       }
 
       match /print_artifacts/{artifactId} {
-        allow read, write: if isTeacher(get(/databases/$(database)/documents/sessions/$(sessionId)).data.teacherId);
+        allow read: if isTeacher(get(/databases/$(database)/documents/sessions/$(sessionId)).data.teacherId)
+          || isViewerOfStudent(get(/databases/$(database)/documents/sessions/$(sessionId)).data.studentId);
+        allow write: if isTeacher(get(/databases/$(database)/documents/sessions/$(sessionId)).data.teacherId);
       }
     }
   }

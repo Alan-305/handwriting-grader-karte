@@ -27,6 +27,8 @@ let storageInstance: FirebaseStorage | null = null;
 if (isFirebaseConfigured) {
   app = initializeApp(firebaseConfig);
   authInstance = getAuth(app);
+  // 認証メール（ログインリンク等）を日本語テンプレートで送信する
+  authInstance.languageCode = "ja";
   dbInstance = getFirestore(app);
   storageInstance = getStorage(app);
 }

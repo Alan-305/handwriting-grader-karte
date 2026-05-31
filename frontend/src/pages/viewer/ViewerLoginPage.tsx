@@ -1,0 +1,186 @@
+import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
+import type { AuthError } from "firebase/auth";
+import { Eye, Mail } from "lucide-react";
+import { SafeForm } from "@/components/forms/SafeForm";
+import { Button } from "@/components/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { InlineLoading } from "@/components/feedback/LoadingOverlay";
+import { useAuth } from "@/hooks/useAuth";
+import { isFirebaseConfigured } from "@/lib/firebase";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function GoogleIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+      />
+    </svg>
+  );
+}
+
+function formatAuthError(error: unknown): string {
+  const code = (error as AuthError | undefined)?.code;
+  switch (code) {
+    case "auth/popup-closed-by-user":
+      return "ログインがキャンセルされました";
+    case "auth/popup-blocked":
+      return "ポップアップがブロックされました。Chrome / Safari でお試しください。";
+    case "auth/unauthorized-domain":
+      return "このURLではログインできません。配布された招待リンクから開いてください。";
+    case "auth/operation-not-allowed":
+      return "メールリンクログインが有効になっていません（管理者にお問い合わせください）。";
+    case "auth/invalid-email":
+      return "メールアドレスの形式が正しくありません";
+    default:
+      return error instanceof Error ? error.message : "ログインに失敗しました";
+  }
+}
+
+export function ViewerLoginPage() {
+  const { user, role, loading, loginViewerWithGoogle, sendViewerEmailLink } = useAuth();
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [linkSent, setLinkSent] = useState(false);
+  const [hostWarning, setHostWarning] = useState("");
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) {
+      setHostWarning("このアプリはまだ設定が完了していません（管理者にお問い合わせください）。");
+    }
+  }, []);
+
+  if (!loading && user && role === "viewer") return <Navigate to="/viewer" replace />;
+  if (!loading && user && role === "teacher") return <Navigate to="/students" replace />;
+
+  const handleGoogle = async () => {
+    setError("");
+    setSubmitting(true);
+    try {
+      await loginViewerWithGoogle();
+    } catch (e) {
+      setError(formatAuthError(e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSendLink = async () => {
+    setError("");
+    const normalized = email.trim().toLowerCase();
+    if (!EMAIL_PATTERN.test(normalized)) {
+      setError("メールアドレスの形式が正しくありません");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await sendViewerEmailLink(normalized);
+      setLinkSent(true);
+    } catch (e) {
+      setError(formatAuthError(e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-2 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 font-ja text-xs font-semibold text-blue-800">
+            <Eye className="h-3.5 w-3.5" />
+            閲覧専用ログイン
+          </div>
+          <CardTitle>カルテ・添削結果を見る</CardTitle>
+          <CardDescription className="font-ja leading-relaxed">
+            先生から招待されたメールアドレスでログインしてください。閲覧のみ可能です。
+          </CardDescription>
+        </CardHeader>
+
+        <div className="space-y-4 px-6 pb-6">
+          {submitting ? (
+            <InlineLoading message="考えてます" className="justify-center py-4" />
+          ) : linkSent ? (
+            <div className="space-y-2 rounded-lg border border-green-200 bg-green-50 px-4 py-4 text-center font-ja text-sm text-green-800">
+              <p className="font-semibold">ログイン用リンクを送信しました</p>
+              <p className="leading-relaxed">
+                <span className="font-en">{email.trim().toLowerCase()}</span> 宛のメールを開き、
+                リンクをタップしてください。
+              </p>
+              <p className="text-xs text-green-700">
+                届かない場合は迷惑メールフォルダ、または受信許可設定をご確認ください。
+              </p>
+            </div>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 w-full gap-3 border-slate-300 bg-white text-base hover:bg-slate-50"
+                onClick={handleGoogle}
+              >
+                <GoogleIcon />
+                Google でログイン
+              </Button>
+
+              <div className="flex items-center gap-3 py-1">
+                <span className="h-px flex-1 bg-slate-200" />
+                <span className="font-ja text-xs text-slate-400">または</span>
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+
+              <SafeForm className="space-y-2" onSafeSubmit={handleSendLink}>
+                <label className="font-ja text-sm font-medium text-slate-700" htmlFor="viewer-email">
+                  メールでログインリンクを受け取る
+                </label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="viewer-email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    className="pl-9 font-en"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <Button type="button" className="h-11 w-full" onClick={handleSendLink}>
+                  ログインリンクを送信
+                </Button>
+                <p className="font-ja text-xs leading-relaxed text-slate-500">
+                  Google アカウントをお持ちでなくても、どのメールアドレスでもご利用いただけます。
+                </p>
+              </SafeForm>
+            </>
+          )}
+
+          {hostWarning && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-center font-ja text-xs text-amber-800">
+              {hostWarning}
+            </p>
+          )}
+          {error && <p className="text-center font-ja text-sm text-red-600">{error}</p>}
+        </div>
+      </Card>
+    </div>
+  );
+}

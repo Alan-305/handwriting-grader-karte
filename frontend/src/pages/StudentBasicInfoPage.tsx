@@ -9,6 +9,7 @@ import {
   emptyStudentProfile,
   profileFromStudent,
 } from "@/components/students/StudentProfileFields";
+import { StudentSharePanel } from "@/components/students/StudentSharePanel";
 import { Button } from "@/components/ui/button";
 import { useStudents } from "@/hooks/useStudent";
 import { getDb } from "@/lib/firebase";
@@ -104,6 +105,8 @@ export function StudentBasicInfoPage() {
             </Button>
           </div>
         </SafeForm>
+
+        <StudentSharePanel studentId={student.id} viewerEmails={student.viewerEmails} />
       </div>
     </div>
   );

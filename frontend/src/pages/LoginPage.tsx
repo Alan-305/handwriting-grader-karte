@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import type { AuthError } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,7 +47,7 @@ function GoogleIcon() {
 }
 
 export function LoginPage() {
-  const { user, loginWithGoogle, loginWithGoogleRedirect, loading } = useAuth();
+  const { user, role, loginWithGoogle, loginWithGoogleRedirect, loading } = useAuth();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [hostWarning, setHostWarning] = useState("");
@@ -69,7 +69,9 @@ export function LoginPage() {
     }
   }, []);
 
-  if (!loading && user) return <Navigate to="/students" replace />;
+  if (!loading && user) {
+    return <Navigate to={role === "viewer" ? "/viewer" : "/students"} replace />;
+  }
 
   const handleGoogleLogin = async (mode: "popup" | "redirect") => {
     setError("");
@@ -140,6 +142,11 @@ export function LoginPage() {
               Firebase で Google ログインを有効化
             </a>
           </p>
+          <div className="border-t border-slate-100 pt-4 text-center">
+            <Link to="/viewer/login" className="font-ja text-sm text-blue-700 underline">
+              生徒・保護者の方（閲覧専用ログイン）はこちら
+            </Link>
+          </div>
         </div>
       </Card>
     </div>
