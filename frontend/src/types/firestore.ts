@@ -277,6 +277,56 @@ export interface AdviceCard {
   priority: "high" | "medium" | "low";
 }
 
+/** 多段カルテ分析: 根拠付き弱点（Stage 1） */
+export interface KarteWeaknessItem {
+  label: string;
+  category: AdviceCard["category"];
+  severity: "high" | "medium" | "low";
+  trend: "improving" | "flat" | "worsening";
+  errorTags?: string[];
+  evidence?: string[];
+}
+
+/** 多段カルテ分析: 分野別到達度（Stage 2） */
+export interface KarteSubjectReadiness {
+  area: string;
+  currentLevel?: string;
+  targetLevel?: string;
+  gapComment?: string;
+}
+
+/** 多段カルテ分析: 次回出題プラン（Stage 3） */
+export interface KarteNextSessionPlan {
+  focus?: string;
+  recommendedQuestionTypes?: string[];
+  drillSuggestions?: string[];
+}
+
+/** 多段カルテ分析: 整合チェック（Stage 4） */
+export interface KarteIntegrityCheck {
+  passed: boolean;
+  violations?: string[];
+  fabricationRisk?: string[];
+}
+
+/** 多段カルテ分析の各ステージ成果（schemaVersion >= 2 で付与） */
+export interface KarteStages {
+  diagnosis?: {
+    weaknessSummary: string;
+    weaknesses: KarteWeaknessItem[];
+  };
+  readiness?: {
+    readinessComment: string;
+    byArea: KarteSubjectReadiness[];
+    priorityAreas: string[];
+  };
+  plan?: {
+    adviceCards: AdviceCard[];
+    nextSessionPlan: KarteNextSessionPlan;
+  };
+  integrity?: KarteIntegrityCheck;
+}
+
 export interface KarteSnapshot {
   id: string;
   generatedAt: Timestamp;
@@ -287,6 +337,16 @@ export interface KarteSnapshot {
   adviceCards: AdviceCard[];
   readinessComment: string;
   geminiModel: string;
+  /** 多段分析のスキーマ版数（1=旧単発, 2=多段） */
+  schemaVersion?: number;
+  /** 教師レビュー状態（多段分析は draft で生成） */
+  reviewStatus?: "draft" | "confirmed";
+  /** 整合チェック（Stage 4）に通過したか */
+  integrityPassed?: boolean;
+  /** 整合チェックで検出された警告（志望校外への言及・捏造疑い等） */
+  integrityWarnings?: string[];
+  /** 各ステージの詳細成果（後方互換のため任意） */
+  stages?: KarteStages;
 }
 
 export interface AggregatedStats {

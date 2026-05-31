@@ -16,9 +16,11 @@ import type {
   UploadSessionResponse,
 } from "@/types/api";
 import type {
+  BuildTestDraftBody,
   GenerateQuestionsResponse,
   GeneratedQuestionDraft,
   QuestionTypeCatalogItem,
+  TestDraftSet,
   ValidityReport,
 } from "@/types/question-design";
 
@@ -273,6 +275,37 @@ export const apiClient = {
   promoteQuestionDraftAsNewTest: (token: string, draftId: string, title?: string) =>
     request<{ testId: string; questionId: string; order: number; testTitle: string }>(
       `/api/question-drafts/${draftId}/promote-new`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(title ? { title } : {}),
+        token,
+      },
+    ),
+
+  buildTestDraft: (token: string, slug: string, body: BuildTestDraftBody) =>
+    request<{ draft: TestDraftSet }>(`/api/universities/${slug}/build-test-draft`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
+  listTestDrafts: (token: string) =>
+    request<{ drafts: TestDraftSet[] }>("/api/test-drafts", { token }),
+
+  getTestDraft: (token: string, draftId: string) =>
+    request<{ draft: TestDraftSet }>(`/api/test-drafts/${draftId}`, { token }),
+
+  deleteTestDraft: (token: string, draftId: string) =>
+    request<{ status: string }>(`/api/test-drafts/${draftId}`, {
+      method: "DELETE",
+      token,
+    }),
+
+  promoteTestDraftAsNewTest: (token: string, draftId: string, title?: string) =>
+    request<{ testId: string; questionCount: number; testTitle: string }>(
+      `/api/test-drafts/${draftId}/promote-new`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

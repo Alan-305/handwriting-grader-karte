@@ -160,6 +160,77 @@ def _extract_response_text(response) -> str:
     )
 
 
+# API キー未設定（開発・モック）時の各スキーマ向けダミー応答
+_MOCK_PAYLOADS: dict[str, dict] = {
+    "KarteAdviceResponse": {
+        "weaknessSummary": "時制の取り違えとスペルミスが繰り返し見られます。",
+        "errorFrequency": {"時制ミス": 3, "スペルミス": 5},
+        "adviceCards": [
+            {
+                "title": "時制の定着",
+                "body": "過去形・現在完了の使い分けドリルを週3回実施しましょう。",
+                "category": "grammar",
+                "priority": "high",
+            }
+        ],
+        "readinessComment": "志望校合格には英作文の安定化が最優先課題です。",
+    },
+    "DiagnosisResult": {
+        "weaknessSummary": "時制の運用とスペルが不安定で、英作文で失点しやすい傾向です。",
+        "weaknesses": [
+            {
+                "label": "時制の運用",
+                "category": "grammar",
+                "severity": "high",
+                "trend": "flat",
+                "errorTags": ["時制ミス"],
+                "evidence": ["第2回 自由英作文: 過去形→現在完了の誤り"],
+            },
+            {
+                "label": "スペル",
+                "category": "vocabulary",
+                "severity": "medium",
+                "trend": "improving",
+                "errorTags": ["スペルミス"],
+                "evidence": ["第1回 短答: つづり誤り複数"],
+            },
+        ],
+    },
+    "ReadinessResult": {
+        "readinessComment": "英作文の安定化が進めば志望校水準に近づけます。",
+        "byArea": [
+            {
+                "area": "自由英作文",
+                "currentLevel": "文法ミスで減点されやすい",
+                "targetLevel": "減点の少ない論理的な英文",
+                "gapComment": "時制とスペルの安定が次の一歩です。",
+            }
+        ],
+        "priorityAreas": ["自由英作文"],
+    },
+    "AdvicePlanResult": {
+        "adviceCards": [
+            {
+                "title": "時制の定着",
+                "body": "過去形・現在完了の使い分けドリルを週3回行いましょう。",
+                "category": "grammar",
+                "priority": "high",
+            }
+        ],
+        "nextSessionPlan": {
+            "focus": "自由英作文の時制精度",
+            "recommendedQuestionTypes": ["english"],
+            "drillSuggestions": ["時制書き換え10問", "スペル確認テスト"],
+        },
+    },
+    "IntegrityCheck": {
+        "passed": True,
+        "violations": [],
+        "fabricationRisk": [],
+    },
+}
+
+
 class GeminiAnalysisClient:
     def __init__(self, api_key: str | None = None, model: str | None = None):
         if api_key is not None:
@@ -391,20 +462,8 @@ class GeminiAnalysisClient:
         )
 
     def _mock_response(self, schema: type[BaseModel]) -> BaseModel:
-        if schema.__name__ == "KarteAdviceResponse":
-            mock = {
-                "weaknessSummary": "時制の取り違えとスペルミスが繰り返し見られます。",
-                "errorFrequency": {"時制ミス": 3, "スペルミス": 5},
-                "adviceCards": [
-                    {
-                        "title": "時制の定着",
-                        "body": "過去形・現在完了の使い分けドリルを週3回実施しましょう。",
-                        "category": "grammar",
-                        "priority": "high",
-                    }
-                ],
-                "readinessComment": "志望校合格には英作文の安定化が最優先課題です。",
-            }
+        mock = _MOCK_PAYLOADS.get(schema.__name__)
+        if mock is not None:
             return schema.model_validate(mock)
 
         raise RuntimeError(

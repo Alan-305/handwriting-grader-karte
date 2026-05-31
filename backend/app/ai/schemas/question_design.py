@@ -54,6 +54,10 @@ class GeneratedQuestionItem(BaseModel):
     answer_format: str | None = Field(alias="answerFormat", default=None)
     notes: str = ""
     reference_examples: list[str] = Field(alias="referenceExamples", default_factory=list)
+    # 生徒がしがちな想定誤答（指導・採点準備用）
+    anticipated_mistakes: list[str] = Field(
+        alias="anticipatedMistakes", default_factory=list
+    )
 
     model_config = {"populate_by_name": True}
 
@@ -79,9 +83,9 @@ class GeneratedQuestionItem(BaseModel):
             return None
         return str(value).strip() or None
 
-    @field_validator("reference_examples", mode="before")
+    @field_validator("reference_examples", "anticipated_mistakes", mode="before")
     @classmethod
-    def coerce_reference_examples(cls, value: object) -> list[str]:
+    def coerce_str_list(cls, value: object) -> list[str]:
         if value is None:
             return []
         if isinstance(value, str):

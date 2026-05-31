@@ -48,6 +48,8 @@ export interface GeneratedQuestionDraft {
   answerFormat?: string | null;
   notes?: string;
   referenceExamples?: string[];
+  /** 生徒がしがちな想定誤答（採点・指導の準備用） */
+  anticipatedMistakes?: string[];
   status?: "draft" | "promoted";
   difficulty?: string;
   topicHint?: string;
@@ -58,4 +60,39 @@ export interface GenerateQuestionsResponse {
   batchId: string;
   draftIds: string[];
   questions: GeneratedQuestionDraft[];
+}
+
+/** ② セット下書き（複数問＋自動検証込み） */
+export interface TestDraftSet {
+  id: string;
+  teacherId?: string;
+  title: string;
+  universitySlug: string;
+  studentId?: string;
+  studentName?: string;
+  /** カルテ由来の弱点フォーカス（生徒指定時のみ） */
+  weaknessFocus?: string;
+  difficulty?: string;
+  topicHint?: string;
+  referenceYears?: number[];
+  status?: "draft" | "promoted";
+  reviewStatus?: "draft" | "confirmed";
+  questions: GeneratedQuestionDraft[];
+  questionCount: number;
+  totalPoints: number;
+  /** 自動で実行した妥当性検証の結果（過去問が無い場合は null） */
+  validityReport?: ValidityReport | null;
+  /** 検証で不足が出たため1回再生成したか */
+  autoRetried?: boolean;
+  createdAt?: string;
+}
+
+export interface BuildTestDraftBody {
+  selections: Array<{ majorOrder: number; partLabel?: string | null; typeLabel?: string }>;
+  referenceYears?: number[];
+  difficulty?: string;
+  topicHint?: string;
+  countPerType?: number;
+  studentId?: string;
+  title?: string;
 }

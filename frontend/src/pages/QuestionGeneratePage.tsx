@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { ArrowLeft, ListChecks, Sparkles } from "lucide-react";
 import { LoadingOverlay } from "@/components/feedback/LoadingOverlay";
 import { SafeForm } from "@/components/forms/SafeForm";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -11,7 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { usePastExamUniversities } from "@/hooks/usePastExamUniversities";
 import { apiClient } from "@/lib/api-client";
+import { getDb } from "@/lib/firebase";
 import type { ExamYearSummary } from "@/types/api";
+import type { Student } from "@/types/firestore";
 import type { QuestionTypeCatalogItem } from "@/types/question-design";
 
 function typeSelectionKey(item: QuestionTypeCatalogItem) {
@@ -19,7 +22,7 @@ function typeSelectionKey(item: QuestionTypeCatalogItem) {
 }
 
 export function QuestionGeneratePage() {
-  const { getIdToken } = useAuth();
+  const { user, getIdToken } = useAuth();
   const navigate = useNavigate();
   const { displayList: universityOptions } = usePastExamUniversities();
 
@@ -31,8 +34,11 @@ export function QuestionGeneratePage() {
   const [difficulty, setDifficulty] = useState("standard");
   const [topicHint, setTopicHint] = useState("");
   const [countPerType, setCountPerType] = useState(1);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [studentId, setStudentId] = useState("");
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [building, setBuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadCatalog = useCallback(async () => {
@@ -69,6 +75,16 @@ export function QuestionGeneratePage() {
   useEffect(() => {
     void loadCatalog();
   }, [loadCatalog]);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(getDb(), "students"), where("teacherId", "==", user.uid));
+    return onSnapshot(q, (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Student);
+      rows.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "ja"));
+      setStudents(rows);
+    });
+  }, [user]);
 
   const universityName = useMemo(
     () => universityOptions.find((u) => u.slug === slug)?.name ?? slug,
@@ -128,9 +144,48 @@ export function QuestionGeneratePage() {
     }
   };
 
+  const selectionsForBuild = () =>
+    questionTypes
+      .filter((t) => selectedTypes.has(typeSelectionKey(t)))
+      .map((t) => ({ majorOrder: t.majorOrder, partLabel: t.partLabel, typeLabel: t.typeLabel }));
+
+  const handleBuildSet = async () => {
+    if (selectedTypes.size === 0) {
+      setError("生成する型を1つ以上選択してください");
+      return;
+    }
+    setBuilding(true);
+    setError(null);
+    const token = await getIdToken();
+    if (!token) {
+      setError("ログインが必要です");
+      setBuilding(false);
+      return;
+    }
+
+    try {
+      const { draft } = await apiClient.buildTestDraft(token, slug, {
+        selections: selectionsForBuild(),
+        referenceYears: selectedYears.length > 0 ? selectedYears : undefined,
+        difficulty,
+        topicHint: topicHint.trim(),
+        countPerType,
+        studentId: studentId || undefined,
+      });
+      navigate(`/test-drafts?focus=${draft.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "セット下書きの作成に失敗しました");
+    } finally {
+      setBuilding(false);
+    }
+  };
+
   return (
     <div>
-      <LoadingOverlay visible={generating} message="考えてます" />
+      <LoadingOverlay
+        visible={generating || building}
+        message={building ? "セットを設計・検証中" : "考えてます"}
+      />
       <PageHeader
         title="問題・模範解答の生成"
         description="過去問の出題型（第1問(A)など）を選び、新しいオリジナルの問題文と模範解答を生成します"
@@ -141,6 +196,12 @@ export function QuestionGeneratePage() {
             <Link to="/question-drafts">
               <ArrowLeft className="h-4 w-4" />
               下書き一覧
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" className="min-h-11 gap-2">
+            <Link to="/test-drafts">
+              <ListChecks className="h-4 w-4" />
+              セット下書き
             </Link>
           </Button>
         </div>
@@ -196,6 +257,26 @@ export function QuestionGeneratePage() {
                   value={countPerType}
                   onChange={(e) => setCountPerType(Math.min(3, Math.max(1, Number(e.target.value) || 1)))}
                 />
+              </div>
+              <div>
+                <label className="font-ja text-sm text-slate-600">
+                  生徒（カルテ反映・任意）
+                </label>
+                <select
+                  className="mt-1 flex h-11 w-full rounded-lg border border-slate-200 px-3 font-ja text-sm"
+                  value={studentId}
+                  onChange={(e) => setStudentId(e.target.value)}
+                >
+                  <option value="">指定なし（汎用セット）</option>
+                  {students.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 font-ja text-xs text-slate-500">
+                  選ぶと、その生徒のカルテの弱点に効く出題を優先します（セット作成時）
+                </p>
               </div>
             </div>
             <div>
@@ -284,12 +365,29 @@ export function QuestionGeneratePage() {
             )}
           </Card>
 
-          <div className="flex justify-end">
-            <Button type="submit" className="min-h-11 gap-2" disabled={generating || selectedTypes.size === 0}>
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 gap-2"
+              disabled={generating || building || selectedTypes.size === 0}
+              onClick={() => void handleBuildSet()}
+            >
+              <ListChecks className="h-4 w-4" />
+              検証付きセット下書きを作成
+            </Button>
+            <Button
+              type="submit"
+              className="min-h-11 gap-2"
+              disabled={generating || building || selectedTypes.size === 0}
+            >
               <Sparkles className="h-4 w-4" />
               問題と模範解答を生成
             </Button>
           </div>
+          <p className="font-ja text-xs text-slate-500">
+            「生成」は1問ずつの下書き、「セット下書き」は複数問をまとめて作り、想定誤答と過去問との妥当性検証まで自動で行います。
+          </p>
         </SafeForm>
       </div>
     </div>

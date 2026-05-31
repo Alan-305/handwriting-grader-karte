@@ -31,6 +31,7 @@ import { PastExamImportReviewPage } from "@/pages/PastExamImportReviewPage";
 import { PastExamYearDetailPage } from "@/pages/PastExamYearDetailPage";
 import { QuestionGeneratePage } from "@/pages/QuestionGeneratePage";
 import { QuestionDraftsPage } from "@/pages/QuestionDraftsPage";
+import { TestDraftsPage } from "@/pages/TestDraftsPage";
 
 function AuthLoading() {
   return (
@@ -92,6 +93,7 @@ export function AppRoutes() {
         <Route path="tests/:testId" element={<TestEditorPage />} />
         <Route path="questions/generate" element={<QuestionGeneratePage />} />
         <Route path="question-drafts" element={<QuestionDraftsPage />} />
+        <Route path="test-drafts" element={<TestDraftsPage />} />
         <Route path="tests/:testId/print/answer-sheet" element={<PrintAnswerSheetPage />} />
         <Route path="tests/:testId/print/test-paper" element={<PrintTestPaperPage />} />
         <Route path="tests/new" element={<TestEditorPage />} />

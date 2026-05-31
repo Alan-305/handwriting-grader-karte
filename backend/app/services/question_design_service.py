@@ -191,18 +191,16 @@ class QuestionDesignService:
             questions.append(item)
         return test, questions
 
-    def run_validity_check(
+    def _validity_for_questions(
         self,
         *,
         teacher_id: str,
-        test_id: str,
         university_slug: str,
+        test_title: str,
+        questions: list[dict],
         reference_years: list[int] | None = None,
-        questions_override: list[dict] | None = None,
     ) -> dict:
-        test, questions = self._get_teacher_test(test_id, teacher_id)
-        if questions_override:
-            questions = questions_override
+        """保存済みテストに依存せず、与えられた設問群の妥当性を点検して payload を返す。"""
         if not questions:
             raise ValueError("設問が登録されていません")
 
@@ -220,7 +218,7 @@ class QuestionDesignService:
         user_prompt = build_validity_user_prompt(
             university_name=self._university_name(university_slug),
             university_slug=university_slug,
-            teacher_test_title=test.get("title", ""),
+            teacher_test_title=test_title,
             teacher_questions=questions,
             past_questions_context=context,
             teacher_materials_context=materials,
@@ -234,7 +232,31 @@ class QuestionDesignService:
 
         payload = result.model_dump(by_alias=True)
         for item in payload.get("items", []):
-            item["coverageLabel"] = COVERAGE_LABELS.get(item.get("coverage", ""), item.get("coverage", ""))
+            item["coverageLabel"] = COVERAGE_LABELS.get(
+                item.get("coverage", ""), item.get("coverage", "")
+            )
+        return payload
+
+    def run_validity_check(
+        self,
+        *,
+        teacher_id: str,
+        test_id: str,
+        university_slug: str,
+        reference_years: list[int] | None = None,
+        questions_override: list[dict] | None = None,
+    ) -> dict:
+        test, questions = self._get_teacher_test(test_id, teacher_id)
+        if questions_override:
+            questions = questions_override
+
+        payload = self._validity_for_questions(
+            teacher_id=teacher_id,
+            university_slug=university_slug,
+            test_title=test.get("title", ""),
+            questions=questions,
+            reference_years=reference_years,
+        )
 
         now = datetime.now(timezone.utc)
         self.firebase.update_doc(
@@ -247,17 +269,18 @@ class QuestionDesignService:
         )
         return payload
 
-    def generate_questions(
+    def _run_generation(
         self,
         *,
-        teacher_id: str,
         university_slug: str,
         selections: list[dict],
-        reference_years: list[int] | None = None,
-        difficulty: str = "standard",
-        topic_hint: str = "",
-        count_per_type: int = 1,
-    ) -> dict:
+        reference_years: list[int] | None,
+        difficulty: str,
+        topic_hint: str,
+        count_per_type: int,
+        weakness_focus: str = "",
+    ) -> list[dict]:
+        """過去問を参照して問題を生成し、正規化済みデータ dict の配列を返す（保存はしない）。"""
         if not selections:
             raise ValueError("生成する型を1つ以上選択してください")
 
@@ -297,6 +320,7 @@ class QuestionDesignService:
             difficulty=difficulty,
             topic_hint=topic_hint,
             count_per_type=count_per_type,
+            weakness_focus=weakness_focus,
         )
 
         class _GenListResponse(BaseModel):
@@ -308,12 +332,7 @@ class QuestionDesignService:
             response_schema=_GenListResponse,
         )
 
-        batch_id = uuid.uuid4().hex[:12]
-        now = datetime.now(timezone.utc)
-        draft_ids: list[str] = []
-        saved_questions: list[dict] = []
-
-        drafts_ref = self._drafts_collection(teacher_id)
+        normalized: list[dict] = []
         for item in raw.questions:
             data = item.model_dump(by_alias=True)
             data["prompt"] = normalize_prompt_markup(data.get("prompt") or "")
@@ -322,6 +341,36 @@ class QuestionDesignService:
                 data.get("answerFormat"),
                 data.get("notes") or "",
             )
+            normalized.append(data)
+        return normalized
+
+    def generate_questions(
+        self,
+        *,
+        teacher_id: str,
+        university_slug: str,
+        selections: list[dict],
+        reference_years: list[int] | None = None,
+        difficulty: str = "standard",
+        topic_hint: str = "",
+        count_per_type: int = 1,
+    ) -> dict:
+        normalized = self._run_generation(
+            university_slug=university_slug,
+            selections=selections,
+            reference_years=reference_years,
+            difficulty=difficulty,
+            topic_hint=topic_hint,
+            count_per_type=count_per_type,
+        )
+
+        batch_id = uuid.uuid4().hex[:12]
+        now = datetime.now(timezone.utc)
+        draft_ids: list[str] = []
+        saved_questions: list[dict] = []
+
+        drafts_ref = self._drafts_collection(teacher_id)
+        for data in normalized:
             doc = {
                 "teacherId": teacher_id,
                 "universitySlug": university_slug,
@@ -512,4 +561,258 @@ class QuestionDesignService:
             "questionId": qref.id,
             "order": next_order,
             "testTitle": test.get("title", ""),
+        }
+
+    # ------------------------------------------------------------------
+    # ② 準備フェーズ: セット下書きパイプライン（build_test_draft）
+    # ------------------------------------------------------------------
+    def _test_drafts_collection(self, teacher_id: str):
+        db = self.firebase.db()
+        if not db:
+            raise RuntimeError("Firestore is not initialized.")
+        return db.collection("teachers").document(teacher_id).collection("test_drafts")
+
+    def _latest_karte_weakness(
+        self, student_id: str, teacher_id: str
+    ) -> tuple[str, dict | None]:
+        """最新カルテスナップショットから、出題に反映する弱点フォーカス文を作る。"""
+        student = self.firebase.get_doc("students", student_id)
+        if not student:
+            raise ValueError("生徒が見つかりません")
+        if student.get("teacherId") != teacher_id:
+            raise PermissionError("この生徒にアクセスする権限がありません")
+
+        snaps = self.firebase.get_subcollection(["students", student_id, "karte_snapshots"])
+        snaps = [s for s in snaps if s.get("generatedAt")]
+        snaps.sort(key=lambda s: s.get("generatedAt"), reverse=True)
+        if not snaps:
+            return "", student
+
+        latest = snaps[0]
+        lines: list[str] = []
+        summary = (latest.get("weaknessSummary") or "").strip()
+        if summary:
+            lines.append(summary)
+
+        stages = latest.get("stages") or {}
+        weaknesses = ((stages.get("diagnosis") or {}).get("weaknesses")) or []
+        for w in weaknesses[:5]:
+            label = (w.get("label") or "").strip()
+            if label:
+                lines.append(f"- {label}（重要度:{w.get('severity', '')}）")
+
+        priority = ((stages.get("readiness") or {}).get("priorityAreas")) or []
+        if priority:
+            lines.append("優先強化分野: " + ", ".join(str(p) for p in priority))
+
+        return "\n".join(lines), student
+
+    @staticmethod
+    def _validity_projection(normalized: list[dict]) -> list[dict]:
+        return [
+            {
+                "order": i,
+                "type": data.get("type", "english"),
+                "prompt": data.get("prompt", ""),
+                "modelAnswer": data.get("modelAnswer", ""),
+                "points": int(data.get("points") or 10),
+            }
+            for i, data in enumerate(normalized, start=1)
+        ]
+
+    @staticmethod
+    def _has_insufficient(validity: dict | None) -> bool:
+        if not validity:
+            return False
+        return any(
+            item.get("coverage") == "insufficient" for item in validity.get("items", [])
+        )
+
+    def build_test_draft(
+        self,
+        *,
+        teacher_id: str,
+        university_slug: str,
+        selections: list[dict],
+        reference_years: list[int] | None = None,
+        difficulty: str = "standard",
+        topic_hint: str = "",
+        count_per_type: int = 1,
+        student_id: str | None = None,
+        title: str | None = None,
+    ) -> dict:
+        """準備パイプライン: 傾向収集→（弱点反映）→出題設計→想定誤答→自動検証→セット下書き保存。"""
+        weakness_focus = ""
+        student_name = ""
+        if student_id:
+            weakness_focus, student = self._latest_karte_weakness(student_id, teacher_id)
+            student_name = (student or {}).get("name", "")
+
+        normalized = self._run_generation(
+            university_slug=university_slug,
+            selections=selections,
+            reference_years=reference_years,
+            difficulty=difficulty,
+            topic_hint=topic_hint,
+            count_per_type=count_per_type,
+            weakness_focus=weakness_focus,
+        )
+        if not normalized:
+            raise ValueError("問題を生成できませんでした。設定を変えて再試行してください。")
+
+        test_title = (title or "").strip() or (
+            f"{student_name} 向け演習セット"
+            if student_name
+            else f"{self._university_name(university_slug)} 演習セット"
+        )
+
+        def _validate(items: list[dict]) -> dict | None:
+            try:
+                return self._validity_for_questions(
+                    teacher_id=teacher_id,
+                    university_slug=university_slug,
+                    test_title=test_title,
+                    questions=self._validity_projection(items),
+                    reference_years=reference_years,
+                )
+            except ValueError:
+                # 参照過去問が無い等。検証は省略するがセット作成はブロックしない。
+                return None
+
+        validity = _validate(normalized)
+
+        # Stage G: 1回だけ自動リトライ（不足が出た設問の改善要望を再生成のヒントに反映）
+        retried = False
+        if self._has_insufficient(validity):
+            improvements: list[str] = []
+            for item in (validity or {}).get("items", []):
+                improvements.extend(item.get("improvements") or [])
+            retry_hint = topic_hint
+            if improvements:
+                retry_hint = (
+                    f"{topic_hint}\n前回の改善要望: " + "; ".join(improvements[:6])
+                ).strip()
+            retry_items = self._run_generation(
+                university_slug=university_slug,
+                selections=selections,
+                reference_years=reference_years,
+                difficulty=difficulty,
+                topic_hint=retry_hint,
+                count_per_type=count_per_type,
+                weakness_focus=weakness_focus,
+            )
+            if retry_items:
+                retry_validity = _validate(retry_items)
+                # リトライで改善した場合のみ採用
+                if not self._has_insufficient(retry_validity):
+                    normalized, validity = retry_items, retry_validity
+                    retried = True
+
+        now = datetime.now(timezone.utc)
+        total_points = sum(int(d.get("points") or 0) for d in normalized)
+        doc = {
+            "teacherId": teacher_id,
+            "title": test_title,
+            "universitySlug": university_slug,
+            "studentId": student_id or "",
+            "studentName": student_name,
+            "weaknessFocus": weakness_focus,
+            "difficulty": difficulty,
+            "topicHint": topic_hint,
+            "referenceYears": reference_years or [],
+            "status": "draft",
+            "reviewStatus": "draft",
+            "questions": normalized,
+            "questionCount": len(normalized),
+            "totalPoints": total_points,
+            "validityReport": validity,
+            "autoRetried": retried,
+            "createdAt": now,
+            "updatedAt": now,
+        }
+        _, ref = self._test_drafts_collection(teacher_id).add(doc)
+        return {**doc, "id": ref.id}
+
+    def list_test_drafts(self, teacher_id: str) -> list[dict]:
+        ref = self._test_drafts_collection(teacher_id)
+        rows = []
+        for doc in ref.stream():
+            item = doc.to_dict() or {}
+            if item.get("status") == "promoted":
+                continue
+            item["id"] = doc.id
+            rows.append(item)
+        rows.sort(
+            key=lambda r: r.get("createdAt") or datetime.min.replace(tzinfo=timezone.utc),
+            reverse=True,
+        )
+        return rows
+
+    def get_test_draft(self, teacher_id: str, draft_id: str) -> dict | None:
+        snap = self._test_drafts_collection(teacher_id).document(draft_id).get()
+        if not snap.exists:
+            return None
+        item = snap.to_dict() or {}
+        item["id"] = snap.id
+        return item
+
+    def delete_test_draft(self, teacher_id: str, draft_id: str) -> None:
+        draft = self.get_test_draft(teacher_id, draft_id)
+        if not draft:
+            raise ValueError("セット下書きが見つかりません")
+        self._test_drafts_collection(teacher_id).document(draft_id).delete()
+
+    def promote_test_draft_as_new_test(
+        self,
+        *,
+        teacher_id: str,
+        draft_id: str,
+        title: str | None = None,
+    ) -> dict:
+        draft = self.get_test_draft(teacher_id, draft_id)
+        if not draft:
+            raise ValueError("セット下書きが見つかりません")
+        questions = draft.get("questions") or []
+        if not questions:
+            raise ValueError("設問がありません")
+
+        test_title = (title or "").strip() or draft.get("title") or "演習セット"
+        now = datetime.now(timezone.utc)
+
+        db = self.firebase.db()
+        if not db:
+            raise RuntimeError("Firestore is not initialized.")
+
+        test_ref = db.collection("tests").document()
+        total_points = 0
+        for order, q in enumerate(questions, start=1):
+            qdata = self._draft_to_question_data(q, order)
+            total_points += qdata["points"]
+            test_ref.collection("questions").document().set(qdata)
+
+        test_ref.set(
+            {
+                "teacherId": teacher_id,
+                "title": test_title,
+                "templateId": "",
+                "totalPoints": total_points,
+                "questionCount": len(questions),
+                "universitySlug": draft.get("universitySlug"),
+                "createdAt": now,
+                "updatedAt": now,
+            }
+        )
+
+        self._test_drafts_collection(teacher_id).document(draft_id).update(
+            {
+                "status": "promoted",
+                "promotedToTestId": test_ref.id,
+                "updatedAt": now,
+            }
+        )
+
+        return {
+            "testId": test_ref.id,
+            "questionCount": len(questions),
+            "testTitle": test_title,
         }

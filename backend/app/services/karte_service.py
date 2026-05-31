@@ -3,8 +3,24 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from app.ai.gemini_client import GeminiAnalysisClient
-from app.ai.prompts.karte_advice import KARTE_SYSTEM, build_karte_user_prompt
-from app.ai.schemas.grading import KarteAdviceResponse
+from app.ai.prompts.karte_stages import (
+    ADVICE_PLAN_SYSTEM,
+    DIAGNOSIS_SYSTEM,
+    INTEGRITY_SYSTEM,
+    READINESS_SYSTEM,
+    build_advice_plan_prompt,
+    build_context_block,
+    build_diagnosis_prompt,
+    build_integrity_prompt,
+    build_readiness_prompt,
+    to_json,
+)
+from app.ai.schemas.karte import (
+    AdvicePlanResult,
+    DiagnosisResult,
+    IntegrityCheck,
+    ReadinessResult,
+)
 from app.services.error_tags import categorize_error_tag
 from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.karte_aggregation import dedupe_completed_for_karte
@@ -138,12 +154,14 @@ class KarteService:
         if db:
             db.collection("students").document(student_id).collection("stats").document("aggregated").set(stats)
 
-    def analyze_student(self, student_id: str, teacher_id: str) -> dict:
+    def _build_karte_context(self, student_id: str, teacher_id: str) -> dict:
+        """Stage 0: 決定論的集計を含む、全ステージ共通の入力コンテキストを構築。"""
         student = self.firebase.get_doc("students", student_id) or {}
         if student.get("teacherId") != teacher_id:
             raise PermissionError("Access denied")
 
         error_stats = self.aggregate_generalized_error_tags(student_id, teacher_id)
+        error_by_session = self.aggregate_error_tags_by_session(student_id, teacher_id)
         summaries, session_ids = self.build_session_summaries(student_id, teacher_id)
 
         interview = student.get("interviewProfile") or {}
@@ -165,31 +183,110 @@ class KarteService:
             else:
                 target_unis.append(tu)
 
-        prompt = build_karte_user_prompt(
+        context_block = build_context_block(
             student_name=student.get("name", ""),
-            course="",
             target_universities=target_unis,
             session_summaries=summaries,
             error_stats=error_stats,
             interview_profile=interview or None,
             interview_records=interview_records or None,
+            error_by_session=error_by_session or None,
         )
 
-        result: KarteAdviceResponse = self.gemini.complete_structured(
-            system=KARTE_SYSTEM,
-            user_text=prompt,
-            response_schema=KarteAdviceResponse,
+        return {
+            "student": student,
+            "error_stats": error_stats,
+            "session_ids": session_ids,
+            "target_unis": target_unis,
+            "interview_profile": interview,
+            "context_block": context_block,
+        }
+
+    def _run_diagnosis(self, ctx: dict) -> DiagnosisResult:
+        return self.gemini.complete_structured(
+            system=DIAGNOSIS_SYSTEM,
+            user_text=build_diagnosis_prompt(ctx["context_block"]),
+            response_schema=DiagnosisResult,
         )
+
+    def _run_readiness(self, ctx: dict, diagnosis: DiagnosisResult) -> ReadinessResult:
+        return self.gemini.complete_structured(
+            system=READINESS_SYSTEM,
+            user_text=build_readiness_prompt(ctx["context_block"], to_json(diagnosis)),
+            response_schema=ReadinessResult,
+        )
+
+    def _run_advice_plan(
+        self, ctx: dict, diagnosis: DiagnosisResult, readiness: ReadinessResult
+    ) -> AdvicePlanResult:
+        return self.gemini.complete_structured(
+            system=ADVICE_PLAN_SYSTEM,
+            user_text=build_advice_plan_prompt(
+                ctx["context_block"], to_json(diagnosis), to_json(readiness)
+            ),
+            response_schema=AdvicePlanResult,
+        )
+
+    def _run_integrity_check(
+        self,
+        ctx: dict,
+        diagnosis: DiagnosisResult,
+        readiness: ReadinessResult,
+        plan: AdvicePlanResult,
+    ) -> IntegrityCheck:
+        """Stage 4: 自己検証。検証自体が失敗しても保存をブロックしない。"""
+        try:
+            return self.gemini.complete_structured(
+                system=INTEGRITY_SYSTEM,
+                user_text=build_integrity_prompt(
+                    allowed_universities=ctx["target_unis"],
+                    diagnosis_json=to_json(diagnosis),
+                    readiness_json=to_json(readiness),
+                    advice_plan_json=to_json(plan),
+                    common_test_scores=(ctx.get("interview_profile") or {}).get("commonTestScores"),
+                ),
+                response_schema=IntegrityCheck,
+            )
+        except Exception:
+            logger.warning("Integrity check failed; saving snapshot without verification", exc_info=True)
+            return IntegrityCheck(passed=True, violations=[], fabrication_risk=[])
+
+    def analyze_student(self, student_id: str, teacher_id: str) -> dict:
+        """多段カルテ分析: 診断 → ギャップ → プラン → 整合チェック。
+
+        既存カルテ画面との後方互換のため、トップレベルに
+        weaknessSummary / readinessComment / adviceCards / errorFrequency を保持する。
+        """
+        ctx = self._build_karte_context(student_id, teacher_id)
+
+        diagnosis = self._run_diagnosis(ctx)
+        readiness = self._run_readiness(ctx, diagnosis)
+        plan = self._run_advice_plan(ctx, diagnosis, readiness)
+        integrity = self._run_integrity_check(ctx, diagnosis, readiness, plan)
+
+        integrity_warnings = list(integrity.violations) + list(integrity.fabrication_risk)
 
         snapshot = {
             "generatedAt": datetime.now(timezone.utc),
-            "sessionIdsIncluded": session_ids,
-            "sessionCount": len(session_ids),
-            "weaknessSummary": result.weakness_summary,
-            "errorFrequency": result.error_frequency or error_stats,
-            "adviceCards": [c.model_dump() for c in result.advice_cards],
-            "readinessComment": result.readiness_comment,
+            "sessionIdsIncluded": ctx["session_ids"],
+            "sessionCount": len(ctx["session_ids"]),
+            "schemaVersion": 2,
+            "reviewStatus": "draft",
+            # --- 後方互換フィールド（既存フロントが無改修で表示） ---
+            "weaknessSummary": diagnosis.weakness_summary,
+            "errorFrequency": ctx["error_stats"],
+            "adviceCards": [c.model_dump() for c in plan.advice_cards],
+            "readinessComment": readiness.readiness_comment,
             "geminiModel": "gemini",
+            # --- 多段の追加成果 ---
+            "integrityPassed": integrity.passed,
+            "integrityWarnings": integrity_warnings,
+            "stages": {
+                "diagnosis": diagnosis.model_dump(by_alias=True),
+                "readiness": readiness.model_dump(by_alias=True),
+                "plan": plan.model_dump(by_alias=True),
+                "integrity": integrity.model_dump(by_alias=True),
+            },
         }
 
         snapshot_id = self.firebase.add_subdoc(["students", student_id, "karte_snapshots"], snapshot)
