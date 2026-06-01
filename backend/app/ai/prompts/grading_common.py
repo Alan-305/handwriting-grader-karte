@@ -27,3 +27,28 @@ USER_PROMPT_SCORING_NOTE = (
     "\n\n採点は満点から誤りの程度に応じて減点すること。"
     "score に減点後の得点、maxPoints にこの問の配点を入れること。"
 )
+
+FEEDBACK_EXPLANATION_INSTRUCTION = """
+講評（feedback）と解説（explanation）の書き分け（必須）:
+- feedback: その設問全体への印象・到達度・次に伸ばす方向を2〜3文でコンパクトにまとめる。文法・語法・表現の個別解説は書かない。
+- explanation: 講評と内容が重複しないこと。誤り・改善点・別解の注意などを項目ごとに箇条書きで書く。各項目の先頭は ①、②、③ … の丸数字を使う（最大5項目、各1文程度で簡潔に）。
+- feedback に書いた総評を explanation で繰り返さない。
+
+生徒への呼びかけ:
+- 「生徒の」「生徒は」など第三者表現は使わない（生徒にそのまま返却する前提）。
+- 生徒名が与えられた場合は「○○さんの」「○○さんは」のように呼ぶ。未指定の場合は「あなたの」を使う。
+"""
+
+
+def student_address_block(student_name: str | None) -> str:
+    name = (student_name or "").strip()
+    if name:
+        return (
+            f"\n生徒名: {name}\n"
+            f"講評・解説では「{name}さんの」「{name}さんは」などと呼ぶこと。"
+            "「生徒の」「生徒は」は使わない。"
+        )
+    return (
+        "\n生徒名: 未指定\n"
+        "講評・解説では「あなたの」を使うこと。「生徒の」「生徒は」は使わない。"
+    )

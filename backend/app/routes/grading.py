@@ -51,6 +51,8 @@ def grade_session(session_id: str):
         ), 400
 
     session_svc.update_status(session_id, "grading")
+    student_doc = session_svc.firebase.get_doc("students", session.get("studentId", ""))
+    student_name = (student_doc or {}).get("name", "") or ""
     questions = session_svc.get_questions_for_test(session["testId"])
     targets = iter_crop_targets(questions)
     by_key = {_result_key(r): r for r in existing}
@@ -75,7 +77,9 @@ def grade_session(session_id: str):
                 ), 400
 
             system, _prompt_fn = select_grading_prompts(target)
-            user_text = build_text_user_prompt(target, student_text)
+            user_text = build_text_user_prompt(
+                target, student_text, student_name=student_name
+            )
             schema = grading_response_schema(target)
 
             grade: GradeResult = client.complete_structured(

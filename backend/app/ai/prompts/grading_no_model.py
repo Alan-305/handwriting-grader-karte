@@ -4,7 +4,11 @@
 採点基準・指示はここを編集してカスタマイズしてください。
 """
 
-from app.ai.prompts.grading_common import USER_PROMPT_SCORING_NOTE
+from app.ai.prompts.grading_common import (
+    FEEDBACK_EXPLANATION_INSTRUCTION,
+    USER_PROMPT_SCORING_NOTE,
+    student_address_block,
+)
 from app.services.error_tags import ERROR_TAGS_INSTRUCTION
 
 GRADING_SYSTEM_NO_MODEL = """あなたは高校生向け英語・国語添削の専門家です。
@@ -40,10 +44,11 @@ GRADING_SYSTEM_NO_MODEL = """あなたは高校生向け英語・国語添削の
 出力は必ず JSON のみ。フィールド:
 grade, score, maxPoints, studentAnswerText, feedback, explanation, errorTags, teacherNotes
 
-explanation は高校生にわかるやさしくコンパクトな解説。
+{feedback_explanation_instruction}
 {error_tags_instruction}
 teacherNotes は対面指導で突くべきポイント（簡潔に）。""".format(
-    error_tags_instruction=ERROR_TAGS_INSTRUCTION
+    feedback_explanation_instruction=FEEDBACK_EXPLANATION_INSTRUCTION,
+    error_tags_instruction=ERROR_TAGS_INSTRUCTION,
 )
 
 
@@ -55,6 +60,7 @@ def build_no_model_prompt(
     max_points: float,
     rubric: str | None,
     part_label: str | None = None,
+    student_name: str | None = None,
 ) -> str:
     sub = f"\n小問: {part_label}" if part_label else ""
     extra = f"\n追加評価基準: {rubric}" if rubric else ""
@@ -62,6 +68,7 @@ def build_no_model_prompt(
 問題文・指示: {prompt}
 模範解答: なし（問題文と評価基準のみに基づいて採点すること）
 満点: {max_points}{extra}
+{student_address_block(student_name)}
 
-添付画像は生徒の手書き解答です。
+添付画像は手書き解答です。
 模範解答との照合は行わず、問題の指示を満たしているかを中心に、満点から減点して採点してください。{USER_PROMPT_SCORING_NOTE}"""

@@ -1,6 +1,10 @@
 """教師確認済みテキストを前提にした添削プロンプト（画像なし）。"""
 
-from app.ai.prompts.grading_common import USER_PROMPT_ALTERNATIVE_NOTE, USER_PROMPT_SCORING_NOTE
+from app.ai.prompts.grading_common import (
+    USER_PROMPT_ALTERNATIVE_NOTE,
+    USER_PROMPT_SCORING_NOTE,
+    student_address_block,
+)
 
 
 def build_text_grading_user_prompt(
@@ -12,6 +16,7 @@ def build_text_grading_user_prompt(
     student_answer_text: str,
     rubric: str | None,
     part_label: str | None = None,
+    student_name: str | None = None,
 ) -> str:
     extra = f"\n追加評価基準: {rubric}" if rubric else ""
     part = f"\n小問: {part_label}" if part_label else ""
@@ -19,11 +24,12 @@ def build_text_grading_user_prompt(
 問題文: {prompt}
 模範解答: {model_answer}
 満点: {max_points}{extra}{part}
+{student_address_block(student_name)}
 
-以下は、手書き答案をAIが善意に読み取り、教師が確認した「生徒の解答」の書き起こしです。
+以下は、手書き答案をAIが善意に読み取り、教師が確認した解答の書き起こしです。
 このテキストを正として採点してください（画像は参照しません）。
 
-【生徒の解答（確認済み）】
+【解答（教師確認済み）】
 {student_answer_text}
 
 {USER_PROMPT_ALTERNATIVE_NOTE}{USER_PROMPT_SCORING_NOTE}"""

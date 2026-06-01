@@ -1,6 +1,11 @@
 """英語添削用プロンプト。"""
 
-from app.ai.prompts.grading_common import USER_PROMPT_ALTERNATIVE_NOTE, USER_PROMPT_SCORING_NOTE
+from app.ai.prompts.grading_common import (
+    FEEDBACK_EXPLANATION_INSTRUCTION,
+    USER_PROMPT_ALTERNATIVE_NOTE,
+    USER_PROMPT_SCORING_NOTE,
+    student_address_block,
+)
 from app.services.error_tags import ERROR_TAGS_INSTRUCTION
 
 GRADING_SYSTEM = """あなたは高校生向け英語添削の専門家です。
@@ -30,10 +35,11 @@ GRADING_SYSTEM = """あなたは高校生向け英語添削の専門家です。
 出力は必ず JSON のみ。フィールド:
 grade, score, maxPoints, studentAnswerText, feedback, explanation, errorTags, teacherNotes
 
-explanation は高校生にわかるやさしくコンパクトな解説。
+{feedback_explanation_instruction}
 {error_tags_instruction}
 teacherNotes は対面指導で突くべきポイント（簡潔に）。""".format(
-    error_tags_instruction=ERROR_TAGS_INSTRUCTION
+    feedback_explanation_instruction=FEEDBACK_EXPLANATION_INSTRUCTION,
+    error_tags_instruction=ERROR_TAGS_INSTRUCTION,
 )
 
 
@@ -44,11 +50,13 @@ def build_grading_user_prompt(
     model_answer: str,
     max_points: float,
     rubric: str | None,
+    student_name: str | None = None,
 ) -> str:
     extra = f"\n追加評価基準: {rubric}" if rubric else ""
     return f"""問題タイプ: {question_type}
 問題文: {prompt}
 模範解答: {model_answer}
 満点: {max_points}{extra}
+{student_address_block(student_name)}
 
-添付画像は生徒の手書き解答です。読み取り、採点してください。{USER_PROMPT_ALTERNATIVE_NOTE}{USER_PROMPT_SCORING_NOTE}"""
+添付画像は手書き解答です。読み取り、採点してください。{USER_PROMPT_ALTERNATIVE_NOTE}{USER_PROMPT_SCORING_NOTE}"""
