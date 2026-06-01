@@ -2,8 +2,8 @@ import logging
 
 from flask import Blueprint, g, jsonify, request
 
+from app.services.answer_sheet_upload import expand_upload_files_to_jpeg_pages
 from app.services.firebase_admin_service import FirebaseAdminService
-from app.services.session_images import MAX_ANSWER_SHEET_PAGES
 from app.services.session_service import SessionService
 from app.utils.auth_decorator import require_auth
 
@@ -24,12 +24,14 @@ def _collect_upload_files() -> list:
 @upload_bp.post("/sessions/upload")
 @require_auth
 def upload_session():
-    image_files = _collect_upload_files()
-    if not image_files:
-        return jsonify({"error": "画像ファイルを1枚以上アップロードしてください"}), 400
+    upload_files = _collect_upload_files()
+    if not upload_files:
+        return jsonify({"error": "写真または PDF を1件以上アップロードしてください"}), 400
 
-    if len(image_files) > MAX_ANSWER_SHEET_PAGES:
-        return jsonify({"error": f"画像は最大 {MAX_ANSWER_SHEET_PAGES} 枚までです"}), 400
+    try:
+        page_images = expand_upload_files_to_jpeg_pages(upload_files)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
     student_id = request.form.get("studentId")
     test_id = request.form.get("testId")
@@ -68,8 +70,7 @@ def upload_session():
 
     firebase = FirebaseAdminService()
     source_paths: list[str] = []
-    for index, image_file in enumerate(image_files):
-        image_bytes = image_file.read()
+    for index, image_bytes in enumerate(page_images):
         path = f"teachers/{g.teacher_id}/sessions/{session_id}/source_p{index + 1}.jpg"
         firebase.upload_bytes(path, image_bytes)
         source_paths.append(path)
