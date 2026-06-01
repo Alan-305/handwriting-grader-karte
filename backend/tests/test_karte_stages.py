@@ -194,3 +194,38 @@ def test_to_json_uses_aliases():
     out = to_json(diag)
     assert "weaknessSummary" in out
     assert "errorTags" in out
+
+
+def test_schemas_coerce_gemini_like_variants():
+    """Gemini が返しがちなゆらぎ（日本語カテゴリ・文字列 evidence）を許容する。"""
+    diag = DiagnosisResult.model_validate(
+        {
+            "weaknessSummary": None,
+            "weaknesses": [
+                {
+                    "label": "時制",
+                    "category": "文法",
+                    "severity": "高",
+                    "trend": "横ばい",
+                    "errorTags": "時制ミス",
+                    "evidence": "第2回 英作文",
+                }
+            ],
+        }
+    )
+    assert diag.weakness_summary
+    assert diag.weaknesses[0].category == "grammar"
+    assert diag.weaknesses[0].severity == "high"
+    assert diag.weaknesses[0].trend == "flat"
+    assert diag.weaknesses[0].error_tags == ["時制ミス"]
+    assert diag.weaknesses[0].evidence == ["第2回 英作文"]
+
+    plan = AdvicePlanResult.model_validate(
+        {
+            "adviceCards": [
+                {"title": "t", "body": "b", "category": "試験対策", "priority": "高"}
+            ],
+        }
+    )
+    assert plan.advice_cards[0].category == "exam_strategy"
+    assert plan.advice_cards[0].priority == "high"

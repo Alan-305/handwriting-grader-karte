@@ -41,7 +41,13 @@ async function request<T>(
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error ?? "API error");
+    const message =
+      typeof err.error === "string"
+        ? err.error
+        : Array.isArray(err.error)
+          ? err.error.map((e: { msg?: string }) => e.msg ?? JSON.stringify(e)).join("; ")
+          : res.statusText;
+    throw new Error(message || "API error");
   }
   return res.json() as Promise<T>;
 }

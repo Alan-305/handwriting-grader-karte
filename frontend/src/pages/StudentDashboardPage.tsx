@@ -27,6 +27,8 @@ export function StudentDashboardPage() {
   const [stats, setStats] = useState<AggregatedStats | null>(null);
   const [snapshot, setSnapshot] = useState<KarteSnapshot | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [snapshotLoadError, setSnapshotLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!studentId) return;
@@ -62,22 +64,40 @@ export function StudentDashboardPage() {
       orderBy("generatedAt", "desc"),
       limit(1),
     );
-    return onSnapshot(q, (snap) => {
-      if (!snap.empty) {
-        const d = snap.docs[0];
-        setSnapshot({ id: d.id, ...d.data() } as KarteSnapshot);
-      }
-    });
+    return onSnapshot(
+      q,
+      (snap) => {
+        setSnapshotLoadError(null);
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          setSnapshot({ id: d.id, ...d.data() } as KarteSnapshot);
+        }
+      },
+      (err) => {
+        setSnapshotLoadError(
+          "カルテの読み込みに失敗しました。ページを再読み込みしてください。",
+        );
+        console.error("karte_snapshots listener error:", err);
+      },
+    );
   }, [studentId]);
 
   const runAnalysis = async () => {
     if (!studentId) return;
     setAnalyzing(true);
+    setAnalysisError(null);
     try {
       const token = await getIdToken();
-      if (!token) return;
+      if (!token) {
+        setAnalysisError("ログインが必要です");
+        return;
+      }
       const result = await apiClient.analyzeStudent(token, studentId);
       setSnapshot(result as unknown as KarteSnapshot);
+    } catch (err) {
+      setAnalysisError(
+        err instanceof Error ? err.message : "カルテ分析に失敗しました。しばらくしてから再試行してください。",
+      );
     } finally {
       setAnalyzing(false);
     }
@@ -106,6 +126,18 @@ export function StudentDashboardPage() {
               </Button>
             </Card>
           )}
+        {analysisError && (
+          <Card className="border-red-200 bg-red-50 p-4">
+            <p className="font-ja text-sm text-red-800">{analysisError}</p>
+          </Card>
+        )}
+
+        {snapshotLoadError && (
+          <Card className="border-amber-200 bg-amber-50 p-4">
+            <p className="font-ja text-sm text-amber-900">{snapshotLoadError}</p>
+          </Card>
+        )}
+
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="outline" asChild>
             <Link to="/students">一覧に戻る</Link>
@@ -145,6 +177,20 @@ export function StudentDashboardPage() {
 
         {snapshot && (
           <>
+            {snapshot.integrityWarnings && snapshot.integrityWarnings.length > 0 && (
+              <Card className="border-amber-200 bg-amber-50/60 p-4">
+                <CardHeader className="p-0 pb-2">
+                  <CardTitle className="font-ja text-base text-amber-900">
+                    整合チェックの警告（内容をご確認ください）
+                  </CardTitle>
+                </CardHeader>
+                <ul className="list-disc space-y-1 pl-5 font-ja text-sm text-amber-900">
+                  {snapshot.integrityWarnings.map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              </Card>
+            )}
             <Card>
               <CardHeader>
                 <CardTitle>よくやりがちなミスの癖</CardTitle>

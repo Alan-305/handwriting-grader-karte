@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, ValidationError
 from app.services.karte_service import KarteService
 from app.services.past_exam_advice_service import PastExamAdviceService
 from app.utils.auth_decorator import require_auth
+from app.utils.json_helpers import to_json_safe
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +57,15 @@ def analyze_student(student_id: str):
     try:
         karte = KarteService()
         snapshot = karte.analyze_student(student_id, g.teacher_id)
-        return jsonify(snapshot)
+        return jsonify(to_json_safe(snapshot))
     except PermissionError:
         return jsonify({"error": "アクセス権がありません"}), 403
+    except RuntimeError as exc:
+        logger.exception("Analysis failed for student %s", student_id)
+        return jsonify({"error": str(exc)}), 502
     except Exception as exc:
         logger.exception("Analysis failed for student %s", student_id)
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": f"カルテ分析に失敗しました: {exc}"}), 500
 
 
 @analysis_bp.post("/students/<student_id>/stats/refresh")

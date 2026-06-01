@@ -203,29 +203,50 @@ class KarteService:
         }
 
     def _run_diagnosis(self, ctx: dict) -> DiagnosisResult:
-        return self.gemini.complete_structured(
-            system=DIAGNOSIS_SYSTEM,
-            user_text=build_diagnosis_prompt(ctx["context_block"]),
-            response_schema=DiagnosisResult,
+        return self._run_karte_stage(
+            "弱点診断",
+            lambda: self.gemini.complete_structured(
+                system=DIAGNOSIS_SYSTEM,
+                user_text=build_diagnosis_prompt(ctx["context_block"]),
+                response_schema=DiagnosisResult,
+                max_output_tokens=8192,
+            ),
         )
 
     def _run_readiness(self, ctx: dict, diagnosis: DiagnosisResult) -> ReadinessResult:
-        return self.gemini.complete_structured(
-            system=READINESS_SYSTEM,
-            user_text=build_readiness_prompt(ctx["context_block"], to_json(diagnosis)),
-            response_schema=ReadinessResult,
+        return self._run_karte_stage(
+            "志望校ギャップ分析",
+            lambda: self.gemini.complete_structured(
+                system=READINESS_SYSTEM,
+                user_text=build_readiness_prompt(ctx["context_block"], to_json(diagnosis)),
+                response_schema=ReadinessResult,
+                max_output_tokens=8192,
+            ),
         )
 
     def _run_advice_plan(
         self, ctx: dict, diagnosis: DiagnosisResult, readiness: ReadinessResult
     ) -> AdvicePlanResult:
-        return self.gemini.complete_structured(
-            system=ADVICE_PLAN_SYSTEM,
-            user_text=build_advice_plan_prompt(
-                ctx["context_block"], to_json(diagnosis), to_json(readiness)
+        return self._run_karte_stage(
+            "指導プラン生成",
+            lambda: self.gemini.complete_structured(
+                system=ADVICE_PLAN_SYSTEM,
+                user_text=build_advice_plan_prompt(
+                    ctx["context_block"], to_json(diagnosis), to_json(readiness)
+                ),
+                response_schema=AdvicePlanResult,
+                max_output_tokens=8192,
             ),
-            response_schema=AdvicePlanResult,
         )
+
+    @staticmethod
+    def _run_karte_stage(stage_label: str, call):
+        """段ごとの失敗をログ・例外メッセージで特定しやすくする。"""
+        try:
+            return call()
+        except Exception as exc:
+            logger.exception("Karte stage failed: %s", stage_label)
+            raise RuntimeError(f"カルテ分析（{stage_label}）に失敗しました: {exc}") from exc
 
     def _run_integrity_check(
         self,
@@ -277,7 +298,7 @@ class KarteService:
             "errorFrequency": ctx["error_stats"],
             "adviceCards": [c.model_dump() for c in plan.advice_cards],
             "readinessComment": readiness.readiness_comment,
-            "geminiModel": "gemini",
+            "geminiModel": self.gemini.model_name if self.gemini.model else "gemini",
             # --- 多段の追加成果 ---
             "integrityPassed": integrity.passed,
             "integrityWarnings": integrity_warnings,
