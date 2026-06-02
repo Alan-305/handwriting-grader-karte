@@ -33,6 +33,32 @@ export interface QuestionTypeCatalogItem {
   sampleQuestionIds: string[];
 }
 
+/** UI 用の生成単位（第5問は1枠に集約など） */
+export interface GenerationUnit {
+  majorOrder: number;
+  partLabel?: string | null;
+  typeLabel: string;
+  unitKey: string;
+  years: number[];
+  sampleQuestionIds: string[];
+  catalogKeys: string[];
+  pipeline: "q5" | "q4a" | "generic";
+}
+
+export interface Q5GenerationArtifacts {
+  passage?: string;
+  passageTitle?: string;
+  fullTranslationJa?: string;
+  evaluatorPassed?: boolean;
+  evaluatorIssues?: string[];
+  evaluatorSummary?: string;
+  retriedQuestions?: boolean;
+  retriedProblem?: boolean;
+  themeSummary?: string;
+  layout?: string;
+  items?: unknown[];
+}
+
 export interface GeneratedQuestionDraft {
   id?: string;
   batchId?: string;
@@ -54,6 +80,8 @@ export interface GeneratedQuestionDraft {
   difficulty?: string;
   topicHint?: string;
   createdAt?: string;
+  generationPipeline?: "q5" | string;
+  generationArtifacts?: Q5GenerationArtifacts;
 }
 
 export interface GenerateQuestionsResponse {

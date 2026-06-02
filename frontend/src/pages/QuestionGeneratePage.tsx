@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { ArrowLeft, ListChecks, Sparkles } from "lucide-react";
 import { LoadingOverlay } from "@/components/feedback/LoadingOverlay";
 import { SafeForm } from "@/components/forms/SafeForm";
@@ -11,10 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { usePastExamUniversities } from "@/hooks/usePastExamUniversities";
+import { useStudents } from "@/hooks/useStudent";
 import { apiClient } from "@/lib/api-client";
-import { getDb } from "@/lib/firebase";
+import { primaryPastExamSlug } from "@/lib/resolve-university";
 import type { ExamYearSummary } from "@/types/api";
-import type { Student } from "@/types/firestore";
 import type { QuestionTypeCatalogItem } from "@/types/question-design";
 
 function typeSelectionKey(item: QuestionTypeCatalogItem) {
@@ -34,7 +33,7 @@ export function QuestionGeneratePage() {
   const [difficulty, setDifficulty] = useState("standard");
   const [topicHint, setTopicHint] = useState("");
   const [countPerType, setCountPerType] = useState(1);
-  const [students, setStudents] = useState<Student[]>([]);
+  const { students } = useStudents();
   const [studentId, setStudentId] = useState("");
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -77,14 +76,11 @@ export function QuestionGeneratePage() {
   }, [loadCatalog]);
 
   useEffect(() => {
-    if (!user) return;
-    const q = query(collection(getDb(), "students"), where("teacherId", "==", user.uid));
-    return onSnapshot(q, (snap) => {
-      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Student);
-      rows.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "ja"));
-      setStudents(rows);
-    });
-  }, [user]);
+    if (!studentId) return;
+    const student = students.find((s) => s.id === studentId);
+    const resolved = primaryPastExamSlug(student);
+    if (resolved) setSlug(resolved);
+  }, [studentId, students]);
 
   const universityName = useMemo(
     () => universityOptions.find((u) => u.slug === slug)?.name ?? slug,
@@ -135,6 +131,7 @@ export function QuestionGeneratePage() {
         difficulty,
         topicHint: topicHint.trim(),
         countPerType,
+        studentId: studentId || undefined,
       });
       navigate("/question-drafts");
     } catch (err) {
@@ -192,6 +189,9 @@ export function QuestionGeneratePage() {
       />
       <div className="page-content space-y-6">
         <div className="flex flex-wrap gap-3">
+          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
+            <Link to="/questions/generate/q5">第5問型の生成（推奨）</Link>
+          </Button>
           <Button asChild variant="ghost" className="min-h-11 gap-2">
             <Link to="/question-drafts">
               <ArrowLeft className="h-4 w-4" />
@@ -242,7 +242,7 @@ export function QuestionGeneratePage() {
                   value={difficulty}
                   onChange={(e) => setDifficulty(e.target.value)}
                 >
-                  <option value="standard">過去問と同等</option>
+                  <option value="standard">東大標準</option>
                   <option value="easier">やや易しめ</option>
                   <option value="harder">やや難しめ</option>
                 </select>
@@ -275,7 +275,7 @@ export function QuestionGeneratePage() {
                   ))}
                 </select>
                 <p className="mt-1 font-ja text-xs text-slate-500">
-                  選ぶと、その生徒のカルテの弱点に効く出題を優先します（セット作成時）
+                  選ぶと第一志望の過去問コーパスを自動選択し、カルテの弱点反映（セット作成時）にも使います
                 </p>
               </div>
             </div>

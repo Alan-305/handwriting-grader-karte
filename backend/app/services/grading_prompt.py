@@ -55,6 +55,7 @@ def build_text_user_prompt(
     student_answer_text: str,
     *,
     student_name: str | None = None,
+    university_context: str = "",
 ) -> str:
     if is_english_composition(target):
         opts = target.get("formatOptions") or {}
@@ -76,6 +77,7 @@ def build_text_user_prompt(
         rubric=target.get("rubric"),
         part_label=target.get("partLabel"),
         student_name=student_name,
+        university_context=university_context,
     )
 
 

@@ -71,6 +71,27 @@ def register_university():
     return jsonify({"university": row}), 201
 
 
+@past_exam_bp.get("/universities/<slug>/prompt-config")
+@require_auth
+def get_university_prompt_config(slug: str):
+    slug_error = _validate_slug(slug)
+    if slug_error:
+        return slug_error
+
+    from app.ai.prompts.universities.registry import get_prompt_status
+
+    status = get_prompt_status(slug)
+    return jsonify(
+        {
+            "slug": status.slug,
+            "hasCustomModule": status.has_custom_module,
+            "configuredKeys": status.configured_keys,
+            "usesDefaults": len(status.configured_keys) == 0,
+            "templatePath": "backend/app/ai/prompts/universities/_template.py",
+        }
+    )
+
+
 @past_exam_bp.get("/universities/<slug>/exam-years")
 @require_auth
 def list_exam_years(slug: str):

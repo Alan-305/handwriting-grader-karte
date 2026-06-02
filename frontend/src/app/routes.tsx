@@ -30,6 +30,8 @@ import { PastExamImportPage } from "@/pages/PastExamImportPage";
 import { PastExamImportReviewPage } from "@/pages/PastExamImportReviewPage";
 import { PastExamYearDetailPage } from "@/pages/PastExamYearDetailPage";
 import { QuestionGeneratePage } from "@/pages/QuestionGeneratePage";
+import { QuestionGenerateQ4APage } from "@/pages/QuestionGenerateQ4APage";
+import { QuestionGenerateQ5Page } from "@/pages/QuestionGenerateQ5Page";
 import { QuestionDraftsPage } from "@/pages/QuestionDraftsPage";
 import { TestDraftsPage } from "@/pages/TestDraftsPage";
 
@@ -92,6 +94,8 @@ export function AppRoutes() {
         <Route path="tests" element={<TestsPage />} />
         <Route path="tests/:testId" element={<TestEditorPage />} />
         <Route path="questions/generate" element={<QuestionGeneratePage />} />
+        <Route path="questions/generate/q4a" element={<QuestionGenerateQ4APage />} />
+        <Route path="questions/generate/q5" element={<QuestionGenerateQ5Page />} />
         <Route path="question-drafts" element={<QuestionDraftsPage />} />
         <Route path="test-drafts" element={<TestDraftsPage />} />
         <Route path="tests/:testId/print/answer-sheet" element={<PrintAnswerSheetPage />} />

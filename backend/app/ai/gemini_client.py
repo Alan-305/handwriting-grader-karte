@@ -228,6 +228,137 @@ _MOCK_PAYLOADS: dict[str, dict] = {
         "violations": [],
         "fabricationRisk": [],
     },
+    "Q5PassageResult": {
+        "title": "A Second Chance",
+        "passage": (
+            "When Ken joined the volunteer club, he did not expect to fail so publicly. "
+            "On the first weekend, he forgot the supplies and the event was cancelled. "
+            "His friends were disappointed, and Ken felt ashamed. "
+            "The following week, he apologized and made a checklist. "
+            "He arrived early, prepared snacks, and guided new members. "
+            "By spring, the club welcomed more students than ever. "
+            "Ken realized that growth begins when we face mistakes honestly."
+        ),
+        "wordCount": 80,
+        "themeSummary": "失敗から学び、ボランティア活動で成長する高校生",
+    },
+    "Q5QuestionsResult": {
+        "instructions": "次の英文を読み、下の問いに答えなさい。",
+        "passageForExam": (
+            "When Ken joined the volunteer club, he did not expect to fail so publicly. "
+            "On the first weekend, he forgot the supplies and the event was cancelled. "
+            "His friends were disappointed, and Ken felt *ashamed*. "
+            "The following week, he apologized and made a checklist."
+        ),
+        "questions": [
+            {
+                "number": 1,
+                "partLabel": "A",
+                "questionType": "cloze",
+                "prompt": "空所(21)に入る最も適当なものを1つ選べ。",
+                "blankLabels": ["(21)"],
+                "choices": [
+                    {"label": "A", "text": "ashamed"},
+                    {"label": "B", "text": "proud"},
+                    {"label": "C", "text": "indifferent"},
+                    {"label": "D", "text": "angry"},
+                ],
+            },
+            {
+                "number": 2,
+                "partLabel": "B",
+                "questionType": "underlined_explanation",
+                "prompt": "下線部の意味として最も適当なものを、日本語で40字以内に述べよ。",
+                "underlinedText": "ashamed",
+                "charLimitJa": 40,
+                "choices": [],
+            },
+            {
+                "number": 3,
+                "partLabel": "C",
+                "questionType": "content_match",
+                "prompt": "本文の内容と一致するものを1つ選べ。",
+                "choices": [
+                    {"label": "A", "text": "初週末、イベントは中止になった。"},
+                    {"label": "B", "text": "ケンは初日から部長になった。"},
+                    {"label": "C", "text": "部は賞を受けた。"},
+                    {"label": "D", "text": "ケンはすぐに部を辞めた。"},
+                ],
+            },
+        ],
+    },
+    "Q5SolverResult": {
+        "passed": True,
+        "answers": [
+            {"number": 1, "choice": "A", "answerText": "", "briefReason": "文脈上 ashamed が適切"},
+            {
+                "number": 2,
+                "choice": "",
+                "answerText": "恥ずかしく思った、という心情",
+                "briefReason": "下線部の語義",
+            },
+            {"number": 3, "choice": "A", "answerText": "", "briefReason": "初週末に中止とある"},
+        ],
+        "issues": [],
+        "summary": "東大型の設問として成立。",
+    },
+    "Q5TeacherPackResult": {
+        "modelAnswerSummary": "1 A, 2 恥ずかしく思った心情, 3 A。",
+        "explanations": [
+            {
+                "number": 1,
+                "correctChoice": "A",
+                "answerText": "",
+                "explanationJa": "失望のあと恥じている描写です。",
+            }
+        ],
+        "fullTranslationJa": "ケンがボランティア部に入ったとき…（モック全訳）",
+        "vocabularyList": ["ashamed — 恥ずかしい"],
+    },
+    "Q4AProblemResult": {
+        "instructions": "次の各英文について、下線部のうち不適切なものを1つずつ選べ。",
+        "layout": "five_paragraphs",
+        "sourceNote": "モック: AI社会の倫理",
+        "items": [
+            {
+                "number": i,
+                "itemLabel": f"({20 + i})",
+                "instructionJa": "次の英文の下線部のうち、文法・語法・構文・文脈のいずれかの観点から不適切なものを1つ選べ。",
+                "englishBlock": (
+                    "The debate over AI ethics *has been growing* rapidly as systems "
+                    "*are deployed* in sensitive domains where *policymakers struggle* "
+                    "to balance *innovation* with *public trust*."
+                ),
+                "parts": [
+                    {"label": "a", "text": "has been growing"},
+                    {"label": "b", "text": "are deployed"},
+                    {"label": "c", "text": "sensitive"},
+                    {"label": "d", "text": "domains"},
+                    {"label": "e", "text": "rapidly"},
+                ],
+                "errorLabel": "b",
+                "errorCategory": "syntax",
+            }
+            for i in range(1, 6)
+        ],
+    },
+    "Q4AValidatorResult": {
+        "passed": True,
+        "issues": [],
+        "summary": "各問1誤り・東大レベルの誤りとして成立。",
+    },
+    "Q4ATeacherPackResult": {
+        "modelAnswerSummary": "(21) b, (22) b, (23) b, (24) b, (25) b。",
+        "explanations": [
+            {
+                "number": 1,
+                "errorLabel": "b",
+                "errorCategory": "syntax",
+                "explanationJa": "主語 The debate は単数のため are deployed は不適切。",
+                "correctionEn": "is deployed",
+            }
+        ],
+    },
 }
 
 

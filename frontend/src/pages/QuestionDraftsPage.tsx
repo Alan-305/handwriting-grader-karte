@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { ArrowLeft, Plus, Sparkles, Trash2 } from "lucide-react";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
@@ -21,6 +21,8 @@ function defaultTestTitle(draft: GeneratedQuestionDraft) {
 export function QuestionDraftsPage() {
   const { user, getIdToken } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const focusDraftId = searchParams.get("focus");
   const [drafts, setDrafts] = useState<GeneratedQuestionDraft[]>([]);
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,10 +147,13 @@ export function QuestionDraftsPage() {
               問題セット一覧
             </Link>
           </Button>
+          <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
+            <Link to="/questions/generate/q4a">第4問(A)を生成</Link>
+          </Button>
           <Button asChild className="min-h-11 gap-2">
-            <Link to="/questions/generate">
+            <Link to="/questions/generate/q5">
               <Sparkles className="h-4 w-4" />
-              新規生成
+              第5問を生成
             </Link>
           </Button>
         </div>
@@ -165,9 +170,9 @@ export function QuestionDraftsPage() {
           <Card className="p-8 text-center">
             <p className="font-ja text-slate-600">下書きはまだありません。</p>
             <Button asChild className="mt-4 min-h-11 gap-2">
-              <Link to="/questions/generate">
+              <Link to="/questions/generate/q5">
                 <Plus className="h-4 w-4" />
-                問題と模範解答を生成する
+                第5問を生成する
               </Link>
             </Button>
           </Card>
@@ -176,14 +181,34 @@ export function QuestionDraftsPage() {
             {drafts.map((draft) => {
               const draftId = draft.id ?? "";
               const isBusy = busyDraftId === draftId;
+              const isQ5 = draft.generationPipeline === "q5";
+              const isQ4A = draft.generationPipeline === "q4a";
+              const artifacts = draft.generationArtifacts;
+              const isFocused = focusDraftId === draftId;
               return (
-                <Card key={draftId} className="space-y-4 p-6">
+                <Card
+                  key={draftId}
+                  className={`space-y-4 p-6 ${isFocused ? "ring-2 ring-blue-400" : ""}`}
+                >
                   <CardHeader className="p-0">
                     <CardTitle className="font-ja text-lg">{draft.typeLabel}</CardTitle>
                     <CardDescription className="font-ja">
                       {draft.universitySlug} · {draft.points}点
+                      {isQ5 ? " · 第5問パイプライン" : ""}
+                      {isQ4A ? " · 第4問(A)パイプライン" : ""}
                       {draft.notes ? ` · ${draft.notes}` : ""}
                     </CardDescription>
+                    {(isQ5 || isQ4A) && artifacts && (
+                      <p className="mt-2 font-ja text-xs text-slate-600">
+                        {artifacts.evaluatorPassed === false
+                          ? "検証: 要確認（設問の曖昧さあり）"
+                          : "検証: 問題なし"}
+                        {artifacts.retriedQuestions || artifacts.retriedProblem
+                          ? " · 1回再生成"
+                          : ""}
+                        {artifacts.themeSummary ? ` · ${artifacts.themeSummary}` : ""}
+                      </p>
+                    )}
                   </CardHeader>
                   <div>
                     <p className="font-ja text-xs font-medium text-slate-500">問題文</p>

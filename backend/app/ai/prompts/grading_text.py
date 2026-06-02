@@ -17,14 +17,16 @@ def build_text_grading_user_prompt(
     rubric: str | None,
     part_label: str | None = None,
     student_name: str | None = None,
+    university_context: str = "",
 ) -> str:
     extra = f"\n追加評価基準: {rubric}" if rubric else ""
     part = f"\n小問: {part_label}" if part_label else ""
+    uni_block = f"\n{university_context.strip()}\n" if university_context.strip() else ""
     return f"""問題タイプ: {question_type}
 問題文: {prompt}
 模範解答: {model_answer}
 満点: {max_points}{extra}{part}
-{student_address_block(student_name)}
+{uni_block}{student_address_block(student_name)}
 
 以下は、手書き答案をAIが善意に読み取り、教師が確認した解答の書き起こしです。
 このテキストを正として採点してください（画像は参照しません）。

@@ -19,6 +19,7 @@ import type {
   BuildTestDraftBody,
   GenerateQuestionsResponse,
   GeneratedQuestionDraft,
+  GenerationUnit,
   QuestionTypeCatalogItem,
   TestDraftSet,
   ValidityReport,
@@ -224,6 +225,47 @@ export const apiClient = {
       { token },
     ),
 
+  listGenerationUnits: (token: string, slug: string) =>
+    request<{ generationUnits: GenerationUnit[] }>(
+      `/api/universities/${slug}/generation-units`,
+      { token },
+    ),
+
+  generateQ5: (
+    token: string,
+    slug: string,
+    body: {
+      referenceYears?: number[];
+      difficulty?: string;
+      topicHint?: string;
+      studentId?: string;
+    },
+  ) =>
+    request<{ draft: GeneratedQuestionDraft }>(`/api/universities/${slug}/generate-q5`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
+  generateQ4A: (
+    token: string,
+    slug: string,
+    body: {
+      referenceYears?: number[];
+      difficulty?: string;
+      topicHint?: string;
+      sourcePassage?: string;
+      studentId?: string;
+    },
+  ) =>
+    request<{ draft: GeneratedQuestionDraft }>(`/api/universities/${slug}/generate-q4a`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
   runValidityCheck: (
     token: string,
     testId: string,
@@ -249,6 +291,7 @@ export const apiClient = {
       difficulty?: string;
       topicHint?: string;
       countPerType?: number;
+      studentId?: string;
     },
   ) =>
     request<GenerateQuestionsResponse>(`/api/universities/${slug}/generate-questions`, {

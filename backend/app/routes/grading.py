@@ -13,6 +13,7 @@ from app.services.grading_prompt import (
 from app.services.karte_service import KarteService
 from app.services.scoring import clamp_score, to_score_out_of_100
 from app.services.session_service import SessionService
+from app.services.university_context_service import UniversityContextService
 from app.utils.auth_decorator import require_auth
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,12 @@ def grade_session(session_id: str):
     session_svc.update_status(session_id, "grading")
     student_doc = session_svc.firebase.get_doc("students", session.get("studentId", ""))
     student_name = (student_doc or {}).get("name", "") or ""
+    test_doc = session_svc.get_test(session["testId"]) or {}
+    uni_ctx = UniversityContextService()
+    uni_slug = uni_ctx.resolve_university_slug(
+        explicit_slug=test_doc.get("universitySlug"),
+        student=student_doc,
+    )
     questions = session_svc.get_questions_for_test(session["testId"])
     targets = iter_crop_targets(questions)
     by_key = {_result_key(r): r for r in existing}
@@ -77,8 +84,17 @@ def grade_session(session_id: str):
                 ), 400
 
             system, _prompt_fn = select_grading_prompts(target)
+            uni_block = ""
+            if uni_slug:
+                uni_block = uni_ctx.build_grading_context_block(
+                    uni_slug,
+                    major_order=int(target.get("order") or 0) or None,
+                )
             user_text = build_text_user_prompt(
-                target, student_text, student_name=student_name
+                target,
+                student_text,
+                student_name=student_name,
+                university_context=uni_block,
             )
             schema = grading_response_schema(target)
 

@@ -4,6 +4,8 @@ from flask import Blueprint, g, jsonify, request
 from pydantic import BaseModel, Field, ValidationError
 
 from app.services.question_design_service import QuestionDesignService
+from app.services.question_q4a_service import QuestionQ4AService
+from app.services.question_q5_service import QuestionQ5Service
 from app.utils.auth_decorator import require_auth
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,7 @@ class GenerateQuestionsBody(BaseModel):
     difficulty: str = "standard"
     topic_hint: str = Field(alias="topicHint", default="")
     count_per_type: int = Field(alias="countPerType", default=1, ge=1, le=3)
+    student_id: str | None = Field(alias="studentId", default=None)
 
     model_config = {"populate_by_name": True}
 
@@ -65,6 +68,99 @@ class PromoteDraftAsNewTestBody(BaseModel):
     title: str | None = None
 
     model_config = {"populate_by_name": True}
+
+
+class GenerateQ5Body(BaseModel):
+    reference_years: list[int] | None = Field(alias="referenceYears", default=None)
+    difficulty: str = "standard"
+    topic_hint: str = Field(alias="topicHint", default="")
+    student_id: str | None = Field(alias="studentId", default=None)
+
+    model_config = {"populate_by_name": True}
+
+
+class GenerateQ4ABody(BaseModel):
+    reference_years: list[int] | None = Field(alias="referenceYears", default=None)
+    difficulty: str = "standard"
+    topic_hint: str = Field(alias="topicHint", default="")
+    source_passage: str = Field(alias="sourcePassage", default="")
+    student_id: str | None = Field(alias="studentId", default=None)
+
+    model_config = {"populate_by_name": True}
+
+
+@question_design_bp.get("/universities/<slug>/generation-units")
+@require_auth
+def list_generation_units(slug: str):
+    slug_error = _validate_slug(slug)
+    if slug_error:
+        return slug_error
+
+    service = QuestionDesignService()
+    try:
+        units = service.list_generation_units(slug)
+        return jsonify({"generationUnits": units})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+
+@question_design_bp.post("/universities/<slug>/generate-q4a")
+@require_auth
+def generate_q4a(slug: str):
+    slug_error = _validate_slug(slug)
+    if slug_error:
+        return slug_error
+
+    try:
+        body = GenerateQ4ABody.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"error": exc.errors()}), 400
+
+    service = QuestionQ4AService()
+    try:
+        draft = service.generate_and_save_draft(
+            teacher_id=g.teacher_id,
+            university_slug=slug,
+            student_id=body.student_id,
+            topic_hint=body.topic_hint,
+            source_passage=body.source_passage,
+            difficulty=body.difficulty,
+            reference_years=body.reference_years,
+        )
+        return jsonify({"draft": draft}), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+
+@question_design_bp.post("/universities/<slug>/generate-q5")
+@require_auth
+def generate_q5(slug: str):
+    slug_error = _validate_slug(slug)
+    if slug_error:
+        return slug_error
+
+    try:
+        body = GenerateQ5Body.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"error": exc.errors()}), 400
+
+    service = QuestionQ5Service()
+    try:
+        draft = service.generate_and_save_draft(
+            teacher_id=g.teacher_id,
+            university_slug=slug,
+            student_id=body.student_id,
+            topic_hint=body.topic_hint,
+            difficulty=body.difficulty,
+            reference_years=body.reference_years,
+        )
+        return jsonify({"draft": draft}), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
 
 
 @question_design_bp.get("/universities/<slug>/question-types")
@@ -130,6 +226,7 @@ def generate_questions(slug: str):
             difficulty=body.difficulty,
             topic_hint=body.topic_hint,
             count_per_type=body.count_per_type,
+            student_id=body.student_id,
         )
         return jsonify(result)
     except ValueError as exc:

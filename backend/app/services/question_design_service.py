@@ -5,16 +5,17 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 
 from app.ai.gemini_client import GeminiAnalysisClient
-from app.ai.prompts.question_generation import GENERATION_SYSTEM, build_generation_user_prompt
+from app.ai.prompts.question_generation import build_generation_user_prompt
+from app.ai.prompts.university_prompts import build_generation_system
+from app.services.university_context_service import UniversityContextService
 from app.services.question_prompt_markup import (
     append_markup_reminder_if_needed,
     normalize_prompt_markup,
 )
 from app.ai.prompts.question_validity import VALIDITY_CHECK_SYSTEM, build_validity_user_prompt
-from pydantic import BaseModel, Field
-
 from app.ai.schemas.question_design import GeneratedQuestionItem, ValidityCheckResponse
 from app.services.firebase_admin_service import FirebaseAdminService
+from app.services.generation_units import catalog_to_generation_units
 from app.services.past_exam_service import UNIVERSITY_REGISTRY, PastExamService
 
 logger = logging.getLogger(__name__)
@@ -30,32 +31,27 @@ REFERENCE_PROMPT_MAX_CHARS = 8000
 REFERENCE_MODEL_ANSWER_MAX_CHARS = 2000
 
 
-def format_type_label(major_order: int, part_label: str | None = None) -> str:
-    base = f"第{major_order}問"
-    label = (part_label or "").strip()
-    if label and label != "本文":
-        return f"{base}{label}"
-    return base
-
-
-def type_key(major_order: int, part_label: str | None = None) -> str:
-    return f"{major_order}:{(part_label or '').strip()}"
-
+from app.services.question_type_labels import format_type_label, type_key
 
 class QuestionDesignService:
     def __init__(self):
         self.firebase = FirebaseAdminService()
         self.past_exam = PastExamService()
+        self.university_ctx = UniversityContextService()
         self.gemini = GeminiAnalysisClient()
 
     def _university_name(self, slug: str) -> str:
-        return UNIVERSITY_REGISTRY.get(slug, {}).get("name", slug)
+        return self.university_ctx.university_name(slug)
 
     def _drafts_collection(self, teacher_id: str):
         db = self.firebase.db()
         if not db:
             raise RuntimeError("Firestore is not initialized.")
         return db.collection("teachers").document(teacher_id).collection("question_drafts")
+
+    def list_generation_units(self, university_slug: str) -> list[dict]:
+        """UI 用の生成単位一覧（第5問は1枠、第2〜4問は大問単位など）。"""
+        return catalog_to_generation_units(self.list_question_types(university_slug))
 
     def list_question_types(self, university_slug: str) -> list[dict]:
         exam_years = self.past_exam.list_exam_years(university_slug)
@@ -327,7 +323,9 @@ class QuestionDesignService:
             questions: list[GeneratedQuestionItem] = Field(default_factory=list)
 
         raw: _GenListResponse = self.gemini.complete_structured(
-            system=GENERATION_SYSTEM,
+            system=build_generation_system(
+                university_slug, self._university_name(university_slug)
+            ),
             user_text=user_prompt,
             response_schema=_GenListResponse,
         )
@@ -348,13 +346,22 @@ class QuestionDesignService:
         self,
         *,
         teacher_id: str,
-        university_slug: str,
+        university_slug: str | None = None,
         selections: list[dict],
         reference_years: list[int] | None = None,
         difficulty: str = "standard",
         topic_hint: str = "",
         count_per_type: int = 1,
+        student_id: str | None = None,
     ) -> dict:
+        resolved_slug, _ = self.university_ctx.resolve_for_teacher(
+            teacher_id=teacher_id,
+            explicit_slug=university_slug,
+            student_id=student_id,
+            require=True,
+        )
+        university_slug = resolved_slug or university_slug or "todai"
+
         normalized = self._run_generation(
             university_slug=university_slug,
             selections=selections,
@@ -374,6 +381,7 @@ class QuestionDesignService:
             doc = {
                 "teacherId": teacher_id,
                 "universitySlug": university_slug,
+                "studentId": student_id or "",
                 "batchId": batch_id,
                 "status": "draft",
                 "difficulty": difficulty,
@@ -632,7 +640,7 @@ class QuestionDesignService:
         self,
         *,
         teacher_id: str,
-        university_slug: str,
+        university_slug: str | None = None,
         selections: list[dict],
         reference_years: list[int] | None = None,
         difficulty: str = "standard",
@@ -642,6 +650,14 @@ class QuestionDesignService:
         title: str | None = None,
     ) -> dict:
         """準備パイプライン: 傾向収集→（弱点反映）→出題設計→想定誤答→自動検証→セット下書き保存。"""
+        resolved_slug, _uni_meta = self.university_ctx.resolve_for_teacher(
+            teacher_id=teacher_id,
+            explicit_slug=university_slug,
+            student_id=student_id,
+            require=True,
+        )
+        university_slug = resolved_slug or university_slug or "todai"
+
         weakness_focus = ""
         student_name = ""
         if student_id:

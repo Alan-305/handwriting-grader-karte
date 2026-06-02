@@ -13,6 +13,7 @@ import { useStudents } from "@/hooks/useStudent";
 import { apiClient } from "@/lib/api-client";
 import { generateAnswerSheetLayout, layoutPageCount } from "@/lib/answer-sheet-layout";
 import { getDb } from "@/lib/firebase";
+import { primaryPastExamSlug } from "@/lib/resolve-university";
 import type { Question, Test } from "@/types/firestore";
 
 export function SessionNewPage() {
@@ -47,7 +48,24 @@ export function SessionNewPage() {
     });
   }, [testId]);
 
-  const selectedTest = tests.find((t) => t.id === testId);
+  const selectedStudent = students.find((s) => s.id === studentId);
+  const studentUniSlug = primaryPastExamSlug(selectedStudent);
+
+  const testsForStudent = useMemo(() => {
+    if (!studentUniSlug) return tests;
+    return tests.filter(
+      (t) => !t.universitySlug || t.universitySlug === studentUniSlug,
+    );
+  }, [tests, studentUniSlug]);
+
+  useEffect(() => {
+    if (testId && !testsForStudent.some((t) => t.id === testId)) {
+      setTestId("");
+      setFiles([]);
+    }
+  }, [testsForStudent, testId]);
+
+  const selectedTest = testsForStudent.find((t) => t.id === testId);
   const selectedQuestions = testId ? questionsByTest[testId] ?? [] : [];
 
   const expectedPages = useMemo(() => {
@@ -117,7 +135,11 @@ export function SessionNewPage() {
             <select
               className="mt-1 flex h-11 w-full rounded-lg border border-slate-200 px-3 font-ja"
               value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
+              onChange={(e) => {
+                setStudentId(e.target.value);
+                setTestId("");
+                setFiles([]);
+              }}
             >
               <option value="">選択してください</option>
               {students.map((s) => (
@@ -138,12 +160,18 @@ export function SessionNewPage() {
               }}
             >
               <option value="">選択してください</option>
-              {tests.map((t) => (
+              {testsForStudent.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.title}（{t.questionCount}問）
+                  {t.universitySlug ? ` · ${t.universitySlug}` : ""}
                 </option>
               ))}
             </select>
+            {studentUniSlug && (
+              <p className="mt-1 font-ja text-xs text-slate-500">
+                生徒の志望校（{studentUniSlug}）に紐づく問題セットを優先表示しています。
+              </p>
+            )}
             {selectedTest && !selectedTest.templateId && (
               <p className="mt-1 font-ja text-xs text-amber-700">
                 このテストには解答用紙テンプレートが未設定です。問題エディタで設定してください。

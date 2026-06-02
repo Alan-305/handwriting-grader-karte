@@ -7,6 +7,7 @@ from app.ai.schemas.past_exam_advice import SessionPastExamAdviceResponse
 from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.past_exam_service import UNIVERSITY_REGISTRY, PastExamService
 from app.services.question_design_service import QuestionDesignService
+from app.services.university_context_service import UniversityContextService
 from app.services.session_service import SessionService
 
 logger = logging.getLogger(__name__)
@@ -18,10 +19,11 @@ class PastExamAdviceService:
         self.session_service = SessionService()
         self.past_exam = PastExamService()
         self.question_design = QuestionDesignService()
+        self.university_ctx = UniversityContextService()
         self.gemini = GeminiAnalysisClient()
 
     def _university_name(self, slug: str) -> str:
-        return UNIVERSITY_REGISTRY.get(slug, {}).get("name", slug)
+        return self.university_ctx.university_name(slug)
 
     def _get_student_name(self, student_id: str) -> str:
         doc = self.firebase.get_doc("students", student_id)
@@ -67,7 +69,11 @@ class PastExamAdviceService:
         if not test:
             raise ValueError("テストが見つかりません")
 
-        slug = university_slug or test.get("universitySlug") or "todai"
+        student_doc = self.firebase.get_doc("students", session.get("studentId", ""))
+        slug = self.university_ctx.resolve_university_slug(
+            explicit_slug=university_slug or test.get("universitySlug"),
+            student=student_doc,
+        ) or "todai"
         questions = self.session_service.get_questions_for_test(test_id)
         results = self.firebase.get_subcollection(["sessions", session_id, "question_results"])
         if not results:

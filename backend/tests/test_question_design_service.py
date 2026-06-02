@@ -1,4 +1,4 @@
-from app.services.question_design_service import format_type_label, type_key
+from app.services.question_type_labels import format_type_label, type_key
 
 
 def test_format_type_label_with_part():

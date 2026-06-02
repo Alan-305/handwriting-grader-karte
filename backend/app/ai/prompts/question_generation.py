@@ -1,36 +1,7 @@
-from app.services.question_prompt_markup import PROMPT_MARKUP_RULES
+from app.ai.prompts.university_prompts import build_generation_system
 
-GENERATION_SYSTEM = f"""あなたは難関大学入試（特に東京大学英語）の問題作成の専門家です。
-過去問の出題系統（第N問(A)型など）を参考に、**新しいオリジナル問題**を作成してください。
-
-ルール:
-- 過去問の文章をそのままコピーしない。題材・設問は新規作成する
-- 形式・技能・字数/語数・指示の厳しさは参照過去問に合わせる
-- 模範解答も作成する（記述・英作文は模範文、選択式は正答記号と簡潔な根拠）
-- type は english / japanese / symbol のいずれか
-- answerFormat は japanese_writing / english_writing / symbol / composite のいずれか（該当時）
-- notes に参考にした過去問（年度・型）と作成の意図を簡潔に
-- points は必ず整数（null 不可。不明なら参照過去問の配点に合わせる）
-- anticipatedMistakes に、この問題で生徒がしがちな想定誤答を1〜3個（採点・指導の準備用）
-
-{PROMPT_MARKUP_RULES}
-
-出力は JSON のみ:
-{{
-  "questions": [{{
-    "typeLabel": "第1問(A)",
-    "majorOrder": 1,
-    "partLabel": "(A)",
-    "prompt": "次の英文の下線部を日本語訳せよ。\\n\\nHe made an *important decision* yesterday.",
-    "modelAnswer": "模範解答",
-    "points": 10,
-    "type": "english",
-    "answerFormat": "japanese_writing",
-    "notes": "参考: 東大2026 第1問(A)。100字要約形式。",
-    "referenceExamples": ["東大2026 第1問(A)"],
-    "anticipatedMistakes": ["important を『重要な』と直訳しすぎて文意がぼやける", "時制の取り違え"]
-  }}]
-}}"""
+# 後方互換（テスト等）
+GENERATION_SYSTEM = build_generation_system("", "東京大学")
 
 
 def build_generation_user_prompt(
@@ -56,8 +27,10 @@ def build_generation_user_prompt(
         else ""
     )
 
+    from app.ai.prompts.university_prompts import difficulty_label
+
     return f"""大学: {university_name}
-難易度: {difficulty}（standard=過去問同等, easier=やや易, harder=やや難）
+難易度: {difficulty_label(difficulty)}
 1型あたり {count_per_type} 問生成{topic_block}
 
 生成する型:
