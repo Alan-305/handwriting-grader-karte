@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useGradingPrintPreferences } from "@/hooks/useGradingPrintPreferences";
+import { usePrintShortcut } from "@/hooks/usePrintShortcut";
 import { useSavePrintArtifact, useSession, useUpdateQuestionResults } from "@/hooks/useSession";
 import { apiClient } from "@/lib/api-client";
 import { isQuestionIncluded } from "@/lib/grading-print-config";
@@ -25,6 +26,7 @@ export function PrintTeacherPage() {
   const { saveArtifact } = useSavePrintArtifact(sessionId ?? "");
   const { getIdToken } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
+  usePrintShortcut(printRef);
 
   const {
     prefs,

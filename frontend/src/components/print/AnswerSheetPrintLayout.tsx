@@ -5,8 +5,76 @@ import {
   shouldBreakBeforeQuestion,
   type PrintLayoutSettings,
 } from "@/lib/print-layout-settings";
+import { DEFAULT_OPTIONS } from "@/lib/answer-format";
 import { AnswerField } from "@/components/print/AnswerField";
 import { PrintFixedCornerMarks, PrintFlowDocument } from "@/components/print/PrintA4Page";
+import type { AnswerFormatOptions } from "@/types/firestore";
+
+function buildSymbolHeaderLabels(
+  count: number,
+  style: "numeric" | "alpha" | "exam",
+): string[] {
+  const n = Math.max(3, Math.min(8, count));
+  if (style === "alpha") {
+    return Array.from({ length: n }, (_, i) => String.fromCharCode(97 + i));
+  }
+  if (style === "numeric") {
+    return Array.from({ length: n }, (_, i) => String(i + 1));
+  }
+  return Array.from({ length: n }, (_, i) => `(${21 + i})`);
+}
+
+function SymbolTableField({ formatOptions }: { formatOptions?: AnswerFormatOptions }) {
+  const rows = buildSymbolHeaderLabels(
+    formatOptions?.symbolTableCount ?? 5,
+    formatOptions?.symbolTableHeader ?? "exam",
+  );
+  return (
+    <div className="bg-white px-1 py-1">
+      <table className="w-full border-collapse table-fixed">
+        <thead>
+          <tr className="bg-slate-50">
+            {rows.map((label) => (
+              <th
+                key={label}
+                className="border border-slate-400 py-1 text-center font-en text-[11px] font-medium text-slate-700"
+              >
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {rows.map((label) => (
+              <td
+                key={label}
+                className="border border-slate-400 align-middle"
+                style={{ height: "16mm" }}
+              >
+                <div className="h-full w-full" />
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+      <p className="px-2 pt-2 text-center font-ja text-[10px] text-slate-500">
+        各欄に A〜E を1つ記入
+      </p>
+    </div>
+  );
+}
+
+function shouldUseSymbolTable(slot: LayoutSlot, order: number): boolean {
+  // 後方互換: 第4問(A) は従来どおり強制的に表形式
+  if (order === 4 && (slot.partLabel ?? "").toUpperCase() === "(A)") return true;
+  // 新仕様: short 形式で列数指定がある場合はどの大問でも表形式
+  if (slot.answerFormat !== "short") return false;
+  const count = Number(
+    slot.formatOptions?.symbolTableCount ?? DEFAULT_OPTIONS.short.symbolTableCount ?? 5,
+  );
+  return count >= 3;
+}
 
 function AnswerQuestionSection({
   order,
@@ -26,7 +94,11 @@ function AnswerQuestionSection({
             {slot.partLabel && (
               <p className="mb-1 font-ja text-xs font-medium text-slate-700">{slot.partLabel}</p>
             )}
-            <AnswerField format={slot.answerFormat} formatOptions={slot.formatOptions} />
+            {shouldUseSymbolTable(slot, order) ? (
+              <SymbolTableField formatOptions={slot.formatOptions} />
+            ) : (
+              <AnswerField format={slot.answerFormat} formatOptions={slot.formatOptions} />
+            )}
           </div>
         ))}
       </div>

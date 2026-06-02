@@ -13,6 +13,7 @@ export type StudentPrintSectionId =
   | "grammarEvaluation"
   | "polishedAnswer"
   | "modelAnswer"
+  | "modelAnswerTranslation"
   | "score";
 
 export type TeacherPrintSectionId =
@@ -63,6 +64,7 @@ export const STUDENT_SECTION_LABELS: Record<StudentPrintSectionId, string> = {
   grammarEvaluation: "文法・語法の評価・解説",
   polishedAnswer: "完成版英文",
   modelAnswer: "模範解答",
+  modelAnswerTranslation: "模範解答の全文和訳",
   score: "得点",
 };
 
@@ -89,6 +91,7 @@ export const DEFAULT_STUDENT_SECTIONS: StudentPrintSections = {
   grammarEvaluation: true,
   polishedAnswer: true,
   modelAnswer: true,
+  modelAnswerTranslation: true,
   score: true,
 };
 
@@ -243,6 +246,7 @@ export const STUDENT_PRINT_PRESETS: Array<{
       grammarEvaluation: false,
       polishedAnswer: false,
       modelAnswer: false,
+      modelAnswerTranslation: false,
       explanation: true,
       feedback: true,
     },
@@ -254,6 +258,7 @@ export const STUDENT_PRINT_PRESETS: Array<{
       ...DEFAULT_STUDENT_SECTIONS,
       studentAnswer: false,
       modelAnswer: false,
+      modelAnswerTranslation: false,
       polishedAnswer: false,
       score: false,
       totalScore: false,

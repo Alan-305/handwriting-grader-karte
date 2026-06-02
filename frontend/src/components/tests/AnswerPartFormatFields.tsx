@@ -58,6 +58,25 @@ export function AnswerPartFormatFields({
             />
           </div>
           <div>
+            <label className="font-ja text-sm">マス目の列数</label>
+            <select
+              className="flex h-11 w-full rounded-lg border px-3 font-ja text-sm"
+              value={formatOptions?.gridCols ?? DEFAULT_OPTIONS.japanese_grid.gridCols}
+              onChange={(e) =>
+                onChangeOptions({
+                  ...formatOptions,
+                  gridCols: Number(e.target.value),
+                })
+              }
+            >
+              {[10, 15, 20, 25, 30].map((n) => (
+                <option key={n} value={n}>
+                  {n} 列
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="font-ja text-sm">字数指定（任意）</label>
             <Input
               type="number"
@@ -79,17 +98,36 @@ export function AnswerPartFormatFields({
       )}
 
       {answerFormat === "underline" && (
-        <div className="max-w-xs">
-          <label className="font-ja text-sm">下線の本数</label>
-          <Input
-            type="number"
-            min={1}
-            max={15}
-            value={formatOptions?.underlineLines ?? DEFAULT_OPTIONS.underline.underlineLines}
-            onChange={(e) =>
-              onChangeOptions({ ...formatOptions, underlineLines: Number(e.target.value) })
-            }
-          />
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="max-w-xs">
+            <label className="font-ja text-sm">下線の本数</label>
+            <Input
+              type="number"
+              min={1}
+              max={15}
+              value={formatOptions?.underlineLines ?? DEFAULT_OPTIONS.underline.underlineLines}
+              onChange={(e) =>
+                onChangeOptions({ ...formatOptions, underlineLines: Number(e.target.value) })
+              }
+            />
+          </div>
+          <div className="max-w-xs">
+            <label className="font-ja text-sm">下線の長さ</label>
+            <select
+              className="flex h-11 w-full rounded-lg border px-3 font-ja text-sm"
+              value={formatOptions?.underlineWidth ?? DEFAULT_OPTIONS.underline.underlineWidth}
+              onChange={(e) =>
+                onChangeOptions({
+                  ...formatOptions,
+                  underlineWidth: e.target.value as "short" | "medium" | "long",
+                })
+              }
+            >
+              <option value="short">短め</option>
+              <option value="medium">標準</option>
+              <option value="long">長め</option>
+            </select>
+          </div>
         </div>
       )}
 
@@ -126,6 +164,68 @@ export function AnswerPartFormatFields({
                 onChangeOptions({ ...formatOptions, compositionLines: Number(e.target.value) })
               }
             />
+          </div>
+          <div className="max-w-xs">
+            <label className="font-ja text-sm">解答欄の長さ</label>
+            <select
+              className="flex h-11 w-full rounded-lg border px-3 font-ja text-sm"
+              value={
+                formatOptions?.compositionWidth ??
+                DEFAULT_OPTIONS.english_composition.compositionWidth ??
+                "long"
+              }
+              onChange={(e) =>
+                onChangeOptions({
+                  ...formatOptions,
+                  compositionWidth: e.target.value as "short" | "medium" | "long",
+                })
+              }
+            >
+              <option value="short">短め</option>
+              <option value="medium">標準</option>
+              <option value="long">長め</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {answerFormat === "short" && (
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="max-w-xs">
+            <label className="font-ja text-sm">表の列数</label>
+            <select
+              className="flex h-11 w-full rounded-lg border px-3 font-ja text-sm"
+              value={formatOptions?.symbolTableCount ?? DEFAULT_OPTIONS.short.symbolTableCount ?? 5}
+              onChange={(e) =>
+                onChangeOptions({
+                  ...formatOptions,
+                  symbolTableCount: Number(e.target.value),
+                })
+              }
+            >
+              {[3, 4, 5, 6, 7, 8].map((n) => (
+                <option key={n} value={n}>
+                  {n} 列
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="max-w-xs">
+            <label className="font-ja text-sm">1行目の見出し</label>
+            <select
+              className="flex h-11 w-full rounded-lg border px-3 font-ja text-sm"
+              value={formatOptions?.symbolTableHeader ?? DEFAULT_OPTIONS.short.symbolTableHeader ?? "exam"}
+              onChange={(e) =>
+                onChangeOptions({
+                  ...formatOptions,
+                  symbolTableHeader: e.target.value as "numeric" | "alpha" | "exam",
+                })
+              }
+            >
+              <option value="numeric">1, 2, 3 ...</option>
+              <option value="alpha">a, b, c ...</option>
+              <option value="exam">(21), (22), (23) ...</option>
+            </select>
           </div>
         </div>
       )}

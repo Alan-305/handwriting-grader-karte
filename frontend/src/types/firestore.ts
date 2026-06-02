@@ -27,14 +27,24 @@ export type TranscriptionStatus = "pending_review" | "confirmed";
 export interface AnswerFormatOptions {
   /** マス目：行数 */
   gridRows?: number;
+  /** マス目：列数（1行あたりのマス数。表示はフォーマット側でクランプ） */
+  gridCols?: number;
   /** マス目：字数指定（用紙上に表示） */
   charLimit?: number;
   /** 下線部：下線の本数 */
   underlineLines?: number;
+  /** 下線部：解答欄の長さ */
+  underlineWidth?: "short" | "medium" | "long";
   /** 自由英作文：目標語数 */
   targetWords?: number;
   /** 自由英作文：下線の本数 */
   compositionLines?: number;
+  /** 自由英作文：解答欄の長さ */
+  compositionWidth?: "short" | "medium" | "long";
+  /** 記号回答の表形式: 列数 */
+  symbolTableCount?: number;
+  /** 記号回答の表形式: 1行目の見出し */
+  symbolTableHeader?: "numeric" | "alpha" | "exam";
 }
 
 export interface Teacher {

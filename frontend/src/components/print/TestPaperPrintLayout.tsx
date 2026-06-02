@@ -10,14 +10,12 @@ import type { Question } from "@/types/firestore";
 
 function QuestionSection({
   question: q,
-  showEndMarker,
 }: {
   question: Question;
-  showEndMarker: boolean;
 }) {
   return (
-    <section className="print-question-block print-break-avoid">
-      <div className="mb-3 flex items-baseline justify-between gap-4 border-b border-slate-300 pb-1">
+    <section className="print-question-block print-question-block--split-ok">
+      <div className="print-break-avoid mb-3 flex items-baseline justify-between gap-4 border-b border-slate-300 pb-1">
         <h2 className="font-ja text-lg font-semibold">第{q.order}問</h2>
         <span className="shrink-0 font-ja text-sm text-slate-700">{q.points}点</span>
       </div>
@@ -26,10 +24,6 @@ function QuestionSection({
         <QuestionPromptBlock prompt={q.prompt} />
       ) : (
         <p className="font-ja text-sm text-slate-400">（問題文未入力）</p>
-      )}
-
-      {showEndMarker && (
-        <p className="mt-6 text-center font-ja text-xs text-slate-500">― 問題ここまで ―</p>
       )}
     </section>
   );
@@ -61,7 +55,6 @@ export function TestPaperPrintLayout({
       {questions.map((q, index) => {
         const breakBefore = shouldBreakBeforeQuestion(index, settings.sectionMode);
         const applyGap = shouldApplyQuestionGap(index, settings.sectionMode);
-        const isLast = index === questions.length - 1;
 
         return (
           <div
@@ -74,10 +67,13 @@ export function TestPaperPrintLayout({
               .filter(Boolean)
               .join(" ")}
           >
-            <QuestionSection question={q} showEndMarker={isLast} />
+            <QuestionSection question={q} />
           </div>
         );
       })}
+      <p className="print-break-avoid mt-6 text-center font-ja text-xs text-slate-500">
+        ― 問題ここまで ―
+      </p>
     </PrintFlowDocument>
   );
 }

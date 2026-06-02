@@ -28,6 +28,17 @@ function questionHeading(r: QuestionResult): string {
   return `第${r.order}問${r.partLabel ? ` ${r.partLabel}` : ""}`;
 }
 
+function splitModelAnswerTranslation(text: string): { body: string; translation: string } {
+  if (!text) return { body: "", translation: "" };
+  const marker = /(【全訳】|【全文和訳】)/;
+  const hit = marker.exec(text);
+  if (!hit || hit.index < 0) return { body: text, translation: "" };
+  return {
+    body: text.slice(0, hit.index).trim(),
+    translation: text.slice(hit.index).trim(),
+  };
+}
+
 export function StudentPrintLayout({
   results,
   totalScore100,
@@ -64,6 +75,12 @@ export function StudentPrintLayout({
       {sorted.map((r, index) => {
         const studentText = studentAnswerForPrint(r, sorted);
         const modelText = modelAnswerForPrint(r, sorted);
+        const modelParts = splitModelAnswerTranslation(modelText);
+        const showTranslation = studentSectionOn(sections, "modelAnswerTranslation");
+        const modelTextForPrint =
+          showTranslation || !modelParts.translation
+            ? modelText
+            : modelParts.body || modelText;
         const breakBefore = shouldBreakBeforeQuestion(index, layout.sectionMode);
         const gapClass =
           shouldApplyQuestionGap(index, layout.sectionMode) ? "print-question-gap" : "";
@@ -122,14 +139,14 @@ export function StudentPrintLayout({
 
               {studentSectionOn(sections, "modelAnswer") &&
               !r.polishedAnswer &&
-              modelText ? (
+              modelTextForPrint ? (
                 <div className="grading-print-block flex items-start gap-3">
                   <div className="flex-1">
                     <p className="font-ja text-sm font-semibold text-slate-600">模範解答</p>
-                    <p className="text-model-answer mt-1 font-en text-slate-900">{modelText}</p>
+                    <p className="text-model-answer mt-1 font-en text-slate-900">{modelTextForPrint}</p>
                   </div>
                   <span className="no-print">
-                    <TtsButton text={modelText} lang="en" />
+                    <TtsButton text={modelTextForPrint} lang="en" />
                   </span>
                 </div>
               ) : null}

@@ -90,10 +90,15 @@ function toLayoutSlot(
     answerFormat: format,
     formatOptions: {
       gridRows: options.gridRows,
+      gridCols: options.gridCols,
       charLimit: options.charLimit,
       underlineLines: options.underlineLines,
+      underlineWidth: options.underlineWidth,
       targetWords: options.targetWords,
       compositionLines: options.compositionLines,
+      compositionWidth: options.compositionWidth,
+      symbolTableCount: unit.formatOptions?.symbolTableCount,
+      symbolTableHeader: unit.formatOptions?.symbolTableHeader,
     },
     labelY: localY - 28,
     cropRegion: {

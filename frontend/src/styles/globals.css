@@ -79,8 +79,9 @@ body {
   .print-flow-document {
     width: 100%;
     max-width: none;
-    padding: 0;
+    padding: 0 2mm;
     margin: 0 !important;
+    box-sizing: border-box;
     box-shadow: none !important;
   }
 
@@ -95,6 +96,12 @@ body {
     page-break-inside: avoid;
   }
 
+  /* 長文の問題本文は、印刷時に途中改ページを許可して欠落を防ぐ */
+  .print-question-block.print-question-block--split-ok {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
   .print-layout-document .print-question-wrap.print-question-gap {
     margin-top: var(--print-question-gap, 12mm);
   }
@@ -107,8 +114,14 @@ body {
   .print-flow-document.print-layout-document[data-page-margin="wide"],
   .print-flow-document.print-flow-document--answer-sheet.print-layout-document[data-page-margin="wide"],
   .grading-print-document.print-layout-document[data-page-margin="wide"] {
-    padding: 6mm 8mm !important;
+    padding: 6mm 10mm !important;
     box-sizing: border-box;
+  }
+
+  .question-prompt-en,
+  .question-prompt-ja {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   /* 解答用紙など：固定1ページコンテナ（余白は @page に任せる） */

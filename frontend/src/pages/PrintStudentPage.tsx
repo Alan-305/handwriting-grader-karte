@@ -13,6 +13,7 @@ import {
   useSession,
   useUpdateQuestionResults,
 } from "@/hooks/useSession";
+import { usePrintShortcut } from "@/hooks/usePrintShortcut";
 import { useGradingPrintPreferences } from "@/hooks/useGradingPrintPreferences";
 import { exportElementToPdf, printElement } from "@/lib/pdf-export";
 import { isQuestionIncluded } from "@/lib/grading-print-config";
@@ -30,6 +31,7 @@ export function PrintStudentPage() {
   const { saveResults, setPrintFinalized, syncSessionScores } = useUpdateQuestionResults(sessionId);
   const { saveArtifact } = useSavePrintArtifact(sessionId ?? "");
   const printRef = useRef<HTMLDivElement>(null);
+  usePrintShortcut(printRef);
 
   const {
     prefs,

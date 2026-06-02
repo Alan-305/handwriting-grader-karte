@@ -87,8 +87,7 @@ function UnderlineBlank({ em, inParens }: { em: number; inParens?: boolean }) {
 function EmphasisText({ value }: { value: string }) {
   return (
     <span
-      className={`${emphasisFontClass(value)} underline decoration-slate-900 decoration-1 underline-offset-[3px] print:decoration-black`}
-      style={{ textUnderlineOffset: "3px" }}
+      className={`${emphasisFontClass(value)} border-b border-slate-900 pb-[1px] print:border-black`}
     >
       {value}
     </span>

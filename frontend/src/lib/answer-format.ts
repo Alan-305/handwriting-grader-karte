@@ -14,18 +14,23 @@ export const DEFAULT_FORMAT: Record<QuestionType, AnswerSheetFormat> = {
 };
 
 export const DEFAULT_OPTIONS: Record<AnswerSheetFormat, AnswerFormatOptions> = {
-  japanese_grid: { gridRows: 5, charLimit: 100 },
-  underline: { underlineLines: 3 },
-  english_composition: { targetWords: 80, compositionLines: 10 },
-  short: {},
+  japanese_grid: { gridRows: 5, gridCols: 20, charLimit: 100 },
+  underline: { underlineLines: 3, underlineWidth: "long" },
+  english_composition: { targetWords: 80, compositionLines: 10, compositionWidth: "long" },
+  short: { symbolTableCount: 5, symbolTableHeader: "exam" },
 };
 
 export interface ResolvedFormatOptions {
   gridRows: number;
+  gridCols: number;
   charLimit?: number;
   underlineLines: number;
+  underlineWidth: "short" | "medium" | "long";
+  underlineWidthRatio: number;
   targetWords: number;
   compositionLines: number;
+  compositionWidth: "short" | "medium" | "long";
+  compositionWidthRatio: number;
 }
 
 export function resolveFormatOptions(
@@ -39,12 +44,31 @@ export function resolveFormatOptions(
   const compositionLines =
     merged.compositionLines ?? Math.max(4, Math.ceil(targetWords / 8));
 
+  const underlineWidth =
+    merged.underlineWidth === "short" || merged.underlineWidth === "medium" || merged.underlineWidth === "long"
+      ? merged.underlineWidth
+      : "long";
+  const underlineWidthRatio = underlineWidth === "short" ? 0.45 : underlineWidth === "medium" ? 0.7 : 1;
+  const compositionWidth =
+    merged.compositionWidth === "short" ||
+    merged.compositionWidth === "medium" ||
+    merged.compositionWidth === "long"
+      ? merged.compositionWidth
+      : "long";
+  const compositionWidthRatio =
+    compositionWidth === "short" ? 0.45 : compositionWidth === "medium" ? 0.7 : 1;
+
   return {
     gridRows: Math.max(1, Math.min(20, merged.gridRows ?? 5)),
+    gridCols: Math.max(5, Math.min(40, merged.gridCols ?? 20)),
     charLimit: merged.charLimit,
     underlineLines: Math.max(1, Math.min(15, merged.underlineLines ?? 3)),
+    underlineWidth,
+    underlineWidthRatio,
     targetWords,
     compositionLines: Math.max(4, Math.min(20, compositionLines)),
+    compositionWidth,
+    compositionWidthRatio,
   };
 }
 

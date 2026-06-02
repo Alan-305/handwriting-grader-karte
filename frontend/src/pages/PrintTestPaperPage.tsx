@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
 import { PageHeader } from "@/components/layout/AppShell";
@@ -6,7 +6,8 @@ import { PrintLayoutSettingsPanel } from "@/components/print/PrintLayoutSettings
 import { TestPaperPrintLayout } from "@/components/print/TestPaperPrintLayout";
 import { Button } from "@/components/ui/button";
 import { usePrintLayoutSettings } from "@/hooks/usePrintLayoutSettings";
-import { printDocument } from "@/lib/print-layout-settings";
+import { usePrintShortcut } from "@/hooks/usePrintShortcut";
+import { printElement } from "@/lib/pdf-export";
 import { getDb } from "@/lib/firebase";
 import type { Question, Test } from "@/types/firestore";
 
@@ -16,6 +17,8 @@ export function PrintTestPaperPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const { settings, setSettings, reset } = usePrintLayoutSettings(testId);
+  const printRef = useRef<HTMLDivElement>(null);
+  usePrintShortcut(printRef);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -66,7 +69,7 @@ export function PrintTestPaperPage() {
       />
       <div className="no-print space-y-4 p-8 pb-0">
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => printDocument()}>印刷 / PDF</Button>
+          <Button onClick={() => printRef.current && printElement(printRef.current)}>印刷 / PDF</Button>
           <Button variant="outline" asChild>
             <Link to={`/tests/${testId}/print/answer-sheet`}>解答用紙を印刷</Link>
           </Button>
@@ -81,7 +84,7 @@ export function PrintTestPaperPage() {
           onReset={reset}
         />
       </div>
-      <div className="bg-slate-100 p-8 print:bg-white print:p-0">
+      <div ref={printRef} className="bg-slate-100 p-8 print:bg-white print:p-0">
         <TestPaperPrintLayout
           testTitle={test.title}
           totalPoints={test.totalPoints}

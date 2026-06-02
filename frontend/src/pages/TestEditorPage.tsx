@@ -52,6 +52,26 @@ const DEFAULT_REGION: CropRegion = { x: 50, y: 50, width: 400, height: 120 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
+function stripUndefinedDeep<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value
+      .filter((v) => v !== undefined)
+      .map((v) => stripUndefinedDeep(v)) as T;
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => [k, stripUndefinedDeep(v)]);
+    return Object.fromEntries(entries) as T;
+  }
+  return value;
+}
+
+function questionPatchForFirestore(question: Question): Record<string, unknown> {
+  const { id, ...rest } = question;
+  return stripUndefinedDeep(rest as Record<string, unknown>);
+}
+
 export function TestEditorPage() {
   const { testId } = useParams<{ testId: string }>();
   const { user } = useAuth();
@@ -214,6 +234,41 @@ export function TestEditorPage() {
     }
   };
 
+  const moveQuestion = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= draftQuestions.length) return;
+
+    setDraftQuestions((prev) => {
+      const next = [...prev];
+      const [moving] = next.splice(index, 1);
+      next.splice(target, 0, moving);
+
+      return next.map((q, i) => ({
+        ...q,
+        order: i + 1,
+        // 画面上のプレビュー位置だけ簡易的に合わせる（実印刷は「解答用紙を自動生成」で再配置される）
+        cropRegion: {
+          ...q.cropRegion,
+          y: DEFAULT_REGION.y + i * 140,
+        },
+      }));
+    });
+
+    setSelectedQ((prev) => {
+      if (prev === index) return target;
+      if (direction === -1) {
+        // index と target の間にいる場合だけ 1つ下へ
+        if (prev >= target && prev < index) return prev + 1;
+      } else {
+        // index と target の間にいる場合だけ 1つ上へ
+        if (prev > index && prev <= target) return prev - 1;
+      }
+      return prev;
+    });
+
+    setSaveState("idle");
+  };
+
   const handleSave = async () => {
     if (!testId) return;
     setSaveState("saving");
@@ -231,8 +286,10 @@ export function TestEditorPage() {
       });
 
       for (const q of draftQuestions) {
-        const { id, ...data } = q;
-        batch.update(doc(getDb(), "tests", testId, "questions", id), data);
+        batch.update(
+          doc(getDb(), "tests", testId, "questions", q.id),
+          questionPatchForFirestore(q),
+        );
       }
 
       await batch.commit();
@@ -274,8 +331,10 @@ export function TestEditorPage() {
         updatedAt: serverTimestamp(),
       });
       for (const q of updatedQuestions) {
-        const { id, ...data } = q;
-        batch.update(doc(getDb(), "tests", testId, "questions", id), data);
+        batch.update(
+          doc(getDb(), "tests", testId, "questions", q.id),
+          questionPatchForFirestore(q),
+        );
       }
       await batch.commit();
 
@@ -436,6 +495,24 @@ export function TestEditorPage() {
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" onClick={() => setSelectedQ(i)}>
                     crop 選択
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="font-ja"
+                    disabled={i === 0}
+                    onClick={() => moveQuestion(i, -1)}
+                  >
+                    上へ
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="font-ja"
+                    disabled={i === draftQuestions.length - 1}
+                    onClick={() => moveQuestion(i, 1)}
+                  >
+                    下へ
                   </Button>
                   <Button
                     type="button"

@@ -3,21 +3,25 @@ import type { AnswerFormatOptions, AnswerSheetFormat } from "@/types/firestore";
 
 function JapaneseGridField({
   gridRows,
+  gridCols,
   charLimit,
 }: {
   gridRows: number;
+  gridCols: number;
   charLimit?: number;
 }) {
   return (
     <div className="space-y-1">
       {charLimit != null && charLimit > 0 && (
-        <p className="font-ja text-[10px] text-slate-500">{charLimit}字以内（1行20字）</p>
+        <p className="font-ja text-[10px] text-slate-500">
+          {charLimit}字以内（1行{gridCols}字）
+        </p>
       )}
       <div
         className="grid border border-slate-400"
-        style={{ gridTemplateColumns: "repeat(20, minmax(0, 1fr))" }}
+        style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}
       >
-        {Array.from({ length: gridRows * 20 }, (_, i) => (
+        {Array.from({ length: gridRows * gridCols }, (_, i) => (
           <div
             key={i}
             className="aspect-square border border-slate-300 bg-white"
@@ -29,9 +33,12 @@ function JapaneseGridField({
   );
 }
 
-function UnderlineField({ lines }: { lines: number }) {
+function UnderlineField({ lines, widthRatio }: { lines: number; widthRatio: number }) {
   return (
-    <div className="space-y-0 rounded border border-slate-400 bg-white px-2 py-3">
+    <div
+      className="space-y-0 rounded border border-slate-400 bg-white px-2 py-3"
+      style={{ width: `${Math.round(widthRatio * 100)}%` }}
+    >
       {Array.from({ length: lines }, (_, i) => (
         <div
           key={i}
@@ -46,12 +53,17 @@ function UnderlineField({ lines }: { lines: number }) {
 function EnglishCompositionField({
   lines,
   targetWords,
+  widthRatio,
 }: {
   lines: number;
   targetWords: number;
+  widthRatio: number;
 }) {
   return (
-    <div className="rounded border border-slate-400 bg-white px-2 py-3">
+    <div
+      className="rounded border border-slate-400 bg-white px-2 py-3"
+      style={{ width: `${Math.round(widthRatio * 100)}%` }}
+    >
       <div className="space-y-0">
         {Array.from({ length: lines }, (_, i) => (
           <div
@@ -97,15 +109,25 @@ export function AnswerField({
   switch (format) {
     case "japanese_grid":
       return (
-        <JapaneseGridField gridRows={resolved.gridRows} charLimit={resolved.charLimit} />
+        <JapaneseGridField
+          gridRows={resolved.gridRows}
+          gridCols={resolved.gridCols}
+          charLimit={resolved.charLimit}
+        />
       );
     case "underline":
-      return <UnderlineField lines={resolved.underlineLines} />;
+      return (
+        <UnderlineField
+          lines={resolved.underlineLines}
+          widthRatio={resolved.underlineWidthRatio}
+        />
+      );
     case "english_composition":
       return (
         <EnglishCompositionField
           lines={resolved.compositionLines}
           targetWords={resolved.targetWords}
+          widthRatio={resolved.compositionWidthRatio}
         />
       );
     case "short":
