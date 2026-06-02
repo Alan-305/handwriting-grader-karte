@@ -87,6 +87,7 @@ def grade_session(session_id: str):
             uni_block = ""
             if uni_slug:
                 uni_block = uni_ctx.build_grading_context_block(
+                    g.teacher_id,
                     uni_slug,
                     major_order=int(target.get("order") or 0) or None,
                 )

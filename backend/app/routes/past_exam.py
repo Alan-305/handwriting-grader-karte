@@ -101,7 +101,7 @@ def list_exam_years(slug: str):
 
     service = PastExamService()
     try:
-        exam_years = service.list_exam_years(slug)
+        exam_years = service.list_exam_years(g.teacher_id, slug)
         return jsonify({"examYears": exam_years})
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 503
@@ -116,8 +116,8 @@ def get_exam_year_detail(slug: str, year: int):
 
     service = PastExamService()
     try:
-        exam_year = service.get_exam_year(slug, year)
-        questions = service.list_past_questions(slug, year)
+        exam_year = service.get_exam_year(g.teacher_id, slug, year)
+        questions = service.list_past_questions(g.teacher_id, slug, year)
         return jsonify({"examYear": exam_year, "questions": questions})
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 503
@@ -245,12 +245,14 @@ def import_past_exam(slug: str):
         )
 
         parsed = service.parse_partial_sources(
+            teacher_id=g.teacher_id,
             university_slug=slug,
             year=year,
             sources=sources,
             provided=provided,
         )
         session_id = service.create_import_session(
+            teacher_id=g.teacher_id,
             university_slug=slug,
             year=year,
             sources=sources,
@@ -300,9 +302,16 @@ def commit_past_exam_import(slug: str, session_id: str):
     service = PastExamService()
 
     try:
-        session_slug, year, parsed, sources, provided = service.load_import_session(session_id)
+        session_teacher_id, session_slug, year, parsed, sources, provided = (
+            service.load_import_session(session_id)
+        )
     except FileNotFoundError:
         return jsonify({"error": "取り込みセッションが見つかりません。再度 PDF をアップロードしてください。"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    if session_teacher_id != g.teacher_id:
+        return jsonify({"error": "この取り込みセッションにアクセスする権限がありません"}), 403
 
     if session_slug != slug:
         return jsonify({"error": "大学 slug がセッションと一致しません"}), 400
@@ -316,6 +325,7 @@ def commit_past_exam_import(slug: str, session_id: str):
 
     try:
         result = service.write_to_firestore(
+            teacher_id=g.teacher_id,
             university_slug=slug,
             year=year,
             parsed=parsed,

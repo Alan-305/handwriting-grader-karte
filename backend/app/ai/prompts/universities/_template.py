@@ -17,6 +17,16 @@
 - Q4A_PROBLEM_SYSTEM     … 第4問(A)・誤り指摘問題（省略可）
 - Q4A_VALIDATOR_SYSTEM   … 第4問(A)・検証（省略可）
 - Q4A_TEACHER_PACK_SYSTEM … 第4問(A)・解答・解説（省略可）
+- Q1A_GENERATION_SYSTEM  … 第1問(A)・英文要約（問題+解答+解説を一括）
+- Q1A_VALIDATOR_SYSTEM   … 第1問(A)・検証（省略可）
+- Q1B_GENERATION_SYSTEM  … 第1問(B)・空所補充（問題+解答+解説を一括）
+- Q1B_VALIDATOR_SYSTEM   … 第1問(B)・検証（省略可）
+- Q2A_GENERATION_SYSTEM  … 第2問(A)・自由英作文（問題+解答例+解説を一括）
+- Q2A_VALIDATOR_SYSTEM   … 第2問(A)・検証（省略可）
+- Q2B_GENERATION_SYSTEM  … 第2問(B)・和文英訳（問題+解答+解説を一括）
+- Q2B_VALIDATOR_SYSTEM   … 第2問(B)・検証（省略可）
+- Q4B_GENERATION_SYSTEM  … 第4問(B)・下線部和訳（問題+解答+解説を一括）
+- Q4B_VALIDATOR_SYSTEM   … 第4問(B)・検証（省略可）
 - GRADING_SUPPLEMENT     … 添削時に追加する大学固有の指示（短文で可）
 - NOTES                  … 管理用メモ（AIには渡らない）
 
@@ -43,6 +53,26 @@ Q4A_PROBLEM_SYSTEM: str | None = None
 Q4A_VALIDATOR_SYSTEM: str | None = None
 
 Q4A_TEACHER_PACK_SYSTEM: str | None = None
+
+Q1A_GENERATION_SYSTEM: str | None = None
+
+Q1A_VALIDATOR_SYSTEM: str | None = None
+
+Q1B_GENERATION_SYSTEM: str | None = None
+
+Q1B_VALIDATOR_SYSTEM: str | None = None
+
+Q2A_GENERATION_SYSTEM: str | None = None
+
+Q2A_VALIDATOR_SYSTEM: str | None = None
+
+Q2B_GENERATION_SYSTEM: str | None = None
+
+Q2B_VALIDATOR_SYSTEM: str | None = None
+
+Q4B_GENERATION_SYSTEM: str | None = None
+
+Q4B_VALIDATOR_SYSTEM: str | None = None
 
 GRADING_SUPPLEMENT: str | None = None
 

@@ -130,6 +130,7 @@ class QuestionQ5Service:
     def run_pipeline(
         self,
         *,
+        teacher_id: str,
         topic_hint: str = "",
         difficulty: str = "standard",
         university_slug: str = "todai",
@@ -138,6 +139,7 @@ class QuestionQ5Service:
         """本文 → 設問 → Solver → 教師用 Pack を実行し、正規化 dict を返す。"""
         uni_name = self.university_ctx.university_name(university_slug)
         ref_context = self.university_ctx.build_reference_context_for_major(
+            teacher_id,
             university_slug,
             major_order=5,
             reference_years=reference_years,
@@ -306,6 +308,7 @@ class QuestionQ5Service:
             require=True,
         )
         data = self.run_pipeline(
+            teacher_id=teacher_id,
             topic_hint=topic_hint,
             difficulty=difficulty,
             university_slug=slug or "todai",

@@ -1,8 +1,9 @@
 """過去問カタログを「生成単位」にまとめるルール。
 
 - 第1問: (A)(B) などアルファベット小問は別単位
-- 第2〜4問: 大問1単位（(1)(2)… は生成結果の中身）
-- 第4問(A): 誤り指摘専用パイプライン（q4a）
+- 第2問: (A) 自由英作文（q2a）、(B) 和文英訳（q2b）
+- 第2〜4問: その他は大問1単位（(1)(2)… は生成結果の中身）
+- 第4問: (A) 誤り指摘（q4a）、(B) 下線部和訳（q4b）
 - 第5問: 常に1単位（本文・設問(1)〜(5) は生成結果の中身）
 """
 
@@ -38,9 +39,77 @@ def is_q4a_part_label(part_label: str | None) -> bool:
     return label in ("(A)", "A")
 
 
+def is_q1a_part_label(part_label: str | None) -> bool:
+    label = _part_label_str(part_label).upper()
+    return label in ("(A)", "A")
+
+
+def is_q1b_part_label(part_label: str | None) -> bool:
+    label = _part_label_str(part_label).upper()
+    return label in ("(B)", "B")
+
+
+def is_q2a_part_label(part_label: str | None) -> bool:
+    label = _part_label_str(part_label).upper()
+    return label in ("(A)", "A")
+
+
+def is_q2b_part_label(part_label: str | None) -> bool:
+    label = _part_label_str(part_label).upper()
+    return label in ("(B)", "B")
+
+
+def is_q4b_part_label(part_label: str | None) -> bool:
+    """第4問の (B) 小問（major_order=4 と併用）。"""
+    label = _part_label_str(part_label).upper()
+    return label in ("(B)", "B")
+
+
+def _part_sort_key(part_label: str | None) -> tuple[int, str]:
+    """大問内の並び: 本文 < (A)(B)… < (1)(2)… < その他。"""
+    pl = _part_label_str(part_label).upper()
+    if pl in ("", "本文"):
+        return (0, "")
+    if _LETTER_PART.match(pl):
+        return (1, pl)
+    if _MINOR_PART.match(pl):
+        return (2, pl)
+    return (3, pl)
+
+
+def sort_generation_units(units: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """UI 用: 大問番号の若い順 → 小問ラベル (A)(B)(1)… の順。"""
+    return sorted(
+        units,
+        key=lambda u: (
+            int(u.get("majorOrder") or 0),
+            _part_sort_key(u.get("partLabel")),
+        ),
+    )
+
+
+def pipeline_for_selection(major_order: int, part_label: str | None = None) -> str:
+    """生成単位の pipeline 名（q1a / q1b / q2a / q2b / q4a / q4b / q5 / generic）。"""
+    if major_order == 5:
+        return "q5"
+    if major_order == 4 and is_q4a_part_label(part_label):
+        return "q4a"
+    if major_order == 4 and is_q4b_part_label(part_label):
+        return "q4b"
+    if major_order == 2 and is_q2a_part_label(part_label):
+        return "q2a"
+    if major_order == 2 and is_q2b_part_label(part_label):
+        return "q2b"
+    if major_order == 1 and is_q1a_part_label(part_label):
+        return "q1a"
+    if major_order == 1 and is_q1b_part_label(part_label):
+        return "q1b"
+    return "generic"
+
+
 def generation_unit_key(major_order: int, part_label: str | None = None) -> str:
-    if major_order == 1 and is_letter_sub_part(part_label):
-        return f"1:{_part_label_str(part_label)}"
+    if major_order in (1, 2, 4) and is_letter_sub_part(part_label):
+        return f"{major_order}:{_part_label_str(part_label)}"
     return f"{major_order}:"
 
 
@@ -65,7 +134,15 @@ def catalog_to_generation_units(catalog: list[dict[str, Any]]) -> list[dict[str,
             letter_rows = [r for r in rows if is_letter_sub_part(r.get("partLabel"))]
             if letter_rows:
                 for r in sorted(letter_rows, key=lambda x: str(x.get("partLabel") or "")):
-                    units.append(_unit_from_rows(major, [r], r.get("partLabel")))
+                    pl = r.get("partLabel")
+                    units.append(
+                        _unit_from_rows(
+                            major,
+                            [r],
+                            pl,
+                            pipeline=pipeline_for_selection(major, pl),
+                        )
+                    )
                 continue
             units.append(_unit_from_rows(major, rows, None))
             continue
@@ -76,23 +153,46 @@ def catalog_to_generation_units(catalog: list[dict[str, Any]]) -> list[dict[str,
             units.append(_unit_from_rows(major, source, None))
             continue
 
-        if major == 4:
-            q4a_rows = [r for r in rows if is_q4a_part_label(r.get("partLabel"))]
-            if q4a_rows:
-                units.append(_unit_from_rows(major, q4a_rows, "(A)", pipeline="q4a"))
-            other = [r for r in rows if not is_q4a_part_label(r.get("partLabel"))]
-            if other:
-                primary = [r for r in other if not is_numeric_sub_part(r.get("partLabel"))]
-                source = primary if primary else other
-                units.append(_unit_from_rows(major, source, None))
+        if major == 2:
+            letter_rows = [r for r in rows if is_letter_sub_part(r.get("partLabel"))]
+            if letter_rows:
+                for r in sorted(letter_rows, key=lambda x: str(x.get("partLabel") or "")):
+                    pl = r.get("partLabel")
+                    units.append(
+                        _unit_from_rows(
+                            major,
+                            [r],
+                            pl,
+                            pipeline=pipeline_for_selection(major, pl),
+                        )
+                    )
+                continue
+            units.append(_unit_from_rows(major, rows, None))
             continue
 
-        # 第2〜3問など: 数値小問はまとめる
+        if major == 4:
+            letter_rows = [r for r in rows if is_letter_sub_part(r.get("partLabel"))]
+            if letter_rows:
+                for r in sorted(letter_rows, key=lambda x: str(x.get("partLabel") or "")):
+                    pl = r.get("partLabel")
+                    units.append(
+                        _unit_from_rows(
+                            major,
+                            [r],
+                            pl,
+                            pipeline=pipeline_for_selection(major, pl),
+                        )
+                    )
+                continue
+            units.append(_unit_from_rows(major, rows, None))
+            continue
+
+        # 第3問など: 数値小問はまとめる
         primary = [r for r in rows if not is_numeric_sub_part(r.get("partLabel"))]
         source = primary if primary else rows
         units.append(_unit_from_rows(major, source, None))
 
-    return units
+    return sort_generation_units(units)
 
 
 def _unit_from_rows(

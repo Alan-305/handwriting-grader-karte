@@ -3,6 +3,23 @@ import pytest
 from app.services.past_exam_service import ImportSources, PastExamService, ProvidedSources
 
 
+def test_catalog_path_is_teacher_scoped():
+    service = PastExamService()
+    path = service._catalog_path("uid-abc", "todai", "past_questions", "2026_1")
+    assert path == [
+        "teachers",
+        "uid-abc",
+        "past_exam_catalog",
+        "todai",
+        "past_questions",
+        "2026_1",
+    ]
+    assert (
+        service._past_exam_storage_prefix("uid-abc", "todai", 2026)
+        == "teachers/uid-abc/past-exams/todai/2026"
+    )
+
+
 def test_question_doc_id_major_only():
     assert PastExamService._question_doc_id(1, None) == "1"
     assert PastExamService._question_doc_id(4, None) == "4"
@@ -176,12 +193,15 @@ def test_write_exam_only_preserves_existing_model_answers(tmp_path, monkeypatch)
     monkeypatch.setattr(
         service,
         "get_exam_year",
-        lambda slug, year: {"parseNotes": "prior note", "sourceAnswersPdfPath": "gs://answers.pdf"},
+        lambda tid, slug, year: {
+            "parseNotes": "prior note",
+            "sourceAnswersPdfPath": "gs://answers.pdf",
+        },
     )
     monkeypatch.setattr(
         service,
         "_existing_questions_by_firestore_id",
-        lambda slug, year: {
+        lambda tid, slug, year: {
             "2024_1": {
                 "id": "2024_1",
                 "majorOrder": 1,
@@ -206,6 +226,7 @@ def test_write_exam_only_preserves_existing_model_answers(tmp_path, monkeypatch)
         ],
     )
     service.write_to_firestore(
+        teacher_id="teacher-test",
         university_slug="todai",
         year=2024,
         parsed=parsed,
@@ -247,15 +268,22 @@ def test_import_session_roundtrip(tmp_path, monkeypatch):
     )
 
     session_id = service.create_import_session(
+        teacher_id="teacher-test",
         university_slug="todai",
         year=2027,
         sources=sources,
         parsed=parsed,
     )
 
-    slug, year, loaded_parsed, loaded_sources, loaded_provided = service.load_import_session(
-        session_id
-    )
+    (
+        session_teacher_id,
+        slug,
+        year,
+        loaded_parsed,
+        loaded_sources,
+        loaded_provided,
+    ) = service.load_import_session(session_id)
+    assert session_teacher_id == "teacher-test"
     assert slug == "todai"
     assert year == 2027
     assert len(loaded_parsed.questions) == 1

@@ -179,10 +179,30 @@ def _find_answers_pdf(folder: Path) -> Path | None:
 class PastExamService:
     YEAR_DIR_NAME = "past-exams"
     SESSION_DIR_NAME = ".import-sessions"
+    PAST_EXAM_CATALOG = "past_exam_catalog"
 
     def __init__(self):
         self.firebase = FirebaseAdminService()
         self.gemini = GeminiAnalysisClient()
+
+    @staticmethod
+    def _require_teacher_id(teacher_id: str) -> str:
+        tid = (teacher_id or "").strip()
+        if not tid:
+            raise ValueError("teacher_id が必要です")
+        return tid
+
+    def _catalog_path(
+        self, teacher_id: str, university_slug: str, *segments: str
+    ) -> list[str]:
+        tid = self._require_teacher_id(teacher_id)
+        return ["teachers", tid, self.PAST_EXAM_CATALOG, university_slug, *segments]
+
+    def _past_exam_storage_prefix(
+        self, teacher_id: str, university_slug: str, year: int
+    ) -> str:
+        tid = self._require_teacher_id(teacher_id)
+        return f"teachers/{tid}/past-exams/{university_slug}/{year}"
 
     @staticmethod
     def project_root() -> Path:
@@ -359,6 +379,7 @@ class PastExamService:
     def parse_answers_only(
         self,
         *,
+        teacher_id: str,
         university_slug: str,
         year: int,
         answers_pdf: Path,
@@ -386,7 +407,7 @@ class PastExamService:
             max_output_tokens=16384,
         )
         merged_questions = self._merge_answer_updates(existing_parsed, updates)
-        existing_year = self.get_exam_year(university_slug, year) or {}
+        existing_year = self.get_exam_year(teacher_id, university_slug, year) or {}
         return PastExamParseResponse(
             university_name=UNIVERSITY_REGISTRY.get(university_slug, {}).get("name", ""),
             year=year,
@@ -399,6 +420,7 @@ class PastExamService:
     def parse_partial_sources(
         self,
         *,
+        teacher_id: str,
         university_slug: str,
         year: int,
         sources: ImportSources,
@@ -407,8 +429,8 @@ class PastExamService:
         if not provided.any_provided():
             raise ValueError("At least one PDF type must be provided")
 
-        existing_year = self.get_exam_year(university_slug, year) or {}
-        existing_questions = self.list_past_questions(university_slug, year)
+        existing_year = self.get_exam_year(teacher_id, university_slug, year) or {}
+        existing_questions = self.list_past_questions(teacher_id, university_slug, year)
         university_name = UNIVERSITY_REGISTRY.get(university_slug, {}).get("name", "")
         exam_type = existing_year.get("examType") or "secondary"
 
@@ -426,6 +448,7 @@ class PastExamService:
             if not sources.answers_pdf:
                 raise ValueError("Answers PDF is required for answers-only import")
             result = self.parse_answers_only(
+                teacher_id=teacher_id,
                 university_slug=university_slug,
                 year=year,
                 answers_pdf=sources.answers_pdf,
@@ -483,12 +506,14 @@ class PastExamService:
     def create_import_session(
         self,
         *,
+        teacher_id: str,
         university_slug: str,
         year: int,
         sources: ImportSources,
         parsed: PastExamParseResponse,
         provided: ProvidedSources | None = None,
     ) -> str:
+        self._require_teacher_id(teacher_id)
         session_id = uuid.uuid4().hex
         session_dir = self.import_session_dir(session_id)
         session_dir.mkdir(parents=True, exist_ok=True)
@@ -527,6 +552,7 @@ class PastExamService:
 
         manifest = {
             "sessionId": session_id,
+            "teacherId": teacher_id,
             "universitySlug": university_slug,
             "year": year,
             "sourceExamPdfs": stored_exam_paths,
@@ -546,7 +572,7 @@ class PastExamService:
 
     def load_import_session(
         self, session_id: str
-    ) -> tuple[str, int, PastExamParseResponse, ImportSources, ProvidedSources]:
+    ) -> tuple[str, str, int, PastExamParseResponse, ImportSources, ProvidedSources]:
         session_dir = self.import_session_dir(session_id)
         manifest_path = session_dir / "manifest.json"
         if not manifest_path.is_file():
@@ -565,7 +591,19 @@ class PastExamService:
             analysis_pdf=Path(analysis_raw) if analysis_raw else None,
         )
         provided = ProvidedSources.from_manifest(data.get("providedSources"))
-        return data["universitySlug"], int(data["year"]), parsed, sources, provided
+        teacher_id = (data.get("teacherId") or "").strip()
+        if not teacher_id:
+            raise ValueError(
+                "取り込みセッションに教師 ID がありません。PDF を再度アップロードしてください。"
+            )
+        return (
+            teacher_id,
+            data["universitySlug"],
+            int(data["year"]),
+            parsed,
+            sources,
+            provided,
+        )
 
     def update_import_session_parsed(self, session_id: str, parsed: PastExamParseResponse) -> None:
         session_dir = self.import_session_dir(session_id)
@@ -597,14 +635,16 @@ class PastExamService:
             for slug, meta in UNIVERSITY_REGISTRY.items()
         ]
 
-    def list_exam_years(self, university_slug: str) -> list[dict]:
+    def list_exam_years(self, teacher_id: str, university_slug: str) -> list[dict]:
         db = self.firebase.db()
         if not db:
             raise RuntimeError(
                 "Firestore is not initialized. Set GOOGLE_APPLICATION_CREDENTIALS in .env"
             )
         ref = (
-            db.collection("universities")
+            db.collection("teachers")
+            .document(self._require_teacher_id(teacher_id))
+            .collection(self.PAST_EXAM_CATALOG)
             .document(university_slug)
             .collection("exam_years")
         )
@@ -615,14 +655,16 @@ class PastExamService:
             rows.append(item)
         return sorted(rows, key=lambda row: int(row.get("year") or 0), reverse=True)
 
-    def get_exam_year(self, university_slug: str, year: int) -> dict | None:
+    def get_exam_year(self, teacher_id: str, university_slug: str, year: int) -> dict | None:
         db = self.firebase.db()
         if not db:
             raise RuntimeError(
                 "Firestore is not initialized. Set GOOGLE_APPLICATION_CREDENTIALS in .env"
             )
         snap = (
-            db.collection("universities")
+            db.collection("teachers")
+            .document(self._require_teacher_id(teacher_id))
+            .collection(self.PAST_EXAM_CATALOG)
             .document(university_slug)
             .collection("exam_years")
             .document(str(year))
@@ -634,14 +676,16 @@ class PastExamService:
         item["id"] = snap.id
         return item
 
-    def list_past_questions(self, university_slug: str, year: int) -> list[dict]:
+    def list_past_questions(self, teacher_id: str, university_slug: str, year: int) -> list[dict]:
         db = self.firebase.db()
         if not db:
             raise RuntimeError(
                 "Firestore is not initialized. Set GOOGLE_APPLICATION_CREDENTIALS in .env"
             )
         docs = (
-            db.collection("universities")
+            db.collection("teachers")
+            .document(self._require_teacher_id(teacher_id))
+            .collection(self.PAST_EXAM_CATALOG)
             .document(university_slug)
             .collection("past_questions")
             .where("year", "==", year)
@@ -660,17 +704,19 @@ class PastExamService:
             ),
         )
 
-    def ensure_exam_year_stub(self, university_slug: str, year: int) -> None:
+    def ensure_exam_year_stub(self, teacher_id: str, university_slug: str, year: int) -> None:
         """教師分析のみ先に保存する場合など、年度レコードの器を確保する。"""
         self.ensure_university(university_slug)
-        existing = self.get_exam_year(university_slug, year)
+        existing = self.get_exam_year(teacher_id, university_slug, year)
         if existing:
             return
         now = datetime.now(timezone.utc)
         self.firebase.set_nested_doc(
-            ["universities", university_slug, "exam_years", str(year)],
+            self._catalog_path(teacher_id, university_slug, "exam_years", str(year)),
             {
                 "year": year,
+                "teacherId": self._require_teacher_id(teacher_id),
+                "universitySlug": university_slug,
                 "examType": "",
                 "importStatus": "draft",
                 "questionCount": 0,
@@ -716,7 +762,7 @@ class PastExamService:
         content: str,
         attachments: list[dict],
     ) -> dict:
-        self.ensure_exam_year_stub(university_slug, year)
+        self.ensure_exam_year_stub(teacher_id, university_slug, year)
         now = datetime.now(timezone.utc)
         doc_id = self._teacher_material_doc_id(university_slug, year)
         existing = self.get_teacher_exam_material(teacher_id, university_slug, year)
@@ -948,6 +994,7 @@ class PastExamService:
     def write_listening_to_firestore(
         self,
         *,
+        teacher_id: str,
         university_slug: str,
         year: int,
         parsed: ListeningScriptParseResponse,
@@ -956,13 +1003,13 @@ class PastExamService:
         profile_status: str = "draft",
     ) -> dict:
         self.ensure_university(university_slug)
+        tid = self._require_teacher_id(teacher_id)
         now = datetime.now(timezone.utc)
         listening_storage_path: str | None = None
+        storage_base = self._past_exam_storage_prefix(tid, university_slug, year)
 
         if upload_pdf and self.firebase.bucket():
-            listening_storage_path = (
-                f"platform/universities/{university_slug}/past-exams/{year}/listening.pdf"
-            )
+            listening_storage_path = f"{storage_base}/listening.pdf"
             self.firebase.upload_bytes(
                 listening_storage_path,
                 listening_pdf.read_bytes(),
@@ -971,9 +1018,11 @@ class PastExamService:
 
         scripts = [s.model_dump() for s in parsed.listening_scripts]
         self.firebase.set_nested_doc(
-            ["universities", university_slug, "exam_years", str(year)],
+            self._catalog_path(tid, university_slug, "exam_years", str(year)),
             {
                 "year": year,
+                "teacherId": tid,
+                "universitySlug": university_slug,
                 "sourceListeningPdfPath": listening_storage_path,
                 "listeningScriptCount": len(scripts),
                 "listeningScripts": scripts,
@@ -1050,14 +1099,15 @@ class PastExamService:
         return f"{existing.strip()}\n{new.strip()}"
 
     def _existing_questions_by_firestore_id(
-        self, university_slug: str, year: int
+        self, teacher_id: str, university_slug: str, year: int
     ) -> dict[str, dict]:
-        rows = self.list_past_questions(university_slug, year)
+        rows = self.list_past_questions(teacher_id, university_slug, year)
         return {row["id"]: row for row in rows if row.get("id")}
 
     def write_to_firestore(
         self,
         *,
+        teacher_id: str,
         university_slug: str,
         year: int,
         parsed: PastExamParseResponse,
@@ -1067,7 +1117,9 @@ class PastExamService:
         provided: ProvidedSources | None = None,
     ) -> dict:
         self.ensure_university(university_slug)
+        tid = self._require_teacher_id(teacher_id)
         now = datetime.now(timezone.utc)
+        storage_base = self._past_exam_storage_prefix(tid, university_slug, year)
 
         if provided is None:
             provided = ProvidedSources(
@@ -1077,7 +1129,7 @@ class PastExamService:
                 analysis=bool(sources.analysis_pdf),
             )
 
-        existing_year = self.get_exam_year(university_slug, year) or {}
+        existing_year = self.get_exam_year(tid, university_slug, year) or {}
 
         exam_storage_paths: list[str] = list(existing_year.get("sourcePdfPaths") or [])
         answers_storage_path: str | None = existing_year.get("sourceAnswersPdfPath")
@@ -1089,9 +1141,7 @@ class PastExamService:
                 exam_storage_paths = []
                 for index, exam_pdf in enumerate(sources.exam_pdfs):
                     suffix = "" if index == 0 else f"_{index + 1}"
-                    storage_path = (
-                        f"platform/universities/{university_slug}/past-exams/{year}/exam{suffix}.pdf"
-                    )
+                    storage_path = f"{storage_base}/exam{suffix}.pdf"
                     self.firebase.upload_bytes(
                         storage_path,
                         exam_pdf.read_bytes(),
@@ -1100,9 +1150,7 @@ class PastExamService:
                     exam_storage_paths.append(storage_path)
 
             if provided.answers and sources.answers_pdf:
-                answers_storage_path = (
-                    f"platform/universities/{university_slug}/past-exams/{year}/answers.pdf"
-                )
+                answers_storage_path = f"{storage_base}/answers.pdf"
                 self.firebase.upload_bytes(
                     answers_storage_path,
                     sources.answers_pdf.read_bytes(),
@@ -1110,9 +1158,7 @@ class PastExamService:
                 )
 
             if provided.listening and sources.listening_pdf:
-                listening_storage_path = (
-                    f"platform/universities/{university_slug}/past-exams/{year}/listening.pdf"
-                )
+                listening_storage_path = f"{storage_base}/listening.pdf"
                 self.firebase.upload_bytes(
                     listening_storage_path,
                     sources.listening_pdf.read_bytes(),
@@ -1120,17 +1166,20 @@ class PastExamService:
                 )
 
             if provided.analysis and sources.analysis_pdf:
-                analysis_storage_path = (
-                    f"platform/universities/{university_slug}/past-exams/{year}/analysis.pdf"
-                )
+                analysis_storage_path = f"{storage_base}/analysis.pdf"
                 self.firebase.upload_bytes(
                     analysis_storage_path,
                     sources.analysis_pdf.read_bytes(),
                     content_type="application/pdf",
                 )
 
-        exam_year_path = ["universities", university_slug, "exam_years", str(year)]
-        exam_year_patch: dict = {"year": year, "updatedAt": now}
+        exam_year_path = self._catalog_path(tid, university_slug, "exam_years", str(year))
+        exam_year_patch: dict = {
+            "year": year,
+            "teacherId": tid,
+            "universitySlug": university_slug,
+            "updatedAt": now,
+        }
         if not existing_year:
             exam_year_patch["createdAt"] = now
 
@@ -1189,7 +1238,9 @@ class PastExamService:
             self.firebase.set_nested_doc(exam_year_path, exam_year_patch, merge=True)
 
         question_ids: list[str] = []
-        existing_questions = self._existing_questions_by_firestore_id(university_slug, year)
+        existing_questions = self._existing_questions_by_firestore_id(
+            tid, university_slug, year
+        )
 
         if provided.exam:
             for q in parsed.questions:
@@ -1206,6 +1257,8 @@ class PastExamService:
                     common_traps=[],
                 )
                 patch: dict = {
+                    "teacherId": tid,
+                    "universitySlug": university_slug,
                     "year": year,
                     "majorOrder": q.major_order,
                     "partLabel": q.part_label,
@@ -1238,7 +1291,7 @@ class PastExamService:
                     pass
 
                 self.firebase.set_nested_doc(
-                    ["universities", university_slug, "past_questions", firestore_id],
+                    self._catalog_path(tid, university_slug, "past_questions", firestore_id),
                     patch,
                     merge=True,
                 )
@@ -1257,7 +1310,7 @@ class PastExamService:
                     "updatedAt": now,
                 }
                 self.firebase.set_nested_doc(
-                    ["universities", university_slug, "past_questions", firestore_id],
+                    self._catalog_path(tid, university_slug, "past_questions", firestore_id),
                     patch,
                     merge=True,
                 )
@@ -1265,7 +1318,11 @@ class PastExamService:
             if question_ids:
                 self.firebase.set_nested_doc(
                     exam_year_path,
-                    {"questionCount": len(self.list_past_questions(university_slug, year))},
+                    {
+                        "questionCount": len(
+                            self.list_past_questions(tid, university_slug, year)
+                        )
+                    },
                     merge=True,
                 )
 

@@ -2,6 +2,11 @@
 
 from app.ai.prompts.universities.registry import (
     build_generation_system,
+    build_q1a_generation_system,
+    build_q1b_generation_system,
+    build_q2a_generation_system,
+    build_q2b_generation_system,
+    build_q4b_generation_system,
     build_q5_passage_system,
     build_q5_questions_system,
     get_overrides,
@@ -32,6 +37,34 @@ def test_todai_has_custom_q5_prompts_not_defaults():
     overrides = get_overrides("todai")
     assert overrides.generation_system is None
     assert "東大" in (overrides.notes or "")
+    assert "q1a_generation_system" in status.configured_keys
+    assert "q1a_validator_system" in status.configured_keys
+
+    q1a = build_q1a_generation_system("todai", "東京大学")
+    assert "70" in q1a
+    assert "要約" in q1a
+    assert "300" in q1a
+
+    assert "q1b_generation_system" in status.configured_keys
+    q1b = build_q1b_generation_system("todai", "東京大学")
+    assert "空所" in q1b or "(ア)" in q1b
+    assert "500" in q1b or "600" in q1b
+
+    assert "q2a_generation_system" in status.configured_keys
+    q2a = build_q2a_generation_system("todai", "東京大学")
+    assert "60" in q2a
+    assert "80" in q2a
+    assert "自由英作文" in q2a or "解答例" in q2a
+
+    assert "q2b_generation_system" in status.configured_keys
+    q2b = build_q2b_generation_system("todai", "東京大学")
+    assert "和文英訳" in q2b or "下線" in q2b
+    assert "直訳" in q2b or "比喩" in q2b
+
+    assert "q4b_generation_system" in status.configured_keys
+    q4b = build_q4b_generation_system("todai", "東京大学")
+    assert "下線" in q4b or "(ア)" in q4b
+    assert "和訳" in q4b or "日本語" in q4b
 
 
 def test_unknown_slug_falls_back_to_defaults():

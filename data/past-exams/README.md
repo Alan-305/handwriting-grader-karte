@@ -45,13 +45,29 @@ npm run import:listening -- --university todai --year 2026
 npm run import:listening -- --university todai --year 2026 --from-listening-draft --write-firestore
 ```
 
-## Firestore 保存先
+## Firestore 保存先（教師ごと・非共有）
+
+過去問の**中身**（問題文・模範解答・脚本・PDF）は、取り込んだ教師の UID 配下のみに保存されます。他の教師からは閲覧・問題生成の参照はできません。
 
 | データ | 保存先 |
 |--------|--------|
-| 大問 | `universities/todai/past_questions/2026_{大問ID}` |
-| 脚本 | `universities/todai/exam_years/2026` → `listeningScripts[]` |
-| PDF原本 | Storage `platform/universities/todai/past-exams/2026/` |
+| 大問 | `teachers/{teacherId}/past_exam_catalog/todai/past_questions/2026_{大問ID}` |
+| 脚本・年度メタ | `teachers/{teacherId}/past_exam_catalog/todai/exam_years/2026` |
+| PDF原本 | Storage `teachers/{teacherId}/past-exams/todai/2026/` |
+| 大学名マスタのみ | `universities/todai`（名称・slug のみ。過去問本文は含まない） |
+
+CLI で Firestore に書き込む場合は `--teacher-id <Firebase Auth UID>` を指定してください。
+
+### 旧共有データの移行（再取り込み不要）
+
+教師隔離以前に `universities/{slug}/...` に入っていた過去問を、指定 UID 配下へコピーする:
+
+```bash
+backend/.venv/bin/python3 scripts/migrate_legacy_past_exams.py --teacher-id YOUR_UID --dry-run
+backend/.venv/bin/python3 scripts/migrate_legacy_past_exams.py --teacher-id YOUR_UID
+```
+
+`GOOGLE_APPLICATION_CREDENTIALS` または Secret Manager 経由の認証が必要です。
 
 ## ドラフト JSON
 

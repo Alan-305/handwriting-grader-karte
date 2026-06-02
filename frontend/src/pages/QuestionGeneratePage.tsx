@@ -13,6 +13,7 @@ import { usePastExamUniversities } from "@/hooks/usePastExamUniversities";
 import { useStudents } from "@/hooks/useStudent";
 import { apiClient } from "@/lib/api-client";
 import { primaryPastExamSlug } from "@/lib/resolve-university";
+import { sortQuestionTypes } from "@/lib/sort-question-types";
 import type { ExamYearSummary } from "@/types/api";
 import type { QuestionTypeCatalogItem } from "@/types/question-design";
 
@@ -55,7 +56,7 @@ export function QuestionGeneratePage() {
         apiClient.listQuestionTypes(token, slug),
       ]);
       setExamYears(yearsRes.examYears);
-      setQuestionTypes(typesRes.questionTypes);
+      setQuestionTypes(sortQuestionTypes(typesRes.questionTypes));
       const defaultYears = yearsRes.examYears.map((y) => y.year).slice(0, 2);
       setSelectedYears(defaultYears);
     } catch (err) {
@@ -189,6 +190,24 @@ export function QuestionGeneratePage() {
       />
       <div className="page-content space-y-6">
         <div className="flex flex-wrap gap-3">
+          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
+            <Link to="/questions/generate/q1a">第1問(A)型の生成</Link>
+          </Button>
+          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
+            <Link to="/questions/generate/q1b">第1問(B)型の生成</Link>
+          </Button>
+          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
+            <Link to="/questions/generate/q2a">第2問(A)型の生成</Link>
+          </Button>
+          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
+            <Link to="/questions/generate/q2b">第2問(B)型の生成</Link>
+          </Button>
+          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
+            <Link to="/questions/generate/q4a">第4問(A)型の生成</Link>
+          </Button>
+          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
+            <Link to="/questions/generate/q4b">第4問(B)型の生成</Link>
+          </Button>
           <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
             <Link to="/questions/generate/q5">第5問型の生成（推奨）</Link>
           </Button>

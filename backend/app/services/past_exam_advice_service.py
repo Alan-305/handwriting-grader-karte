@@ -79,7 +79,9 @@ class PastExamAdviceService:
         if not results:
             raise ValueError("添削結果がありません。先に添削を完了してください。")
 
-        past_questions = self.question_design._load_past_questions_for_years(slug, None)
+        past_questions = self.question_design._load_past_questions_for_years(
+            teacher_id, slug, None
+        )
         if not past_questions:
             raise ValueError("参照できる過去問がありません")
 

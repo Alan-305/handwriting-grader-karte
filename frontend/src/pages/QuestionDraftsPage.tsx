@@ -148,7 +148,22 @@ export function QuestionDraftsPage() {
             </Link>
           </Button>
           <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
+            <Link to="/questions/generate/q1a">第1問(A)を生成</Link>
+          </Button>
+          <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
+            <Link to="/questions/generate/q1b">第1問(B)を生成</Link>
+          </Button>
+          <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
+            <Link to="/questions/generate/q2a">第2問(A)を生成</Link>
+          </Button>
+          <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
+            <Link to="/questions/generate/q2b">第2問(B)を生成</Link>
+          </Button>
+          <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
             <Link to="/questions/generate/q4a">第4問(A)を生成</Link>
+          </Button>
+          <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
+            <Link to="/questions/generate/q4b">第4問(B)を生成</Link>
           </Button>
           <Button asChild className="min-h-11 gap-2">
             <Link to="/questions/generate/q5">
@@ -183,6 +198,11 @@ export function QuestionDraftsPage() {
               const isBusy = busyDraftId === draftId;
               const isQ5 = draft.generationPipeline === "q5";
               const isQ4A = draft.generationPipeline === "q4a";
+              const isQ4B = draft.generationPipeline === "q4b";
+              const isQ1A = draft.generationPipeline === "q1a";
+              const isQ1B = draft.generationPipeline === "q1b";
+              const isQ2A = draft.generationPipeline === "q2a";
+              const isQ2B = draft.generationPipeline === "q2b";
               const artifacts = draft.generationArtifacts;
               const isFocused = focusDraftId === draftId;
               return (
@@ -196,9 +216,14 @@ export function QuestionDraftsPage() {
                       {draft.universitySlug} · {draft.points}点
                       {isQ5 ? " · 第5問パイプライン" : ""}
                       {isQ4A ? " · 第4問(A)パイプライン" : ""}
+                      {isQ4B ? " · 第4問(B)パイプライン" : ""}
+                      {isQ1A ? " · 第1問(A)パイプライン" : ""}
+                      {isQ1B ? " · 第1問(B)パイプライン" : ""}
+                      {isQ2A ? " · 第2問(A)パイプライン" : ""}
+                      {isQ2B ? " · 第2問(B)パイプライン" : ""}
                       {draft.notes ? ` · ${draft.notes}` : ""}
                     </CardDescription>
-                    {(isQ5 || isQ4A) && artifacts && (
+                    {(isQ5 || isQ4A || isQ4B || isQ1A || isQ1B || isQ2A || isQ2B) && artifacts && (
                       <p className="mt-2 font-ja text-xs text-slate-600">
                         {artifacts.evaluatorPassed === false
                           ? "検証: 要確認（設問の曖昧さあり）"

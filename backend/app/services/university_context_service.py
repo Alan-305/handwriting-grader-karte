@@ -39,20 +39,25 @@ class UniversityContextService:
 
     def _load_past_questions_for_years(
         self,
+        teacher_id: str,
         university_slug: str,
         years: list[int] | None = None,
     ) -> list[dict]:
         if years:
             rows: list[dict] = []
             for year in years:
-                rows.extend(self.past_exam.list_past_questions(university_slug, year))
+                rows.extend(
+                    self.past_exam.list_past_questions(teacher_id, university_slug, year)
+                )
             return rows
-        exam_years = self.past_exam.list_exam_years(university_slug)
+        exam_years = self.past_exam.list_exam_years(teacher_id, university_slug)
         rows: list[dict] = []
         for year_row in exam_years:
             year = int(year_row.get("year") or 0)
             if year:
-                rows.extend(self.past_exam.list_past_questions(university_slug, year))
+                rows.extend(
+                    self.past_exam.list_past_questions(teacher_id, university_slug, year)
+                )
         return rows
 
     @staticmethod
@@ -190,6 +195,7 @@ class UniversityContextService:
 
     def build_reference_context_for_major(
         self,
+        teacher_id: str,
         university_slug: str,
         *,
         major_order: int | None = None,
@@ -198,7 +204,9 @@ class UniversityContextService:
         limit: int = 4,
         max_chars: int = 4000,
     ) -> str:
-        past = self._load_past_questions_for_years(university_slug, reference_years)
+        past = self._load_past_questions_for_years(
+            teacher_id, university_slug, reference_years
+        )
         if not past:
             return ""
         if major_order == 5:
@@ -219,6 +227,7 @@ class UniversityContextService:
 
     def build_grading_context_block(
         self,
+        teacher_id: str,
         university_slug: str,
         *,
         major_order: int | None = None,
@@ -234,10 +243,12 @@ class UniversityContextService:
             lines.append(f"出題傾向（登録メモ）: {meta['examTrends']}")
 
         past_all: list[dict] = []
-        for year_row in self.past_exam.list_exam_years(university_slug):
+        for year_row in self.past_exam.list_exam_years(teacher_id, university_slug):
             year = int(year_row.get("year") or 0)
             if year:
-                past_all.extend(self.past_exam.list_past_questions(university_slug, year))
+                past_all.extend(
+                    self.past_exam.list_past_questions(teacher_id, university_slug, year)
+                )
 
         if major_order is not None:
             past_all = [q for q in past_all if int(q.get("majorOrder") or 0) == major_order]

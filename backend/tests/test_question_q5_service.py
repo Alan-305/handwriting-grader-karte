@@ -68,7 +68,11 @@ def test_run_pipeline_mock_without_api_key(monkeypatch):
     svc = QuestionQ5Service()
     monkeypatch.setattr(svc.university_ctx, "_load_past_questions_for_years", lambda *a, **k: [])
 
-    result = svc.run_pipeline(topic_hint="ボランティア", difficulty="standard")
+    result = svc.run_pipeline(
+        teacher_id="teacher-test",
+        topic_hint="ボランティア",
+        difficulty="standard",
+    )
     assert result["majorOrder"] == 5
     assert result["generationPipeline"] == "q5"
     assert "Story body" in result["prompt"] or "Ken" in result["prompt"]

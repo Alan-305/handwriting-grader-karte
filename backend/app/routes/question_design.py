@@ -4,7 +4,12 @@ from flask import Blueprint, g, jsonify, request
 from pydantic import BaseModel, Field, ValidationError
 
 from app.services.question_design_service import QuestionDesignService
+from app.services.question_q1a_service import QuestionQ1AService
+from app.services.question_q1b_service import QuestionQ1BService
+from app.services.question_q2a_service import QuestionQ2AService
+from app.services.question_q2b_service import QuestionQ2BService
 from app.services.question_q4a_service import QuestionQ4AService
+from app.services.question_q4b_service import QuestionQ4BService
 from app.services.question_q5_service import QuestionQ5Service
 from app.utils.auth_decorator import require_auth
 
@@ -89,6 +94,171 @@ class GenerateQ4ABody(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class GenerateQ4BBody(BaseModel):
+    reference_years: list[int] | None = Field(alias="referenceYears", default=None)
+    difficulty: str = "standard"
+    topic_hint: str = Field(alias="topicHint", default="")
+    student_id: str | None = Field(alias="studentId", default=None)
+
+    model_config = {"populate_by_name": True}
+
+
+class GenerateQ1ABody(BaseModel):
+    reference_years: list[int] | None = Field(alias="referenceYears", default=None)
+    difficulty: str = "standard"
+    topic_hint: str = Field(alias="topicHint", default="")
+    source_passage: str = Field(alias="sourcePassage", default="")
+    student_id: str | None = Field(alias="studentId", default=None)
+
+    model_config = {"populate_by_name": True}
+
+
+class GenerateQ1BBody(BaseModel):
+    reference_years: list[int] | None = Field(alias="referenceYears", default=None)
+    difficulty: str = "standard"
+    topic_hint: str = Field(alias="topicHint", default="")
+    source_passage: str = Field(alias="sourcePassage", default="")
+    student_id: str | None = Field(alias="studentId", default=None)
+
+    model_config = {"populate_by_name": True}
+
+
+class GenerateQ2ABody(BaseModel):
+    reference_years: list[int] | None = Field(alias="referenceYears", default=None)
+    difficulty: str = "standard"
+    topic_hint: str = Field(alias="topicHint", default="")
+    student_id: str | None = Field(alias="studentId", default=None)
+
+    model_config = {"populate_by_name": True}
+
+
+class GenerateQ2BBody(BaseModel):
+    reference_years: list[int] | None = Field(alias="referenceYears", default=None)
+    difficulty: str = "standard"
+    topic_hint: str = Field(alias="topicHint", default="")
+    student_id: str | None = Field(alias="studentId", default=None)
+
+    model_config = {"populate_by_name": True}
+
+
+@question_design_bp.post("/universities/<slug>/generate-q2b")
+@require_auth
+def generate_q2b(slug: str):
+    slug_error = _validate_slug(slug)
+    if slug_error:
+        return slug_error
+
+    try:
+        body = GenerateQ2BBody.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"error": exc.errors()}), 400
+
+    service = QuestionQ2BService()
+    try:
+        draft = service.generate_and_save_draft(
+            teacher_id=g.teacher_id,
+            university_slug=slug,
+            student_id=body.student_id,
+            topic_hint=body.topic_hint,
+            difficulty=body.difficulty,
+            reference_years=body.reference_years,
+        )
+        return jsonify({"draft": draft}), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+
+@question_design_bp.post("/universities/<slug>/generate-q2a")
+@require_auth
+def generate_q2a(slug: str):
+    slug_error = _validate_slug(slug)
+    if slug_error:
+        return slug_error
+
+    try:
+        body = GenerateQ2ABody.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"error": exc.errors()}), 400
+
+    service = QuestionQ2AService()
+    try:
+        draft = service.generate_and_save_draft(
+            teacher_id=g.teacher_id,
+            university_slug=slug,
+            student_id=body.student_id,
+            topic_hint=body.topic_hint,
+            difficulty=body.difficulty,
+            reference_years=body.reference_years,
+        )
+        return jsonify({"draft": draft}), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+
+@question_design_bp.post("/universities/<slug>/generate-q1b")
+@require_auth
+def generate_q1b(slug: str):
+    slug_error = _validate_slug(slug)
+    if slug_error:
+        return slug_error
+
+    try:
+        body = GenerateQ1BBody.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"error": exc.errors()}), 400
+
+    service = QuestionQ1BService()
+    try:
+        draft = service.generate_and_save_draft(
+            teacher_id=g.teacher_id,
+            university_slug=slug,
+            student_id=body.student_id,
+            topic_hint=body.topic_hint,
+            source_passage=body.source_passage,
+            difficulty=body.difficulty,
+            reference_years=body.reference_years,
+        )
+        return jsonify({"draft": draft}), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+
+@question_design_bp.post("/universities/<slug>/generate-q1a")
+@require_auth
+def generate_q1a(slug: str):
+    slug_error = _validate_slug(slug)
+    if slug_error:
+        return slug_error
+
+    try:
+        body = GenerateQ1ABody.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"error": exc.errors()}), 400
+
+    service = QuestionQ1AService()
+    try:
+        draft = service.generate_and_save_draft(
+            teacher_id=g.teacher_id,
+            university_slug=slug,
+            student_id=body.student_id,
+            topic_hint=body.topic_hint,
+            source_passage=body.source_passage,
+            difficulty=body.difficulty,
+            reference_years=body.reference_years,
+        )
+        return jsonify({"draft": draft}), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+
 @question_design_bp.get("/universities/<slug>/generation-units")
 @require_auth
 def list_generation_units(slug: str):
@@ -98,8 +268,37 @@ def list_generation_units(slug: str):
 
     service = QuestionDesignService()
     try:
-        units = service.list_generation_units(slug)
+        units = service.list_generation_units(g.teacher_id, slug)
         return jsonify({"generationUnits": units})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+
+@question_design_bp.post("/universities/<slug>/generate-q4b")
+@require_auth
+def generate_q4b(slug: str):
+    slug_error = _validate_slug(slug)
+    if slug_error:
+        return slug_error
+
+    try:
+        body = GenerateQ4BBody.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"error": exc.errors()}), 400
+
+    service = QuestionQ4BService()
+    try:
+        draft = service.generate_and_save_draft(
+            teacher_id=g.teacher_id,
+            university_slug=slug,
+            student_id=body.student_id,
+            topic_hint=body.topic_hint,
+            difficulty=body.difficulty,
+            reference_years=body.reference_years,
+        )
+        return jsonify({"draft": draft}), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 503
 
@@ -172,7 +371,7 @@ def list_question_types(slug: str):
 
     service = QuestionDesignService()
     try:
-        types = service.list_question_types(slug)
+        types = service.list_question_types(g.teacher_id, slug)
         return jsonify({"questionTypes": types})
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 503

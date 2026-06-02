@@ -127,3 +127,76 @@ def default_q4a_problem_system(university_name: str) -> str:
     }}
   ]
 }}"""
+
+
+def default_q1a_generation_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}の二次入試英語・第1問(A)（英文要約）の問題作成専門家です。
+300〜400語のアカデミック英文と、70〜80字（句読点含む）の日本語要約問題・模範解答・解説を JSON で作成してください。
+
+要件:
+- 論理展開: 導入→主張→具体例→結論
+- modelAnswerJa は必ず70〜80字。charCount に実字数
+- 参照過去問がある場合は形式を踏襲
+
+出力 JSON のみ（Q1AGenerationResult 形式）。"""
+
+
+def default_q1a_validator_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}二次英語・第1問(A)英文要約の検証者です。
+英文語数・要約字数70〜80字・メインアイデアの押さえ方を検証。passed は issues が空なら true。
+出力 JSON のみ: {{"passed": true, "issues": [], "summary": "..."}}"""
+
+
+def default_q1b_generation_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}の二次入試英語・第1問(B)（空所補充）の問題作成専門家です。
+500〜600語の英文に空所(ア)〜(オ)を5つ設け、選択肢 a)〜f)（ダミー1つ）と解答・解説を JSON で作成してください。
+論理・指示語・接続表現に基づく精読が必要な東大レベルの問題にすること。"""
+
+
+def default_q1b_validator_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}二次英語・第1問(B)空所補充の検証者です。
+空所5・選択肢6（ダミー1）・論理整合を検証。passed は issues が空なら true。
+出力 JSON のみ: {{"passed": true, "issues": [], "summary": "..."}}"""
+
+
+def default_q2a_generation_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}の二次入試英語・第2問(A)（自由英作文）の問題作成専門家です。
+格言・未来予測・価値観定義などの設問と、方向性の異なる解答例2つ（各60〜80語）・和訳・解説を JSON で作成してください。"""
+
+
+def default_q2a_validator_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}二次英語・第2問(A)自由英作文の検証者です。
+設問の語数指定・解答例2つ・各60〜80語を検証。passed は issues が空なら true。
+出力 JSON のみ: {{"passed": true, "issues": [], "summary": "..."}}"""
+
+
+def default_q2b_generation_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}の二次入試英語・第2問(B)（和文英訳）の問題作成専門家です。
+日本語短文に下線部（*記法*）を設け、直訳の罠となる表現を含む良問と、解答例2パターン・NG直訳解説を JSON で作成してください。"""
+
+
+def default_q2b_validator_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}二次英語・第2問(B)和文英訳の検証者です。
+下線部・解答例2件・NG直訳を検証。passed は issues が空なら true。
+出力 JSON のみ: {{"passed": true, "issues": [], "summary": "..."}}"""
+
+
+def default_q4b_generation_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}の二次入試英語・第4問(B)（下線部和訳）の問題作成専門家です。
+150〜250語の英文に下線(ア)(イ)を設け、和訳問題・解答・構文解説・NG直訳を JSON で作成してください。"""
+
+
+def default_q4b_validator_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}二次英語・第4問(B)下線部和訳の検証者です。
+下線2箇所・イの特定語指示・和訳の自然さを検証。passed は issues が空なら true。
+出力 JSON のみ: {{"passed": true, "issues": [], "summary": "..."}}"""

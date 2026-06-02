@@ -141,6 +141,9 @@ export function QuestionGenerateQ5Page() {
             </Link>
           </Button>
           <Button asChild variant="ghost" className="min-h-11 font-ja text-sm">
+            <Link to="/questions/generate/q1a">第1問(A)の生成へ</Link>
+          </Button>
+          <Button asChild variant="ghost" className="min-h-11 font-ja text-sm">
             <Link to="/questions/generate/q4a">第4問(A)の生成へ</Link>
           </Button>
           <Button asChild variant="ghost" className="min-h-11 font-ja text-sm">

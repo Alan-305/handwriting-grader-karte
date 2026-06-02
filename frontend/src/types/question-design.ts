@@ -42,7 +42,7 @@ export interface GenerationUnit {
   years: number[];
   sampleQuestionIds: string[];
   catalogKeys: string[];
-  pipeline: "q5" | "q4a" | "generic";
+  pipeline: "q5" | "q4a" | "q4b" | "q1a" | "q1b" | "q2a" | "q2b" | "generic";
 }
 
 export interface Q5GenerationArtifacts {

@@ -20,7 +20,12 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { to: "/students", label: "生徒", icon: Users },
   { to: "/tests", label: "問題", icon: BookOpen },
+  { to: "/questions/generate/q1a", label: "第1問(A)生成", icon: Sparkles },
+  { to: "/questions/generate/q1b", label: "第1問(B)生成", icon: Sparkles },
+  { to: "/questions/generate/q2a", label: "第2問(A)生成", icon: Sparkles },
+  { to: "/questions/generate/q2b", label: "第2問(B)生成", icon: Sparkles },
   { to: "/questions/generate/q4a", label: "第4問(A)生成", icon: Sparkles },
+  { to: "/questions/generate/q4b", label: "第4問(B)生成", icon: Sparkles },
   { to: "/questions/generate/q5", label: "第5問生成", icon: Sparkles },
   { to: "/question-drafts", label: "下書き", icon: FileEdit },
   { to: "/sessions/new", label: "添削", icon: ClipboardList },

@@ -140,7 +140,10 @@ export function QuestionGenerateQ4APage() {
             </Link>
           </Button>
           <Button asChild variant="ghost" className="min-h-11 font-ja text-sm">
-            <Link to="/questions/generate/q5">第5問の生成へ</Link>
+            <Link to="/questions/generate/q1a">第1問(A)の生成へ</Link>
+          </Button>
+          <Button asChild variant="ghost" className="min-h-11 font-ja text-sm">
+            <Link to="/questions/generate/q4b">第4問(B)の生成へ</Link>
           </Button>
         </div>
 

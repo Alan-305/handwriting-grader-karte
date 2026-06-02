@@ -82,6 +82,7 @@ def _run_listening_only(service: PastExamService, args: argparse.Namespace) -> i
         if args.from_listening_draft:
             parsed, listening_pdf = service.load_listening_draft_bundle(args.university, args.year)
         result = service.write_listening_to_firestore(
+            teacher_id=teacher_id,
             university_slug=args.university,
             year=args.year,
             parsed=parsed,
@@ -108,6 +109,10 @@ def main() -> int:
         help="Import listening script PDF only",
     )
     parser.add_argument("--write-firestore", action="store_true")
+    parser.add_argument(
+        "--teacher-id",
+        help="Firestore 保存先の教師 UID（--write-firestore 時は必須）",
+    )
     parser.add_argument("--from-draft", action="store_true")
     parser.add_argument("--from-listening-draft", action="store_true")
     parser.add_argument("--no-upload-pdf", action="store_true")
@@ -116,7 +121,11 @@ def main() -> int:
     if args.write_firestore or args.from_draft or args.from_listening_draft:
         bootstrap_firebase_from_env(ROOT / ".env")
         print(f"Firebase connected (project: {os.getenv('FIREBASE_PROJECT_ID', '')})")
+        if args.write_firestore and not (args.teacher_id or "").strip():
+            print("エラー: --write-firestore には --teacher-id が必要です。", file=sys.stderr)
+            return 2
 
+    teacher_id = (args.teacher_id or "").strip()
     service = PastExamService()
 
     if args.listening_only:
@@ -162,6 +171,7 @@ def main() -> int:
 
     if args.write_firestore:
         result = service.write_to_firestore(
+            teacher_id=teacher_id,
             university_slug=args.university,
             year=args.year,
             parsed=parsed,

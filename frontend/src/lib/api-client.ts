@@ -248,6 +248,23 @@ export const apiClient = {
       token,
     }),
 
+  generateQ4B: (
+    token: string,
+    slug: string,
+    body: {
+      referenceYears?: number[];
+      difficulty?: string;
+      topicHint?: string;
+      studentId?: string;
+    },
+  ) =>
+    request<{ draft: GeneratedQuestionDraft }>(`/api/universities/${slug}/generate-q4b`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
   generateQ4A: (
     token: string,
     slug: string,
@@ -260,6 +277,76 @@ export const apiClient = {
     },
   ) =>
     request<{ draft: GeneratedQuestionDraft }>(`/api/universities/${slug}/generate-q4a`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
+  generateQ1A: (
+    token: string,
+    slug: string,
+    body: {
+      referenceYears?: number[];
+      difficulty?: string;
+      topicHint?: string;
+      sourcePassage?: string;
+      studentId?: string;
+    },
+  ) =>
+    request<{ draft: GeneratedQuestionDraft }>(`/api/universities/${slug}/generate-q1a`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
+  generateQ1B: (
+    token: string,
+    slug: string,
+    body: {
+      referenceYears?: number[];
+      difficulty?: string;
+      topicHint?: string;
+      sourcePassage?: string;
+      studentId?: string;
+    },
+  ) =>
+    request<{ draft: GeneratedQuestionDraft }>(`/api/universities/${slug}/generate-q1b`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
+  generateQ2A: (
+    token: string,
+    slug: string,
+    body: {
+      referenceYears?: number[];
+      difficulty?: string;
+      topicHint?: string;
+      studentId?: string;
+    },
+  ) =>
+    request<{ draft: GeneratedQuestionDraft }>(`/api/universities/${slug}/generate-q2a`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
+  generateQ2B: (
+    token: string,
+    slug: string,
+    body: {
+      referenceYears?: number[];
+      difficulty?: string;
+      topicHint?: string;
+      studentId?: string;
+    },
+  ) =>
+    request<{ draft: GeneratedQuestionDraft }>(`/api/universities/${slug}/generate-q2b`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

@@ -100,6 +100,7 @@ class QuestionQ4AService:
     def run_pipeline(
         self,
         *,
+        teacher_id: str,
         topic_hint: str = "",
         source_passage: str = "",
         difficulty: str = "standard",
@@ -108,6 +109,7 @@ class QuestionQ4AService:
     ) -> dict:
         uni_name = self.university_ctx.university_name(university_slug)
         ref_context = self.university_ctx.build_reference_context_for_major(
+            teacher_id,
             university_slug,
             major_order=4,
             part_label=Q4A_PART_LABEL,
@@ -117,6 +119,7 @@ class QuestionQ4AService:
         )
         if not ref_context:
             ref_context = self.university_ctx.build_reference_context_for_major(
+                teacher_id,
                 university_slug,
                 major_order=4,
                 part_label=None,
@@ -297,6 +300,7 @@ class QuestionQ4AService:
             require=True,
         )
         data = self.run_pipeline(
+            teacher_id=teacher_id,
             topic_hint=topic_hint,
             source_passage=source_passage,
             difficulty=difficulty,

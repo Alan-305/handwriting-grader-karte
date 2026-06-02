@@ -30,7 +30,12 @@ import { PastExamImportPage } from "@/pages/PastExamImportPage";
 import { PastExamImportReviewPage } from "@/pages/PastExamImportReviewPage";
 import { PastExamYearDetailPage } from "@/pages/PastExamYearDetailPage";
 import { QuestionGeneratePage } from "@/pages/QuestionGeneratePage";
+import { QuestionGenerateQ1APage } from "@/pages/QuestionGenerateQ1APage";
+import { QuestionGenerateQ1BPage } from "@/pages/QuestionGenerateQ1BPage";
+import { QuestionGenerateQ2APage } from "@/pages/QuestionGenerateQ2APage";
+import { QuestionGenerateQ2BPage } from "@/pages/QuestionGenerateQ2BPage";
 import { QuestionGenerateQ4APage } from "@/pages/QuestionGenerateQ4APage";
+import { QuestionGenerateQ4BPage } from "@/pages/QuestionGenerateQ4BPage";
 import { QuestionGenerateQ5Page } from "@/pages/QuestionGenerateQ5Page";
 import { QuestionDraftsPage } from "@/pages/QuestionDraftsPage";
 import { TestDraftsPage } from "@/pages/TestDraftsPage";
@@ -94,7 +99,12 @@ export function AppRoutes() {
         <Route path="tests" element={<TestsPage />} />
         <Route path="tests/:testId" element={<TestEditorPage />} />
         <Route path="questions/generate" element={<QuestionGeneratePage />} />
+        <Route path="questions/generate/q1a" element={<QuestionGenerateQ1APage />} />
+        <Route path="questions/generate/q1b" element={<QuestionGenerateQ1BPage />} />
+        <Route path="questions/generate/q2a" element={<QuestionGenerateQ2APage />} />
+        <Route path="questions/generate/q2b" element={<QuestionGenerateQ2BPage />} />
         <Route path="questions/generate/q4a" element={<QuestionGenerateQ4APage />} />
+        <Route path="questions/generate/q4b" element={<QuestionGenerateQ4BPage />} />
         <Route path="questions/generate/q5" element={<QuestionGenerateQ5Page />} />
         <Route path="question-drafts" element={<QuestionDraftsPage />} />
         <Route path="test-drafts" element={<TestDraftsPage />} />

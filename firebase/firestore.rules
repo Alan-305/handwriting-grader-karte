@@ -28,6 +28,19 @@ service cloud.firestore {
       match /question_drafts/{draftId} {
         allow read, write: if request.auth != null && request.auth.uid == teacherId;
       }
+
+      // 過去問（問題文・模範解答・PDF パス）は取り込み教師のみ
+      match /past_exam_catalog/{universitySlug} {
+        allow read, write: if isTeacher(teacherId);
+
+        match /exam_years/{yearId} {
+          allow read, write: if isTeacher(teacherId);
+        }
+
+        match /past_questions/{questionId} {
+          allow read, write: if isTeacher(teacherId);
+        }
+      }
     }
 
     match /students/{studentId} {
@@ -64,14 +77,13 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
 
+      // 旧共有パス（universities/.../past_questions）はクライアントから不可
       match /exam_years/{yearId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null;
+        allow read, write: if false;
       }
 
       match /past_questions/{questionId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null;
+        allow read, write: if false;
       }
     }
 

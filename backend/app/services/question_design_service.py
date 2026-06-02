@@ -15,7 +15,11 @@ from app.services.question_prompt_markup import (
 from app.ai.prompts.question_validity import VALIDITY_CHECK_SYSTEM, build_validity_user_prompt
 from app.ai.schemas.question_design import GeneratedQuestionItem, ValidityCheckResponse
 from app.services.firebase_admin_service import FirebaseAdminService
-from app.services.generation_units import catalog_to_generation_units
+from app.services.generation_units import (
+    _part_sort_key,
+    catalog_to_generation_units,
+    pipeline_for_selection,
+)
 from app.services.past_exam_service import UNIVERSITY_REGISTRY, PastExamService
 
 logger = logging.getLogger(__name__)
@@ -29,6 +33,8 @@ COVERAGE_LABELS = {
 # 参照過去問をプロンプトに載せる上限（読解長文を含めるため modelAnswer より長め）
 REFERENCE_PROMPT_MAX_CHARS = 8000
 REFERENCE_MODEL_ANSWER_MAX_CHARS = 2000
+
+DEDICATED_PIPELINES = frozenset({"q1a", "q1b", "q2a", "q2b", "q4a", "q4b", "q5"})
 
 
 from app.services.question_type_labels import format_type_label, type_key
@@ -49,19 +55,23 @@ class QuestionDesignService:
             raise RuntimeError("Firestore is not initialized.")
         return db.collection("teachers").document(teacher_id).collection("question_drafts")
 
-    def list_generation_units(self, university_slug: str) -> list[dict]:
+    def list_generation_units(self, teacher_id: str, university_slug: str) -> list[dict]:
         """UI 用の生成単位一覧（第5問は1枠、第2〜4問は大問単位など）。"""
-        return catalog_to_generation_units(self.list_question_types(university_slug))
+        return catalog_to_generation_units(
+            self.list_question_types(teacher_id, university_slug)
+        )
 
-    def list_question_types(self, university_slug: str) -> list[dict]:
-        exam_years = self.past_exam.list_exam_years(university_slug)
+    def list_question_types(self, teacher_id: str, university_slug: str) -> list[dict]:
+        exam_years = self.past_exam.list_exam_years(teacher_id, university_slug)
         catalog: dict[str, dict] = {}
 
         for year_row in exam_years:
             year = int(year_row.get("year") or 0)
             if not year:
                 continue
-            questions = self.past_exam.list_past_questions(university_slug, year)
+            questions = self.past_exam.list_past_questions(
+                teacher_id, university_slug, year
+            )
             for q in questions:
                 major = int(q.get("majorOrder") or 0)
                 part = q.get("partLabel")
@@ -83,25 +93,33 @@ class QuestionDesignService:
         rows = list(catalog.values())
         for row in rows:
             row["years"] = sorted(row["years"], reverse=True)
-        return sorted(rows, key=lambda r: (r["majorOrder"], str(r.get("partLabel") or "")))
+        return sorted(
+            rows,
+            key=lambda r: (int(r["majorOrder"] or 0), _part_sort_key(r.get("partLabel"))),
+        )
 
     def _load_past_questions_for_years(
         self,
+        teacher_id: str,
         university_slug: str,
         years: list[int] | None = None,
     ) -> list[dict]:
         if years:
             rows: list[dict] = []
             for year in years:
-                rows.extend(self.past_exam.list_past_questions(university_slug, year))
+                rows.extend(
+                    self.past_exam.list_past_questions(teacher_id, university_slug, year)
+                )
             return rows
 
-        exam_years = self.past_exam.list_exam_years(university_slug)
+        exam_years = self.past_exam.list_exam_years(teacher_id, university_slug)
         rows = []
         for year_row in exam_years:
             year = int(year_row.get("year") or 0)
             if year:
-                rows.extend(self.past_exam.list_past_questions(university_slug, year))
+                rows.extend(
+                    self.past_exam.list_past_questions(teacher_id, university_slug, year)
+                )
         return rows
 
     @staticmethod
@@ -200,7 +218,9 @@ class QuestionDesignService:
         if not questions:
             raise ValueError("設問が登録されていません")
 
-        past_questions = self._load_past_questions_for_years(university_slug, reference_years)
+        past_questions = self._load_past_questions_for_years(
+            teacher_id, university_slug, reference_years
+        )
         if not past_questions:
             raise ValueError("参照できる過去問がありません。先に過去問を取り込んでください。")
 
@@ -268,6 +288,7 @@ class QuestionDesignService:
     def _run_generation(
         self,
         *,
+        teacher_id: str,
         university_slug: str,
         selections: list[dict],
         reference_years: list[int] | None,
@@ -281,7 +302,9 @@ class QuestionDesignService:
             raise ValueError("生成する型を1つ以上選択してください")
 
         count_per_type = max(1, min(count_per_type, 3))
-        past_questions = self._load_past_questions_for_years(university_slug, reference_years)
+        past_questions = self._load_past_questions_for_years(
+            teacher_id, university_slug, reference_years
+        )
         if not past_questions:
             raise ValueError("参照できる過去問がありません")
 
@@ -342,6 +365,107 @@ class QuestionDesignService:
             normalized.append(data)
         return normalized
 
+    def _run_dedicated_pipeline(
+        self,
+        *,
+        teacher_id: str,
+        pipeline: str,
+        university_slug: str,
+        reference_years: list[int] | None,
+        difficulty: str,
+        topic_hint: str,
+    ) -> dict:
+        pipeline_kwargs = {
+            "teacher_id": teacher_id,
+            "topic_hint": topic_hint,
+            "difficulty": difficulty,
+            "university_slug": university_slug,
+            "reference_years": reference_years,
+        }
+        if pipeline == "q1a":
+            from app.services.question_q1a_service import QuestionQ1AService
+
+            return QuestionQ1AService().run_pipeline(**pipeline_kwargs)
+        if pipeline == "q1b":
+            from app.services.question_q1b_service import QuestionQ1BService
+
+            return QuestionQ1BService().run_pipeline(**pipeline_kwargs)
+        if pipeline == "q2a":
+            from app.services.question_q2a_service import QuestionQ2AService
+
+            return QuestionQ2AService().run_pipeline(**pipeline_kwargs)
+        if pipeline == "q2b":
+            from app.services.question_q2b_service import QuestionQ2BService
+
+            return QuestionQ2BService().run_pipeline(**pipeline_kwargs)
+        if pipeline == "q4a":
+            from app.services.question_q4a_service import QuestionQ4AService
+
+            return QuestionQ4AService().run_pipeline(**pipeline_kwargs)
+        if pipeline == "q4b":
+            from app.services.question_q4b_service import QuestionQ4BService
+
+            return QuestionQ4BService().run_pipeline(**pipeline_kwargs)
+        if pipeline == "q5":
+            from app.services.question_q5_service import QuestionQ5Service
+
+            return QuestionQ5Service().run_pipeline(**pipeline_kwargs)
+        raise ValueError(f"未対応の専用パイプライン: {pipeline}")
+
+    def _run_generation_with_pipelines(
+        self,
+        *,
+        teacher_id: str,
+        university_slug: str,
+        selections: list[dict],
+        reference_years: list[int] | None,
+        difficulty: str,
+        topic_hint: str,
+        count_per_type: int,
+        weakness_focus: str = "",
+    ) -> list[dict]:
+        """専用パイプライン（第1問A/B・第4問A・第5問）と汎用生成を振り分ける。"""
+        if not selections:
+            raise ValueError("生成する型を1つ以上選択してください")
+
+        count_per_type = max(1, min(count_per_type, 3))
+        normalized: list[dict] = []
+        generic_selections: list[dict] = []
+
+        for sel in selections:
+            major = int(sel.get("majorOrder") or 0)
+            part = sel.get("partLabel")
+            pipeline = pipeline_for_selection(major, part)
+            if pipeline in DEDICATED_PIPELINES:
+                for _ in range(count_per_type):
+                    normalized.append(
+                        self._run_dedicated_pipeline(
+                            teacher_id=teacher_id,
+                            pipeline=pipeline,
+                            university_slug=university_slug,
+                            reference_years=reference_years,
+                            difficulty=difficulty,
+                            topic_hint=topic_hint,
+                        )
+                    )
+            else:
+                generic_selections.append(sel)
+
+        if generic_selections:
+            normalized.extend(
+                self._run_generation(
+                    teacher_id=teacher_id,
+                    university_slug=university_slug,
+                    selections=generic_selections,
+                    reference_years=reference_years,
+                    difficulty=difficulty,
+                    topic_hint=topic_hint,
+                    count_per_type=count_per_type,
+                    weakness_focus=weakness_focus,
+                )
+            )
+        return normalized
+
     def generate_questions(
         self,
         *,
@@ -362,7 +486,8 @@ class QuestionDesignService:
         )
         university_slug = resolved_slug or university_slug or "todai"
 
-        normalized = self._run_generation(
+        normalized = self._run_generation_with_pipelines(
+            teacher_id=teacher_id,
             university_slug=university_slug,
             selections=selections,
             reference_years=reference_years,
@@ -664,7 +789,8 @@ class QuestionDesignService:
             weakness_focus, student = self._latest_karte_weakness(student_id, teacher_id)
             student_name = (student or {}).get("name", "")
 
-        normalized = self._run_generation(
+        normalized = self._run_generation_with_pipelines(
+            teacher_id=teacher_id,
             university_slug=university_slug,
             selections=selections,
             reference_years=reference_years,
@@ -709,6 +835,7 @@ class QuestionDesignService:
                     f"{topic_hint}\n前回の改善要望: " + "; ".join(improvements[:6])
                 ).strip()
             retry_items = self._run_generation(
+                teacher_id=teacher_id,
                 university_slug=university_slug,
                 selections=selections,
                 reference_years=reference_years,

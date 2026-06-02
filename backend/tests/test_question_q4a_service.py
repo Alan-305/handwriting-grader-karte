@@ -90,7 +90,11 @@ def test_run_pipeline_mock_without_api_key(monkeypatch):
     svc = QuestionQ4AService()
     monkeypatch.setattr(svc.university_ctx, "_load_past_questions_for_years", lambda *a, **k: [])
 
-    result = svc.run_pipeline(topic_hint="AI ethics", difficulty="standard")
+    result = svc.run_pipeline(
+        teacher_id="teacher-test",
+        topic_hint="AI ethics",
+        difficulty="standard",
+    )
     assert result["majorOrder"] == 4
     assert result["partLabel"] == "(A)"
     assert result["generationPipeline"] == "q4a"
