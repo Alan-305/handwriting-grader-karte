@@ -95,13 +95,8 @@ body {
   font-size: 1.5em;
 }
 
-.grading-print-document :where(.text-feedback, .text-explanation) {
+.grading-print-document :where(.text-feedback, .text-explanation, .text-model-answer) {
   font-size: 1em;
-  line-height: var(--grading-print-line-height, 1.55);
-}
-
-.grading-print-document :where(.text-model-answer) {
-  font-size: 1.125em;
   line-height: var(--grading-print-line-height, 1.55);
 }
 

@@ -76,12 +76,12 @@ export function StudentPrintLayout({
     >
       <header className="print-doc-header border-b border-slate-200 pb-2 print:border-black">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h1 className="min-w-0 font-ja text-base font-semibold leading-snug text-slate-900">
+          <h1 className="min-w-0 font-ja text-lg font-semibold leading-snug text-slate-900">
             {titlePrefix}添削結果と解説
             {compactName ? `（${compactName}）` : ""}
           </h1>
           {showScore ? (
-            <p className="shrink-0 font-ja text-base font-semibold text-slate-900">
+            <p className="shrink-0 font-ja text-lg font-semibold text-slate-900">
               {totalScore100}点／100点満点
             </p>
           ) : null}
@@ -108,9 +108,12 @@ export function StudentPrintLayout({
           >
             <section className="grading-print-question space-y-4 border-b border-slate-100 pb-8 print:border-black/20">
               <div className="flex items-center justify-between">
-                <h2 className="font-ja text-lg font-semibold">{questionHeading(r)}</h2>
+                <h2 className="font-ja text-sm font-semibold text-slate-800">{questionHeading(r)}</h2>
                 {studentSectionOn(sections, "grade") && (
-                  <GradeBadge grade={r.grade as GradeLevel} />
+                  <GradeBadge
+                    grade={r.grade as GradeLevel}
+                    className="min-h-9 min-w-9 px-3 text-sm"
+                  />
                 )}
               </div>
 
@@ -163,7 +166,7 @@ export function StudentPrintLayout({
                 <div className="grading-print-block flex items-start gap-3">
                   <div className="flex-1">
                     <p className="font-ja text-sm font-semibold text-slate-600">模範解答</p>
-                    <p className="text-model-answer mt-1 font-en text-slate-900">{modelTextForPrint}</p>
+                    <p className="text-explanation mt-1 font-en text-slate-900">{modelTextForPrint}</p>
                   </div>
                   <span className="no-print">
                     <TtsButton text={modelTextForPrint} lang="en" />
