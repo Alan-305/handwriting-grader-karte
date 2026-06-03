@@ -18,3 +18,9 @@ export function depersonalizeForStudentPrint(text: string, studentName?: string)
 
   return out;
 }
+
+/** 返却プリント見出し用: 氏名から空白を除いて（合六亮）形式にする */
+export function compactStudentNameForPrintHeader(studentName?: string): string {
+  if (!studentName?.trim()) return "";
+  return studentName.trim().replace(/[\s\u3000]+/g, "");
+}

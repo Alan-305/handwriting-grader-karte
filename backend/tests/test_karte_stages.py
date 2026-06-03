@@ -69,15 +69,23 @@ def test_context_block_includes_targets_scores_and_trend():
     # 時系列（回ごと）が含まれる
     assert "第1回:" in text
     assert "第2回:" in text
+    assert "触れてはいけない未登録情報" in text
+    assert "模試" in text
+    assert "使ってよい根拠" in text
 
 
-def test_all_stage_systems_enforce_common_rules():
+def test_all_stage_systems_enforce_registered_data_rules():
     for system in (DIAGNOSIS_SYSTEM, READINESS_SYSTEM, ADVICE_PLAN_SYSTEM):
         assert "不合格" in system  # 「使わない」という禁止指示として登場
         assert "登録" in system
-    # Stage 4 は検証専用で、捏造・志望校外を検出対象に明記
+        assert "模試" in system
+    assert "模試" in READINESS_SYSTEM
+    assert "偏差値" in READINESS_SYSTEM
+    # Stage 4 は検証専用で、捏造・志望校外・模試を検出対象に明記
     assert "捏造" in INTEGRITY_SYSTEM
     assert "不合格" in INTEGRITY_SYSTEM
+    assert "模試" in INTEGRITY_SYSTEM
+    assert "偏差値" in INTEGRITY_SYSTEM
 
 
 def test_schemas_parse_camelcase_input():
@@ -180,6 +188,45 @@ def test_integrity_prompt_surfaces_violation_for_verifier():
     assert "京都大学" in prompt
     # 共通テスト得点帯も点検対象に含む
     assert "80〜89点" in prompt
+    assert "触れてはいけない未登録情報" in prompt
+    assert "模試" in prompt
+
+
+def test_integrity_prompt_flags_mock_exam_violation_text():
+    """模試偏差値言及を仕込んだ Stage2 出力が点検対象に載ること。"""
+    diagnosis = DiagnosisResult.model_validate({"weaknessSummary": "x", "weaknesses": []})
+    readiness = ReadinessResult.model_validate(
+        {
+            "readinessComment": "ok",
+            "byArea": [
+                {
+                    "area": "長文読解",
+                    "currentLevel": "模試の偏差値から、東大レベルにはまだ距離があります。",
+                    "targetLevel": "東大合格水準",
+                    "gapComment": "継続が必要",
+                }
+            ],
+            "priorityAreas": ["長文読解"],
+        }
+    )
+    plan = AdvicePlanResult.model_validate(
+        {
+            "adviceCards": [],
+            "nextSessionPlan": {
+                "focus": "",
+                "recommendedQuestionTypes": [],
+                "drillSuggestions": [],
+            },
+        }
+    )
+    prompt = build_integrity_prompt(
+        allowed_universities=_TARGET_UNIS,
+        diagnosis_json=to_json(diagnosis),
+        readiness_json=to_json(readiness),
+        advice_plan_json=to_json(plan),
+        common_test_scores={"englishReading": "80_89"},
+    )
+    assert "模試の偏差値から" in prompt
 
 
 def test_to_json_uses_aliases():

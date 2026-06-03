@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import {
   useSavePrintArtifact,
   useSession,
+  useSessionsForStudent,
   useUpdateQuestionResults,
 } from "@/hooks/useSession";
 import { usePrintShortcut } from "@/hooks/usePrintShortcut";
@@ -20,6 +21,7 @@ import { exportElementToPdf, printElement } from "@/lib/pdf-export";
 import { getDb } from "@/lib/firebase";
 import { isQuestionIncluded } from "@/lib/grading-print-config";
 import { sortQuestionResults } from "@/lib/question-results";
+import { dedupeSessionsByTest } from "@/lib/session-list";
 import { sumResultScores, toScoreOutOf100 } from "@/lib/scoring";
 import type { StudentPrintSections } from "@/lib/grading-print-config";
 import type { QuestionResult, Student } from "@/types/firestore";
@@ -30,6 +32,7 @@ export function PrintStudentPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const { session, results, loading } = useSession(sessionId);
+  const studentSessions = useSessionsForStudent(session?.studentId);
   const { saveResults, setPrintFinalized, syncSessionScores } = useUpdateQuestionResults(sessionId);
   const { saveArtifact } = useSavePrintArtifact(sessionId ?? "");
   const printRef = useRef<HTMLDivElement>(null);
@@ -73,6 +76,13 @@ export function PrintStudentPage() {
   }, [session?.studentId]);
 
   const sortedDrafts = useMemo(() => sortQuestionResults(drafts), [drafts]);
+
+  const sessionNumber = useMemo(() => {
+    if (!sessionId) return undefined;
+    const chrono = dedupeSessionsByTest(studentSessions);
+    const idx = chrono.findIndex((s) => s.id === sessionId);
+    return idx >= 0 ? idx + 1 : undefined;
+  }, [studentSessions, sessionId]);
 
   useEffect(() => {
     if (session?.studentPrintFinalizedAt) {
@@ -288,6 +298,7 @@ export function PrintStudentPage() {
         <StudentPrintLayout
           results={activeResults}
           studentName={studentName}
+          sessionNumber={sessionNumber}
           totalScore100={totalScore100}
           sections={prefs.sections as StudentPrintSections}
           layout={prefs.layout}

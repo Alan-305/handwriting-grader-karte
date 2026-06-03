@@ -265,6 +265,7 @@ class KarteService:
                     readiness_json=to_json(readiness),
                     advice_plan_json=to_json(plan),
                     common_test_scores=(ctx.get("interview_profile") or {}).get("commonTestScores"),
+                    interview_profile=ctx.get("interview_profile"),
                 ),
                 response_schema=IntegrityCheck,
             )

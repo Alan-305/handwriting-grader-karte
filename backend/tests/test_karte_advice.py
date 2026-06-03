@@ -45,3 +45,5 @@ def test_prompt_includes_interview_profile_and_records():
     assert "【生徒の相談】" in text
     assert "【教師のアドバイス】" in text
     assert "このリスト以外" in text
+    assert "触れてはいけない未登録情報" in text
+    assert "模試" in text
