@@ -71,7 +71,7 @@ export function PastExamAdvicePrintControlsPanel({
       <CardHeader>
         <CardTitle className="font-ja text-lg">過去問アドバイスの印刷設定</CardTitle>
         <CardDescription className="font-ja">
-          掲載する項目を選び、A4レイアウトを調整できます。設定はテンプレとして保存できます。
+          掲載する項目を選び、A4レイアウトを調整できます。文字サイズ（%）と行間は下のプレビューにそのまま反映されます。
         </CardDescription>
       </CardHeader>
 
@@ -188,6 +188,9 @@ export function PastExamAdvicePrintControlsPanel({
                 updateLayout("fontScalePercent", clampFontScale(Number(e.target.value)))
               }
             />
+            <p className="font-ja text-xs text-slate-500">
+              見出し・本文など、プリント全体の文字が連動して変わります（85〜120%）。
+            </p>
           </Field>
           <Field label="行間">
             <Input
@@ -201,6 +204,7 @@ export function PastExamAdvicePrintControlsPanel({
                 updateLayout("lineHeight", clampLineHeight(Number(e.target.value)))
               }
             />
+            <p className="font-ja text-xs text-slate-500">本文の行の開き（1.25〜1.9）。</p>
           </Field>
         </section>
         <button

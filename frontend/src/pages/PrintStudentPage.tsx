@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { doc, onSnapshot } from "firebase/firestore";
 import { Check, Edit3, Printer } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
@@ -16,11 +17,12 @@ import {
 import { usePrintShortcut } from "@/hooks/usePrintShortcut";
 import { useGradingPrintPreferences } from "@/hooks/useGradingPrintPreferences";
 import { exportElementToPdf, printElement } from "@/lib/pdf-export";
+import { getDb } from "@/lib/firebase";
 import { isQuestionIncluded } from "@/lib/grading-print-config";
 import { sortQuestionResults } from "@/lib/question-results";
 import { sumResultScores, toScoreOutOf100 } from "@/lib/scoring";
 import type { StudentPrintSections } from "@/lib/grading-print-config";
-import type { QuestionResult } from "@/types/firestore";
+import type { QuestionResult, Student } from "@/types/firestore";
 
 type PrintMode = "edit" | "preview";
 
@@ -47,6 +49,7 @@ export function PrintStudentPage() {
   } = useGradingPrintPreferences("student");
 
   const [mode, setMode] = useState<PrintMode>("edit");
+  const [studentName, setStudentName] = useState("");
   const [drafts, setDrafts] = useState<QuestionResult[]>([]);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState("");
@@ -54,6 +57,20 @@ export function PrintStudentPage() {
   useEffect(() => {
     setDrafts(sortQuestionResults(results));
   }, [results]);
+
+  useEffect(() => {
+    if (!session?.studentId) {
+      setStudentName("");
+      return;
+    }
+    return onSnapshot(doc(getDb(), "students", session.studentId), (snap) => {
+      if (snap.exists()) {
+        setStudentName((snap.data() as Student).name ?? "");
+      } else {
+        setStudentName("");
+      }
+    });
+  }, [session?.studentId]);
 
   const sortedDrafts = useMemo(() => sortQuestionResults(drafts), [drafts]);
 
@@ -270,6 +287,7 @@ export function PrintStudentPage() {
       <div ref={printRef} className="bg-slate-100 p-8 print:bg-white print:p-0">
         <StudentPrintLayout
           results={activeResults}
+          studentName={studentName}
           totalScore100={totalScore100}
           sections={prefs.sections as StudentPrintSections}
           layout={prefs.layout}

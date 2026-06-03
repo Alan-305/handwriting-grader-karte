@@ -36,5 +36,6 @@ def test_build_prompt_includes_student_name():
         rubric=None,
         student_name="山田太郎",
     )
-    assert "山田太郎さん" in prompt
-    assert "生徒の" not in prompt.split("使わない")[0] or "使わない" in prompt
+    assert "山田太郎" in prompt
+    assert "あなたの" in prompt
+    assert "山田太郎さん" not in prompt

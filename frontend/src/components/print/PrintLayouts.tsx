@@ -23,6 +23,7 @@ import {
   shouldApplyQuestionGap,
   shouldBreakBeforeQuestion,
 } from "@/lib/print-layout-settings";
+import { depersonalizeForStudentPrint } from "@/lib/student-print-text";
 
 function questionHeading(r: QuestionResult): string {
   return `第${r.order}問${r.partLabel ? ` ${r.partLabel}` : ""}`;
@@ -41,12 +42,14 @@ function splitModelAnswerTranslation(text: string): { body: string; translation:
 
 export function StudentPrintLayout({
   results,
+  studentName,
   totalScore100,
   sections,
   layout,
   includedQuestions = {},
 }: {
   results: QuestionResult[];
+  studentName?: string;
   totalScore100?: number;
   sections: StudentPrintSections;
   layout: GradingPrintLayoutSettings;
@@ -55,6 +58,8 @@ export function StudentPrintLayout({
   const sorted = sortQuestionResults(results).filter((r) =>
     isQuestionIncluded(includedQuestions, r.id),
   );
+  const personalize = (text?: string) =>
+    text ? depersonalizeForStudentPrint(text, studentName) : text;
 
   return (
     <PrintFlowDocument
@@ -63,7 +68,12 @@ export function StudentPrintLayout({
       data-page-margin={layout.pageMargin}
     >
       <header className="print-doc-header border-b border-slate-200 pb-4 print:border-black">
-        <h1 className="font-ja text-2xl font-semibold">返却プリント</h1>
+        {studentName?.trim() ? (
+          <p className="font-ja text-2xl font-semibold text-slate-900">{studentName.trim()} さん</p>
+        ) : null}
+        <h1 className={`font-ja text-2xl font-semibold ${studentName?.trim() ? "mt-2" : ""}`}>
+          返却プリント
+        </h1>
         <p className="font-ja text-sm text-slate-500">添削結果のご確認</p>
         {studentSectionOn(sections, "totalScore") && totalScore100 != null && (
           <p className="mt-3 font-ja text-lg font-semibold text-slate-900">
@@ -107,7 +117,9 @@ export function StudentPrintLayout({
               )}
 
               {studentSectionOn(sections, "feedback") && r.feedback ? (
-                <p className="grading-print-block font-ja text-sm text-slate-700">{r.feedback}</p>
+                <p className="grading-print-block font-ja text-sm text-slate-700">
+                  {personalize(r.feedback)}
+                </p>
               ) : null}
 
               {(studentSectionOn(sections, "contentEvaluation") ||
@@ -117,12 +129,12 @@ export function StudentPrintLayout({
                 <CompositionFeedbackSections
                   contentEvaluation={
                     studentSectionOn(sections, "contentEvaluation")
-                      ? r.contentEvaluation
+                      ? personalize(r.contentEvaluation)
                       : undefined
                   }
                   grammarEvaluation={
                     studentSectionOn(sections, "grammarEvaluation")
-                      ? r.grammarEvaluation
+                      ? personalize(r.grammarEvaluation)
                       : undefined
                   }
                   polishedAnswer={
@@ -133,7 +145,9 @@ export function StudentPrintLayout({
               ) : studentSectionOn(sections, "explanation") && r.explanation ? (
                 <div className="grading-print-block rounded-xl bg-slate-50 p-4 print:bg-transparent print:p-0">
                   <p className="font-ja text-sm font-semibold text-slate-600">解説</p>
-                  <p className="text-explanation mt-2 font-ja text-slate-800">{r.explanation}</p>
+                  <p className="text-explanation mt-2 font-ja text-slate-800">
+                    {personalize(r.explanation)}
+                  </p>
                 </div>
               ) : null}
 

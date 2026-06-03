@@ -81,7 +81,7 @@ export function GradingPrintControlsPanel({
           {kind === "student" ? "返却プリント" : "教師用指導資料"}の印刷設定
         </CardTitle>
         <CardDescription className="font-ja">
-          掲載する項目を選び、A4レイアウトを調整できます。設定はブラウザに保存され、テンプレとして再利用できます。
+          掲載する項目を選び、A4レイアウトを調整できます。文字サイズ（%）と行間は下のプレビューにそのまま反映されます。設定はブラウザに保存され、テンプレとして再利用できます。
         </CardDescription>
       </CardHeader>
 
@@ -198,6 +198,9 @@ export function GradingPrintControlsPanel({
                 updateLayout("fontScalePercent", clampFontScale(Number(e.target.value)))
               }
             />
+            <p className="font-ja text-xs text-slate-500">
+              見出し・解答・解説・模範解答など、プリント全体の文字が連動して変わります（85〜120%）。
+            </p>
           </Field>
           <Field label="行間">
             <Input
@@ -211,6 +214,9 @@ export function GradingPrintControlsPanel({
                 updateLayout("lineHeight", clampLineHeight(Number(e.target.value)))
               }
             />
+            <p className="font-ja text-xs text-slate-500">
+              講評・解説・過去問アドバイスなど本文の行の開き（1.25〜1.9）。
+            </p>
           </Field>
         </section>
         <button

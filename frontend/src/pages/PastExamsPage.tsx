@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Archive, ChevronRight, Plus } from "lucide-react";
+import { Archive, ChevronRight, Plus, Sparkles } from "lucide-react";
 import { SafeForm } from "@/components/forms/SafeForm";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -154,17 +154,23 @@ export function PastExamsPage() {
                     <Archive className="h-5 w-5 shrink-0 text-blue-800" />
                   </div>
                   <p className="mt-3 font-ja text-sm text-slate-600">
-                    登録済みの過去問年度を確認したり、新しい年度を取り込んだりできます。
+                    登録済みの過去問年度を確認したり、新しい年度を取り込んだり、問題を生成できます。
                   </p>
                 </div>
-                <div className="flex flex-col gap-2 border-t border-slate-100 p-4 sm:flex-row">
-                  <Button asChild className="min-h-11 flex-1 gap-2">
+                <div className="flex flex-col gap-2 border-t border-slate-100 p-4 sm:flex-row sm:flex-wrap">
+                  <Button asChild className="min-h-11 flex-1 gap-2 sm:min-w-[10rem]">
+                    <Link to={`/past-exams/${uni.slug}/generate`}>
+                      <Sparkles className="h-4 w-4" />
+                      問題を生成
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="min-h-11 flex-1 gap-2 sm:min-w-[10rem]">
                     <Link to={`/past-exams/${uni.slug}`}>
                       年度一覧を開く
                       <ChevronRight className="h-4 w-4" />
                     </Link>
                   </Button>
-                  <Button asChild variant="outline" className="min-h-11 flex-1 gap-2">
+                  <Button asChild variant="outline" className="min-h-11 flex-1 gap-2 sm:min-w-[10rem]">
                     <Link to={`/past-exams/${uni.slug}/import`}>
                       <Plus className="h-4 w-4" />
                       PDF を取り込む

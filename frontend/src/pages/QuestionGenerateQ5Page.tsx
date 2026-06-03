@@ -135,10 +135,13 @@ export function QuestionGenerateQ5Page() {
       <div className="page-content space-y-6">
         <div className="flex flex-wrap gap-3">
           <Button asChild variant="ghost" className="min-h-11 gap-2">
-            <Link to="/question-drafts">
+            <Link to={`/past-exams/${slug}/generate`}>
               <ArrowLeft className="h-4 w-4" />
-              下書き一覧
+              問題生成メニュー
             </Link>
+          </Button>
+          <Button asChild variant="ghost" className="min-h-11 font-ja text-sm">
+            <Link to="/question-drafts">下書き一覧</Link>
           </Button>
           <Button asChild variant="ghost" className="min-h-11 font-ja text-sm">
             <Link to="/questions/generate/q1a">第1問(A)の生成へ</Link>

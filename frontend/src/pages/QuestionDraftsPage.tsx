@@ -147,28 +147,10 @@ export function QuestionDraftsPage() {
               問題セット一覧
             </Link>
           </Button>
-          <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
-            <Link to="/questions/generate/q1a">第1問(A)を生成</Link>
-          </Button>
-          <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
-            <Link to="/questions/generate/q1b">第1問(B)を生成</Link>
-          </Button>
-          <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
-            <Link to="/questions/generate/q2a">第2問(A)を生成</Link>
-          </Button>
-          <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
-            <Link to="/questions/generate/q2b">第2問(B)を生成</Link>
-          </Button>
-          <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
-            <Link to="/questions/generate/q4a">第4問(A)を生成</Link>
-          </Button>
-          <Button asChild variant="outline" className="min-h-11 gap-2 font-ja">
-            <Link to="/questions/generate/q4b">第4問(B)を生成</Link>
-          </Button>
           <Button asChild className="min-h-11 gap-2">
-            <Link to="/questions/generate/q5">
+            <Link to="/past-exams">
               <Sparkles className="h-4 w-4" />
-              第5問を生成
+              過去問から問題を生成
             </Link>
           </Button>
         </div>
@@ -185,9 +167,9 @@ export function QuestionDraftsPage() {
           <Card className="p-8 text-center">
             <p className="font-ja text-slate-600">下書きはまだありません。</p>
             <Button asChild className="mt-4 min-h-11 gap-2">
-              <Link to="/questions/generate/q5">
+              <Link to="/past-exams">
                 <Plus className="h-4 w-4" />
-                第5問を生成する
+                過去問から問題を生成する
               </Link>
             </Button>
           </Card>

@@ -190,30 +190,14 @@ export function QuestionGeneratePage() {
       />
       <div className="page-content space-y-6">
         <div className="flex flex-wrap gap-3">
-          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
-            <Link to="/questions/generate/q1a">第1問(A)型の生成</Link>
-          </Button>
-          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
-            <Link to="/questions/generate/q1b">第1問(B)型の生成</Link>
-          </Button>
-          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
-            <Link to="/questions/generate/q2a">第2問(A)型の生成</Link>
-          </Button>
-          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
-            <Link to="/questions/generate/q2b">第2問(B)型の生成</Link>
-          </Button>
-          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
-            <Link to="/questions/generate/q4a">第4問(A)型の生成</Link>
-          </Button>
-          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
-            <Link to="/questions/generate/q4b">第4問(B)型の生成</Link>
-          </Button>
-          <Button asChild variant="outline" className="min-h-11 font-ja text-sm">
-            <Link to="/questions/generate/q5">第5問型の生成（推奨）</Link>
+          <Button asChild variant="ghost" className="min-h-11 gap-2">
+            <Link to={`/past-exams/${slug}/generate`}>
+              <ArrowLeft className="h-4 w-4" />
+              問題生成メニュー
+            </Link>
           </Button>
           <Button asChild variant="ghost" className="min-h-11 gap-2">
             <Link to="/question-drafts">
-              <ArrowLeft className="h-4 w-4" />
               下書き一覧
             </Link>
           </Button>

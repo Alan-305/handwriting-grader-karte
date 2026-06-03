@@ -121,7 +121,7 @@ export function UniversityPastExamGeneratePage() {
           <CardHeader>
             <CardTitle className="font-ja text-base">大学別の問題生成</CardTitle>
             <CardDescription className="font-ja leading-relaxed">
-              {displayName}の過去問コーパスに基づき、利用可能な大問だけが表示されます。東大向けの生成画面とは別ルートです。
+              {displayName}の過去問コーパスに基づき、利用可能な大問だけが表示されます。左メニューの「過去問」から大学を選び、この画面で問題を生成します。
             </CardDescription>
           </CardHeader>
         </Card>

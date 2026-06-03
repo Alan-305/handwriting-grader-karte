@@ -53,6 +53,62 @@ body {
   min-height: 100vh;
 }
 
+/*
+ * 添削返却・過去問アドバイス等：文字サイズ（%）・行間をプレビューと印刷の両方に反映。
+ * 子要素の Tailwind / token クラスは em 基準に上書きし、fontScalePercent が全体に効くようにする。
+ */
+.grading-print-document {
+  font-size: calc(1rem * var(--grading-print-font-scale, 100%) / 100);
+  line-height: var(--grading-print-line-height, 1.55);
+}
+
+.grading-print-document .grading-print-block + .grading-print-block,
+.grading-print-document .grading-print-question .grading-print-block {
+  margin-top: var(--grading-print-block-gap, 4mm);
+}
+
+.grading-print-document .grading-print-question > *:first-child {
+  margin-top: 0;
+}
+
+.grading-print-document :where(.text-xs) {
+  font-size: 0.75em;
+}
+
+.grading-print-document :where(.text-sm) {
+  font-size: 0.875em;
+}
+
+.grading-print-document :where(.text-base) {
+  font-size: 1em;
+}
+
+.grading-print-document :where(.text-lg) {
+  font-size: 1.125em;
+}
+
+.grading-print-document :where(.text-xl) {
+  font-size: 1.25em;
+}
+
+.grading-print-document :where(.text-2xl) {
+  font-size: 1.5em;
+}
+
+.grading-print-document :where(.text-feedback, .text-explanation) {
+  font-size: 1em;
+  line-height: var(--grading-print-line-height, 1.55);
+}
+
+.grading-print-document :where(.text-model-answer) {
+  font-size: 1.125em;
+  line-height: var(--grading-print-line-height, 1.55);
+}
+
+.grading-print-document :where(.leading-relaxed) {
+  line-height: var(--grading-print-line-height, 1.55);
+}
+
 @media print {
   body {
     background: white;
@@ -147,20 +203,6 @@ body {
   .print-break-avoid {
     break-inside: avoid;
     page-break-inside: avoid;
-  }
-
-  .grading-print-document {
-    font-size: calc(1rem * var(--grading-print-font-scale, 100%) / 100);
-    line-height: var(--grading-print-line-height, 1.55);
-  }
-
-  .grading-print-document .grading-print-block + .grading-print-block,
-  .grading-print-document .grading-print-question .grading-print-block {
-    margin-top: var(--grading-print-block-gap, 4mm);
-  }
-
-  .grading-print-document .grading-print-question > *:first-child {
-    margin-top: 0;
   }
 
   /* 解答用紙：印刷時各ページ四隅にトンボ */
