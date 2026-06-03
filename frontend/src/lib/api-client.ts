@@ -283,6 +283,42 @@ export const apiClient = {
       token,
     }),
 
+  generateQ2: (
+    token: string,
+    slug: string,
+    body: {
+      referenceYears?: number[];
+      difficulty?: string;
+      topicHint?: string;
+      sourcePassage?: string;
+      studentId?: string;
+    },
+  ) =>
+    request<{ draft: GeneratedQuestionDraft }>(`/api/universities/${slug}/generate-q2`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
+  generateQ1: (
+    token: string,
+    slug: string,
+    body: {
+      referenceYears?: number[];
+      difficulty?: string;
+      topicHint?: string;
+      sourcePassage?: string;
+      studentId?: string;
+    },
+  ) =>
+    request<{ draft: GeneratedQuestionDraft }>(`/api/universities/${slug}/generate-q1`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      token,
+    }),
+
   generateQ1A: (
     token: string,
     slug: string,

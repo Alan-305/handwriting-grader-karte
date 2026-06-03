@@ -10,6 +10,9 @@
 
 定数一覧:
 - GENERATION_SYSTEM      … 型別問題生成（第1〜4問など）のシステムプロンプト全文
+- Q1_GENERATION_SYSTEM   … 第1問・読解総合（問1〜5一体型。札幌医大など）
+- Q2_GENERATION_SYSTEM   … 第2問・読解総合（問1〜6一体型。札幌医大など）
+- Q2_VALIDATOR_SYSTEM    … 第2問・読解総合・検証（省略可）
 - Q5_PASSAGE_SYSTEM      … 第5問・物語本文 Writer
 - Q5_QUESTIONS_SYSTEM    … 第5問・設問 Writer
 - Q5_SOLVER_SYSTEM       … 第5問・検証 Evaluator（省略可）
@@ -39,6 +42,14 @@ SLUG = "your_slug_here"
 # --- 以下、準備できたものだけ文字列を代入（未準備は None のまま） ---
 
 GENERATION_SYSTEM: str | None = None
+
+Q1_GENERATION_SYSTEM: str | None = None
+
+Q1_VALIDATOR_SYSTEM: str | None = None
+
+Q2_GENERATION_SYSTEM: str | None = None
+
+Q2_VALIDATOR_SYSTEM: str | None = None
 
 Q5_PASSAGE_SYSTEM: str | None = None
 

@@ -163,6 +163,19 @@ def default_q1b_validator_system(university_name: str) -> str:
 出力 JSON のみ: {{"passed": true, "issues": [], "summary": "..."}}"""
 
 
+def default_q2_generation_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}の英語入試・大問2（読解総合）の問題作成専門家です。
+参照過去問の形式に合わせ、1,000〜1,200語程度の評論文と問1〜問6を JSON で作成してください。"""
+
+
+def default_q2_validator_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}英語入試・大問2（読解総合）の検証者です。
+語数・設問構成・模範解答の根拠を検証。passed は issues が空なら true。
+出力 JSON のみ: {{"passed": true, "issues": [], "summary": "..."}}"""
+
+
 def default_q2a_generation_system(university_name: str) -> str:
     uni = university_name.strip() or "志望校"
     return f"""あなたは{uni}の二次入試英語・第2問(A)（自由英作文）の問題作成専門家です。
@@ -199,4 +212,17 @@ def default_q4b_validator_system(university_name: str) -> str:
     uni = university_name.strip() or "志望校"
     return f"""あなたは{uni}二次英語・第4問(B)下線部和訳の検証者です。
 下線2箇所・イの特定語指示・和訳の自然さを検証。passed は issues が空なら true。
+出力 JSON のみ: {{"passed": true, "issues": [], "summary": "..."}}"""
+
+
+def default_q1_generation_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}の英語入試・大問1（読解総合）の問題作成専門家です。
+参照過去問の形式に合わせ、900〜1,200語程度の評論文と問1〜問5（言い換え・空所・内容説明・和訳・英作文）を JSON で作成してください。"""
+
+
+def default_q1_validator_system(university_name: str) -> str:
+    uni = university_name.strip() or "志望校"
+    return f"""あなたは{uni}英語入試・大問1（読解総合）の検証者です。
+語数・設問構成・模範解答の根拠を検証。passed は issues が空なら true。
 出力 JSON のみ: {{"passed": true, "issues": [], "summary": "..."}}"""

@@ -2,6 +2,8 @@
 
 from app.ai.prompts.universities.registry import (
     build_generation_system,
+    build_q1_generation_system,
+    build_q2_generation_system,
     build_q1a_generation_system,
     build_q1b_generation_system,
     build_q2a_generation_system,
@@ -79,6 +81,32 @@ def test_unknown_slug_falls_back_to_defaults():
     q5 = build_q5_questions_system("unknown-uni-xyz", "テスト大学")
     assert "共通テスト" in q5
     assert "二次入試" in q5
+
+
+def test_sapporo_med_has_q1_comprehensive_prompts():
+    status = get_prompt_status("sapporo-med")
+    assert status.slug == "sapporo-med"
+    assert status.has_custom_module is True
+    assert "q1_generation_system" in status.configured_keys
+    assert "q1_validator_system" in status.configured_keys
+    assert "q2_generation_system" in status.configured_keys
+    assert "q2_validator_system" in status.configured_keys
+
+    q1 = build_q1_generation_system("sapporo-med", "札幌医科大学")
+    assert "札幌医科大学" in q1
+    assert "900" in q1
+
+    q2 = build_q2_generation_system("sapporo-med", "札幌医科大学")
+    assert "1,000" in q2 or "1000" in q2
+    assert "問6" in q2 or "自由英作文" in q2
+    assert "対話文" in q2
+
+    assert grading_supplement("sapporo-med").startswith("札幌医科大学")
+
+
+def test_list_includes_sapporo_med():
+    slugs = list_university_prompt_slugs()
+    assert "sapporo-med" in slugs
 
 
 def test_list_includes_todai():

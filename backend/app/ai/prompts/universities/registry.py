@@ -29,10 +29,14 @@ class UniversityPromptOverrides:
     q4a_problem_system: str | None = None
     q4a_validator_system: str | None = None
     q4a_teacher_pack_system: str | None = None
+    q1_generation_system: str | None = None
+    q1_validator_system: str | None = None
     q1a_generation_system: str | None = None
     q1a_validator_system: str | None = None
     q1b_generation_system: str | None = None
     q1b_validator_system: str | None = None
+    q2_generation_system: str | None = None
+    q2_validator_system: str | None = None
     q2a_generation_system: str | None = None
     q2a_validator_system: str | None = None
     q2b_generation_system: str | None = None
@@ -106,10 +110,14 @@ def get_overrides(slug: str) -> UniversityPromptOverrides:
         q4a_problem_system=_non_empty(getattr(mod, "Q4A_PROBLEM_SYSTEM", None)),
         q4a_validator_system=_non_empty(getattr(mod, "Q4A_VALIDATOR_SYSTEM", None)),
         q4a_teacher_pack_system=_non_empty(getattr(mod, "Q4A_TEACHER_PACK_SYSTEM", None)),
+        q1_generation_system=_non_empty(getattr(mod, "Q1_GENERATION_SYSTEM", None)),
+        q1_validator_system=_non_empty(getattr(mod, "Q1_VALIDATOR_SYSTEM", None)),
         q1a_generation_system=_non_empty(getattr(mod, "Q1A_GENERATION_SYSTEM", None)),
         q1a_validator_system=_non_empty(getattr(mod, "Q1A_VALIDATOR_SYSTEM", None)),
         q1b_generation_system=_non_empty(getattr(mod, "Q1B_GENERATION_SYSTEM", None)),
         q1b_validator_system=_non_empty(getattr(mod, "Q1B_VALIDATOR_SYSTEM", None)),
+        q2_generation_system=_non_empty(getattr(mod, "Q2_GENERATION_SYSTEM", None)),
+        q2_validator_system=_non_empty(getattr(mod, "Q2_VALIDATOR_SYSTEM", None)),
         q2a_generation_system=_non_empty(getattr(mod, "Q2A_GENERATION_SYSTEM", None)),
         q2a_validator_system=_non_empty(getattr(mod, "Q2A_VALIDATOR_SYSTEM", None)),
         q2b_generation_system=_non_empty(getattr(mod, "Q2B_GENERATION_SYSTEM", None)),
@@ -141,6 +149,10 @@ def get_prompt_status(slug: str) -> UniversityPromptStatus:
         keys.append("q4a_validator_system")
     if overrides.q4a_teacher_pack_system:
         keys.append("q4a_teacher_pack_system")
+    if overrides.q1_generation_system:
+        keys.append("q1_generation_system")
+    if overrides.q1_validator_system:
+        keys.append("q1_validator_system")
     if overrides.q1a_generation_system:
         keys.append("q1a_generation_system")
     if overrides.q1a_validator_system:
@@ -149,6 +161,10 @@ def get_prompt_status(slug: str) -> UniversityPromptStatus:
         keys.append("q1b_generation_system")
     if overrides.q1b_validator_system:
         keys.append("q1b_validator_system")
+    if overrides.q2_generation_system:
+        keys.append("q2_generation_system")
+    if overrides.q2_validator_system:
+        keys.append("q2_validator_system")
     if overrides.q2a_generation_system:
         keys.append("q2a_generation_system")
     if overrides.q2a_validator_system:
@@ -243,6 +259,24 @@ def build_q4a_teacher_pack_system(slug: str, default_system: str) -> str:
     return Q4A_TEACHER_PACK_SYSTEM_FALLBACK
 
 
+def build_q1_generation_system(slug: str, university_name: str) -> str:
+    overrides = get_overrides(slug)
+    if overrides.q1_generation_system:
+        return overrides.q1_generation_system
+    return _defaults.default_q1_generation_system(university_name)
+
+
+def build_q1_validator_system(slug: str, university_name: str) -> str:
+    overrides = get_overrides(slug)
+    if overrides.q1_validator_system:
+        return overrides.q1_validator_system
+    if university_name.strip():
+        return _defaults.default_q1_validator_system(university_name)
+    from app.ai.prompts.question_generation_q1 import Q1_VALIDATOR_SYSTEM_FALLBACK
+
+    return Q1_VALIDATOR_SYSTEM_FALLBACK
+
+
 def build_q1a_generation_system(slug: str, university_name: str) -> str:
     overrides = get_overrides(slug)
     if overrides.q1a_generation_system:
@@ -277,6 +311,24 @@ def build_q1b_validator_system(slug: str, default_system: str) -> str:
     from app.ai.prompts.question_generation_q1b import Q1B_VALIDATOR_SYSTEM_FALLBACK
 
     return Q1B_VALIDATOR_SYSTEM_FALLBACK
+
+
+def build_q2_generation_system(slug: str, university_name: str) -> str:
+    overrides = get_overrides(slug)
+    if overrides.q2_generation_system:
+        return overrides.q2_generation_system
+    return _defaults.default_q2_generation_system(university_name)
+
+
+def build_q2_validator_system(slug: str, university_name: str) -> str:
+    overrides = get_overrides(slug)
+    if overrides.q2_validator_system:
+        return overrides.q2_validator_system
+    if university_name.strip():
+        return _defaults.default_q2_validator_system(university_name)
+    from app.ai.prompts.question_generation_q2 import Q2_VALIDATOR_SYSTEM_FALLBACK
+
+    return Q2_VALIDATOR_SYSTEM_FALLBACK
 
 
 def build_q2a_generation_system(slug: str, university_name: str) -> str:

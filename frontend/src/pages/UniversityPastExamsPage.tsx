@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { doc, onSnapshot } from "firebase/firestore";
-import { ArrowLeft, FileText, Plus } from "lucide-react";
+import { ArrowLeft, FileText, Plus, Sparkles } from "lucide-react";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -108,6 +108,12 @@ export function UniversityPastExamsPage() {
             <Link to="/past-exams">
               <ArrowLeft className="h-4 w-4" />
               大学一覧へ
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="min-h-11 gap-2">
+            <Link to={`/past-exams/${slug}/generate`}>
+              <Sparkles className="h-4 w-4" />
+              問題を生成
             </Link>
           </Button>
           <Button asChild className="min-h-11 gap-2">

@@ -34,7 +34,7 @@ COVERAGE_LABELS = {
 REFERENCE_PROMPT_MAX_CHARS = 8000
 REFERENCE_MODEL_ANSWER_MAX_CHARS = 2000
 
-DEDICATED_PIPELINES = frozenset({"q1a", "q1b", "q2a", "q2b", "q4a", "q4b", "q5"})
+DEDICATED_PIPELINES = frozenset({"q1", "q2", "q1a", "q1b", "q2a", "q2b", "q4a", "q4b", "q5"})
 
 
 from app.services.question_type_labels import format_type_label, type_key
@@ -382,6 +382,14 @@ class QuestionDesignService:
             "university_slug": university_slug,
             "reference_years": reference_years,
         }
+        if pipeline == "q1":
+            from app.services.question_q1_service import QuestionQ1Service
+
+            return QuestionQ1Service().run_pipeline(**pipeline_kwargs)
+        if pipeline == "q2":
+            from app.services.question_q2_service import QuestionQ2Service
+
+            return QuestionQ2Service().run_pipeline(**pipeline_kwargs)
         if pipeline == "q1a":
             from app.services.question_q1a_service import QuestionQ1AService
 

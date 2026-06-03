@@ -22,7 +22,7 @@ def test_q2_merges_numeric_sub_parts():
     units = catalog_to_generation_units(catalog)
     assert len(units) == 1
     assert units[0]["typeLabel"] == "第2問"
-    assert units[0]["pipeline"] == "generic"
+    assert units[0]["pipeline"] == "q2"
 
 
 def test_q1_keeps_letter_parts_separate():

@@ -196,6 +196,8 @@ export function QuestionDraftsPage() {
             {drafts.map((draft) => {
               const draftId = draft.id ?? "";
               const isBusy = busyDraftId === draftId;
+              const isQ1 = draft.generationPipeline === "q1";
+              const isQ2 = draft.generationPipeline === "q2";
               const isQ5 = draft.generationPipeline === "q5";
               const isQ4A = draft.generationPipeline === "q4a";
               const isQ4B = draft.generationPipeline === "q4b";
@@ -214,6 +216,8 @@ export function QuestionDraftsPage() {
                     <CardTitle className="font-ja text-lg">{draft.typeLabel}</CardTitle>
                     <CardDescription className="font-ja">
                       {draft.universitySlug} · {draft.points}点
+                      {isQ1 ? " · 第1問（読解総合）パイプライン" : ""}
+                      {isQ2 ? " · 第2問（読解総合）パイプライン" : ""}
                       {isQ5 ? " · 第5問パイプライン" : ""}
                       {isQ4A ? " · 第4問(A)パイプライン" : ""}
                       {isQ4B ? " · 第4問(B)パイプライン" : ""}
@@ -223,7 +227,7 @@ export function QuestionDraftsPage() {
                       {isQ2B ? " · 第2問(B)パイプライン" : ""}
                       {draft.notes ? ` · ${draft.notes}` : ""}
                     </CardDescription>
-                    {(isQ5 || isQ4A || isQ4B || isQ1A || isQ1B || isQ2A || isQ2B) && artifacts && (
+                    {(isQ1 || isQ2 || isQ5 || isQ4A || isQ4B || isQ1A || isQ1B || isQ2A || isQ2B) && artifacts && (
                       <p className="mt-2 font-ja text-xs text-slate-600">
                         {artifacts.evaluatorPassed === false
                           ? "検証: 要確認（設問の曖昧さあり）"

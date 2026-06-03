@@ -100,10 +100,14 @@ def pipeline_for_selection(major_order: int, part_label: str | None = None) -> s
         return "q2a"
     if major_order == 2 and is_q2b_part_label(part_label):
         return "q2b"
+    if major_order == 2:
+        return "q2"
     if major_order == 1 and is_q1a_part_label(part_label):
         return "q1a"
     if major_order == 1 and is_q1b_part_label(part_label):
         return "q1b"
+    if major_order == 1:
+        return "q1"
     return "generic"
 
 
@@ -144,7 +148,7 @@ def catalog_to_generation_units(catalog: list[dict[str, Any]]) -> list[dict[str,
                         )
                     )
                 continue
-            units.append(_unit_from_rows(major, rows, None))
+            units.append(_unit_from_rows(major, rows, None, pipeline="q1"))
             continue
 
         if major >= 5:
@@ -167,7 +171,7 @@ def catalog_to_generation_units(catalog: list[dict[str, Any]]) -> list[dict[str,
                         )
                     )
                 continue
-            units.append(_unit_from_rows(major, rows, None))
+            units.append(_unit_from_rows(major, rows, None, pipeline="q2"))
             continue
 
         if major == 4:

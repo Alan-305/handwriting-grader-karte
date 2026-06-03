@@ -4,6 +4,8 @@ from flask import Blueprint, g, jsonify, request
 from pydantic import BaseModel, Field, ValidationError
 
 from app.services.question_design_service import QuestionDesignService
+from app.services.question_q2_service import QuestionQ2Service
+from app.services.question_q1_service import QuestionQ1Service
 from app.services.question_q1a_service import QuestionQ1AService
 from app.services.question_q1b_service import QuestionQ1BService
 from app.services.question_q2a_service import QuestionQ2AService
@@ -212,6 +214,66 @@ def generate_q1b(slug: str):
         return jsonify({"error": exc.errors()}), 400
 
     service = QuestionQ1BService()
+    try:
+        draft = service.generate_and_save_draft(
+            teacher_id=g.teacher_id,
+            university_slug=slug,
+            student_id=body.student_id,
+            topic_hint=body.topic_hint,
+            source_passage=body.source_passage,
+            difficulty=body.difficulty,
+            reference_years=body.reference_years,
+        )
+        return jsonify({"draft": draft}), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+
+@question_design_bp.post("/universities/<slug>/generate-q2")
+@require_auth
+def generate_q2(slug: str):
+    slug_error = _validate_slug(slug)
+    if slug_error:
+        return slug_error
+
+    try:
+        body = GenerateQ1ABody.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"error": exc.errors()}), 400
+
+    service = QuestionQ2Service()
+    try:
+        draft = service.generate_and_save_draft(
+            teacher_id=g.teacher_id,
+            university_slug=slug,
+            student_id=body.student_id,
+            topic_hint=body.topic_hint,
+            source_passage=body.source_passage,
+            difficulty=body.difficulty,
+            reference_years=body.reference_years,
+        )
+        return jsonify({"draft": draft}), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+
+@question_design_bp.post("/universities/<slug>/generate-q1")
+@require_auth
+def generate_q1(slug: str):
+    slug_error = _validate_slug(slug)
+    if slug_error:
+        return slug_error
+
+    try:
+        body = GenerateQ1ABody.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"error": exc.errors()}), 400
+
+    service = QuestionQ1Service()
     try:
         draft = service.generate_and_save_draft(
             teacher_id=g.teacher_id,

@@ -26,10 +26,13 @@ import { TestsPage } from "@/pages/TestsPage";
 import { UniversitiesPage } from "@/pages/UniversitiesPage";
 import { PastExamsPage } from "@/pages/PastExamsPage";
 import { UniversityPastExamsPage } from "@/pages/UniversityPastExamsPage";
+import { UniversityPastExamGeneratePage } from "@/pages/UniversityPastExamGeneratePage";
 import { PastExamImportPage } from "@/pages/PastExamImportPage";
 import { PastExamImportReviewPage } from "@/pages/PastExamImportReviewPage";
 import { PastExamYearDetailPage } from "@/pages/PastExamYearDetailPage";
 import { QuestionGeneratePage } from "@/pages/QuestionGeneratePage";
+import { QuestionGenerateQ1Page } from "@/pages/QuestionGenerateQ1Page";
+import { QuestionGenerateQ2Page } from "@/pages/QuestionGenerateQ2Page";
 import { QuestionGenerateQ1APage } from "@/pages/QuestionGenerateQ1APage";
 import { QuestionGenerateQ1BPage } from "@/pages/QuestionGenerateQ1BPage";
 import { QuestionGenerateQ2APage } from "@/pages/QuestionGenerateQ2APage";
@@ -99,6 +102,8 @@ export function AppRoutes() {
         <Route path="tests" element={<TestsPage />} />
         <Route path="tests/:testId" element={<TestEditorPage />} />
         <Route path="questions/generate" element={<QuestionGeneratePage />} />
+        <Route path="questions/generate/:slug/q1" element={<QuestionGenerateQ1Page />} />
+        <Route path="questions/generate/:slug/q2" element={<QuestionGenerateQ2Page />} />
         <Route path="questions/generate/q1a" element={<QuestionGenerateQ1APage />} />
         <Route path="questions/generate/q1b" element={<QuestionGenerateQ1BPage />} />
         <Route path="questions/generate/q2a" element={<QuestionGenerateQ2APage />} />
@@ -121,6 +126,7 @@ export function AppRoutes() {
         <Route path="universities" element={<UniversitiesPage />} />
         <Route path="past-exams" element={<PastExamsPage />} />
         <Route path="past-exams/:slug" element={<UniversityPastExamsPage />} />
+        <Route path="past-exams/:slug/generate" element={<UniversityPastExamGeneratePage />} />
         <Route path="past-exams/:slug/import" element={<PastExamImportPage />} />
         <Route path="past-exams/:slug/import/:sessionId/review" element={<PastExamImportReviewPage />} />
         <Route path="past-exams/:slug/years/:year" element={<PastExamYearDetailPage />} />
