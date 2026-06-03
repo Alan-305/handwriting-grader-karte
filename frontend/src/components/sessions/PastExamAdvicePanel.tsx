@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, Edit3, Printer, RefreshCw } from "lucide-react";
+import { doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 import { PastExamAdviceEditor } from "@/components/sessions/PastExamAdviceEditor";
 import { PastExamAdvicePrintControlsPanel } from "@/components/sessions/PastExamAdvicePrintControlsPanel";
 import { PastExamAdvicePrintLayout } from "@/components/sessions/PastExamAdvicePrintLayout";
@@ -9,10 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { usePastExamAdvicePrintPreferences } from "@/hooks/usePastExamAdvicePrintPreferences";
+import { useSession, useSessionsForStudent } from "@/hooks/useSession";
 import { apiClient } from "@/lib/api-client";
 import { exportElementToPdf, printElement } from "@/lib/pdf-export";
 import { getDb } from "@/lib/firebase";
-import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { dedupeSessionsByTest } from "@/lib/session-list";
+import type { Student } from "@/types/firestore";
 import type { SessionPastExamAdvice } from "@/types/past-exam-advice";
 
 interface PastExamAdvicePanelProps {
@@ -23,6 +26,9 @@ interface PastExamAdvicePanelProps {
 export function PastExamAdvicePanel({ sessionId, initialAdvice }: PastExamAdvicePanelProps) {
   const { getIdToken } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
+  const { session } = useSession(sessionId);
+  const studentSessions = useSessionsForStudent(session?.studentId);
+  const [studentName, setStudentName] = useState("");
 
   const {
     prefs,
@@ -51,6 +57,25 @@ export function PastExamAdvicePanel({ sessionId, initialAdvice }: PastExamAdvice
       setSavedAdvice(initialAdvice);
     }
   }, [initialAdvice]);
+
+  useEffect(() => {
+    if (!session?.studentId) {
+      setStudentName("");
+      return;
+    }
+    return onSnapshot(doc(getDb(), "students", session.studentId), (snap) => {
+      if (snap.exists()) {
+        setStudentName((snap.data() as Student).name ?? "");
+      } else {
+        setStudentName("");
+      }
+    });
+  }, [session?.studentId]);
+
+  const sessionNumber = useMemo(() => {
+    const idx = studentSessions.findIndex((s) => s.id === sessionId);
+    return idx >= 0 ? idx + 1 : undefined;
+  }, [studentSessions, sessionId]);
 
   const isDirty =
     advice != null && savedAdvice != null && JSON.stringify(advice) !== JSON.stringify(savedAdvice);
@@ -206,6 +231,8 @@ export function PastExamAdvicePanel({ sessionId, initialAdvice }: PastExamAdvice
           <div ref={printRef} className="bg-slate-100 p-8 print:bg-white print:p-0">
             <PastExamAdvicePrintLayout
               advice={advice}
+              studentName={studentName}
+              sessionNumber={sessionNumber}
               sections={prefs.sections}
               layout={prefs.layout}
               includedQuestions={prefs.includedQuestions}
