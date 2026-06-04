@@ -11,6 +11,25 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
+def _is_retryable_ai_error(exc: Exception) -> bool:
+    status = getattr(exc, "status_code", None)
+    if status in (429, 500, 502, 503, 504):
+        return True
+    if isinstance(exc, ValueError):
+        msg = str(exc).lower()
+        return any(
+            token in msg
+            for token in (
+                "json",
+                "max_tokens",
+                "空の応答",
+                "形式が不正",
+                "parsed_output",
+            )
+        )
+    return False
+
+
 def with_retry(func, max_retries: int = 3, base_delay: float = 1.0):
     last_error = None
     for attempt in range(max_retries):
@@ -20,6 +39,9 @@ def with_retry(func, max_retries: int = 3, base_delay: float = 1.0):
             last_error = exc
             status = getattr(exc, "status_code", None)
             if status and status not in (429, 500, 502, 503, 504):
+                if not _is_retryable_ai_error(exc):
+                    raise
+            elif not _is_retryable_ai_error(exc):
                 raise
             if attempt < max_retries - 1:
                 delay = base_delay * (2**attempt)

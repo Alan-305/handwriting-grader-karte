@@ -148,7 +148,16 @@ def grade_session(session_id: str):
         message = str(exc)
         if any(
             key in message
-            for key in ("Anthropic", "JSON", "空の応答", "model", "API")
+            for key in (
+                "Anthropic",
+                "添削AI",
+                "JSON",
+                "空の応答",
+                "max_tokens",
+                "API キー",
+                "model",
+                "API",
+            )
         ):
             return jsonify({"error": message}), 502
         return jsonify({"error": "添削中にエラーが発生しました。しばらくしてから再試行してください。"}), 500
