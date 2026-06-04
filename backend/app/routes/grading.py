@@ -71,7 +71,10 @@ def grade_session(session_id: str):
 
     try:
         for i, target in enumerate(targets):
-            session_svc.update_progress(session_id, i, len(targets), "添削中")
+            label = target.get("partLabel") or f"第{target.get('order')}問"
+            session_svc.update_progress(
+                session_id, i, len(targets), f"{label}を添削中"
+            )
 
             stored = by_key.get(_result_key(target))
             if not stored:

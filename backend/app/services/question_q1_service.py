@@ -24,6 +24,12 @@ from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.question_design_service import QuestionDesignService
 from app.services.question_prompt_markup import normalize_prompt_markup
 from app.services.question_type_labels import format_type_label
+from app.generation_limits import (
+    GEMINI_MAX_OUTPUT_COMPREHENSIVE,
+    GEMINI_MAX_OUTPUT_VALIDATOR,
+    REFERENCE_CONTEXT_LIMIT_COMPREHENSIVE,
+    REFERENCE_CONTEXT_MAX_CHARS_COMPREHENSIVE,
+)
 from app.services.university_context_service import UniversityContextService
 
 logger = logging.getLogger(__name__)
@@ -217,8 +223,8 @@ class QuestionQ1Service:
             major_order=1,
             part_label=None,
             reference_years=reference_years,
-            limit=3,
-            max_chars=8000,
+            limit=REFERENCE_CONTEXT_LIMIT_COMPREHENSIVE,
+            max_chars=REFERENCE_CONTEXT_MAX_CHARS_COMPREHENSIVE,
         )
 
         result, validator, retried = self._generate_with_validation(
@@ -301,7 +307,7 @@ class QuestionQ1Service:
                 system=build_q1_generation_system(university_slug, university_name),
                 user_text=user_text,
                 response_schema=Q1ComprehensiveGenerationResult,
-                max_output_tokens=24576,
+                max_output_tokens=GEMINI_MAX_OUTPUT_COMPREHENSIVE,
             )
 
             block = format_q1_for_validator(current)
@@ -309,7 +315,7 @@ class QuestionQ1Service:
                 system=build_q1_validator_system(university_slug, university_name),
                 user_text=build_q1_validator_user_prompt(problem_block=block),
                 response_schema=Q1ComprehensiveValidatorResult,
-                max_output_tokens=4096,
+                max_output_tokens=GEMINI_MAX_OUTPUT_VALIDATOR,
             )
 
             structural = self._structural_issues(current)

@@ -193,7 +193,7 @@ export interface Test {
 export interface GradingProgress {
   current: number;
   total: number;
-  message: "添削中" | "考えてます" | "読み取り中";
+  message: string;
 }
 
 export interface Session {

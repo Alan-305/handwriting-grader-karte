@@ -10,6 +10,11 @@ PAST_EXAM_ADVICE_SYSTEM = """あなたは難関大学入試（特に東京大学
 トーン: 高校生向け。厳しさはあるが前向き。「不合格」は使わない。
 英語の和訳説明では「」を使う。
 
+添削結果との書き分け（必須）:
+- 入力の講評・解説の言い換えや繰り返しは禁止。文法個別指摘は書かない。
+- performanceSummary は過去問・受験準備の視点での要約に限定する。
+- pastExamConnection / studyAction / adviceCards は過去問コーパス・出題傾向に基づく新情報を書く。
+
 出力は JSON のみ:
 {
   "overallSummary": "セッション全体の総評（過去問視点）",

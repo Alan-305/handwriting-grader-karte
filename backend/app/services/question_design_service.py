@@ -30,9 +30,10 @@ COVERAGE_LABELS = {
     "insufficient": "不足",
 }
 
-# 参照過去問をプロンプトに載せる上限（読解長文を含めるため modelAnswer より長め）
-REFERENCE_PROMPT_MAX_CHARS = 8000
-REFERENCE_MODEL_ANSWER_MAX_CHARS = 2000
+from app.generation_limits import (
+    REFERENCE_MODEL_ANSWER_MAX_CHARS,
+    REFERENCE_PROMPT_MAX_CHARS,
+)
 
 DEDICATED_PIPELINES = frozenset({"q1", "q2", "q1a", "q1b", "q2a", "q2b", "q4a", "q4b", "q5"})
 

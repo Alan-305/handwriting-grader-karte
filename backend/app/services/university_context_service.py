@@ -12,8 +12,10 @@ from app.services.question_type_labels import format_type_label
 
 logger = logging.getLogger(__name__)
 
-REFERENCE_PROMPT_MAX_CHARS = 8000
-REFERENCE_MODEL_ANSWER_MAX_CHARS = 2000
+from app.generation_limits import (
+    REFERENCE_MODEL_ANSWER_MAX_CHARS,
+    REFERENCE_PROMPT_MAX_CHARS,
+)
 
 
 def primary_past_exam_slug(student: dict | None) -> str | None:
@@ -88,6 +90,19 @@ class UniversityContextService:
             return True
         return False
 
+    @staticmethod
+    def _pick_reference_questions(filtered: list[dict], limit: int) -> list[dict]:
+        """同一年度に大問単体と小問分割が混在するとき、最も長い prompt を代表に選ぶ。"""
+        by_year: dict[int, dict] = {}
+        for q in filtered:
+            year = int(q.get("year") or 0)
+            prompt_len = len(q.get("prompt") or "")
+            prev = by_year.get(year)
+            if prev is None or prompt_len > len(prev.get("prompt") or ""):
+                by_year[year] = q
+        picked = sorted(by_year.values(), key=lambda q: int(q.get("year") or 0), reverse=True)
+        return picked[:limit]
+
     def _build_reference_context(
         self,
         past_questions: list[dict],
@@ -112,12 +127,16 @@ class UniversityContextService:
             filtered = [q for q in past_questions if int(q.get("majorOrder") or 0) == major_order]
         if not filtered:
             filtered = past_questions
-        filtered = sorted(
-            filtered,
-            key=lambda q: (int(q.get("year") or 0), int(q.get("majorOrder") or 0)),
-            reverse=True,
-        )
-        blocks = [self._format_past_question_for_prompt(q) for q in filtered[:limit]]
+        if major_order is not None and not (part_label or "").strip():
+            selected = self._pick_reference_questions(filtered, limit)
+        else:
+            filtered = sorted(
+                filtered,
+                key=lambda q: (int(q.get("year") or 0), int(q.get("majorOrder") or 0)),
+                reverse=True,
+            )
+            selected = filtered[:limit]
+        blocks = [self._format_past_question_for_prompt(q) for q in selected]
         return "\n".join(blocks) if blocks else "（参照過去問なし）"
 
     def get_university_meta(self, slug: str) -> dict:

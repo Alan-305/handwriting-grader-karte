@@ -79,49 +79,65 @@ class PastExamAdviceService:
         if not results:
             raise ValueError("添削結果がありません。先に添削を完了してください。")
 
-        past_questions = self.question_design._load_past_questions_for_years(
-            teacher_id, slug, None
-        )
-        if not past_questions:
-            raise ValueError("参照できる過去問がありません")
-
-        context = self.question_design._build_reference_context(past_questions, limit=14)
-        years = sorted({int(q.get("year") or 0) for q in past_questions if q.get("year")}, reverse=True)
-        materials = self.question_design._load_teacher_materials_snippet(teacher_id, slug, years)
-
-        total = session.get("totalScore", 0)
-        max_score = session.get("maxScore", 0)
-        score_line = f"{total} / {max_score}点"
-        if session.get("totalScore100") is not None:
-            score_line += f"（100点換算 {session['totalScore100']}点）"
-
-        user_prompt = build_past_exam_advice_user_prompt(
-            student_name=self._get_student_name(session.get("studentId", "")),
-            university_name=self._university_name(slug),
-            university_slug=slug,
-            test_title=test.get("title", ""),
-            session_score_line=score_line,
-            question_results_block=self._format_results_block(results, questions),
-            past_questions_context=context,
-            teacher_materials_context=materials,
+        self.session_service.update_progress(
+            session_id, 0, 1, "過去問視点のアドバイスを生成中"
         )
 
-        advice: SessionPastExamAdviceResponse = self.gemini.complete_structured(
-            system=PAST_EXAM_ADVICE_SYSTEM,
-            user_text=user_prompt,
-            response_schema=SessionPastExamAdviceResponse,
-        )
+        try:
+            past_questions = self.question_design._load_past_questions_for_years(
+                teacher_id, slug, None
+            )
+            if not past_questions:
+                raise ValueError("参照できる過去問がありません")
 
-        payload = advice.model_dump(by_alias=True)
-        now = datetime.now(timezone.utc)
-        payload["generatedAt"] = now.isoformat()
+            context = self.question_design._build_reference_context(past_questions, limit=14)
+            years = sorted({int(q.get("year") or 0) for q in past_questions if q.get("year")}, reverse=True)
+            materials = self.question_design._load_teacher_materials_snippet(teacher_id, slug, years)
 
-        self.firebase.update_doc(
-            "sessions",
-            session_id,
-            {"pastExamAdvice": payload, "updatedAt": now},
-        )
-        return payload
+            total = session.get("totalScore", 0)
+            max_score = session.get("maxScore", 0)
+            score_line = f"{total} / {max_score}点"
+            if session.get("totalScore100") is not None:
+                score_line += f"（100点換算 {session['totalScore100']}点）"
+
+            user_prompt = build_past_exam_advice_user_prompt(
+                student_name=self._get_student_name(session.get("studentId", "")),
+                university_name=self._university_name(slug),
+                university_slug=slug,
+                test_title=test.get("title", ""),
+                session_score_line=score_line,
+                question_results_block=self._format_results_block(results, questions),
+                past_questions_context=context,
+                teacher_materials_context=materials,
+            )
+
+            advice: SessionPastExamAdviceResponse = self.gemini.complete_structured(
+                system=PAST_EXAM_ADVICE_SYSTEM,
+                user_text=user_prompt,
+                response_schema=SessionPastExamAdviceResponse,
+            )
+
+            payload = advice.model_dump(by_alias=True)
+            now = datetime.now(timezone.utc)
+            payload["generatedAt"] = now.isoformat()
+
+            self.firebase.update_doc(
+                "sessions",
+                session_id,
+                {
+                    "pastExamAdvice": payload,
+                    "updatedAt": now,
+                    "gradingProgress": None,
+                },
+            )
+            return payload
+        except Exception:
+            self.firebase.update_doc(
+                "sessions",
+                session_id,
+                {"gradingProgress": None},
+            )
+            raise
 
     def get_cached_advice(self, session_id: str, teacher_id: str) -> dict | None:
         session = self.session_service.get_session(session_id)

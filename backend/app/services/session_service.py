@@ -107,11 +107,10 @@ class SessionService:
         self.firebase.update_doc("sessions", session_id, data)
 
     def update_progress(self, session_id: str, current: int, total: int, message: str = "添削中"):
-        msg = "考えてます" if current > total * 0.5 else message
         self.firebase.update_doc(
             "sessions",
             session_id,
-            {"gradingProgress": {"current": current, "total": total, "message": msg}},
+            {"gradingProgress": {"current": current, "total": total, "message": message}},
         )
 
     def save_question_result(self, session_id: str, result: dict) -> str:
