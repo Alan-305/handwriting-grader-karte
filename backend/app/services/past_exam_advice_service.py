@@ -8,6 +8,7 @@ from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.past_exam_service import UNIVERSITY_REGISTRY, PastExamService
 from app.services.question_design_service import QuestionDesignService
 from app.services.university_context_service import UniversityContextService
+from app.services.past_exam_advice_compact import compact_past_exam_advice_payload
 from app.services.past_exam_advice_history import (
     format_previous_advice_block,
     pick_previous_advice_sessions,
@@ -161,9 +162,10 @@ class PastExamAdviceService:
                 system=PAST_EXAM_ADVICE_SYSTEM,
                 user_text=user_prompt,
                 response_schema=SessionPastExamAdviceResponse,
+                max_output_tokens=4096,
             )
 
-            payload = advice.model_dump(by_alias=True)
+            payload = compact_past_exam_advice_payload(advice.model_dump(by_alias=True))
             now = datetime.now(timezone.utc)
             payload["generatedAt"] = now.isoformat()
 

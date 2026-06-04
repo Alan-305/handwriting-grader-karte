@@ -49,7 +49,6 @@ export function SessionGradingReviewPage() {
 
   const [drafts, setDrafts] = useState<QuestionResult[]>([]);
   const [advice, setAdvice] = useState<SessionPastExamAdvice | null>(null);
-  const [adviceIncludedQuestions, setAdviceIncludedQuestions] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [generatingAdvice, setGeneratingAdvice] = useState(false);
@@ -86,13 +85,6 @@ export function SessionGradingReviewPage() {
 
   const updateDraft = (id: string, patch: Partial<QuestionResult>) => {
     setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
-  };
-
-  const handleIncludedChange = (questionOrder: number, included: boolean) => {
-    setAdviceIncludedQuestions((prev) => ({
-      ...prev,
-      [String(questionOrder)]: included,
-    }));
   };
 
   const persistAdvice = async (payload: SessionPastExamAdvice) => {
@@ -327,7 +319,7 @@ export function SessionGradingReviewPage() {
             <div>
               <h2 className="font-ja text-xl font-semibold text-slate-900">過去問視点のアドバイス</h2>
               <p className="mt-1 font-ja text-sm text-slate-600">
-                添削結果とは別の観点（過去問との対応・学習アクション）を編集します。前回のアドバイスがある場合は継続・変化を踏まえて生成されます。
+                総評・受験準備度・アドバイスカードのみ（コンパクト）。設問別は添削結果を参照してください。
               </p>
             </div>
             <Button
@@ -358,12 +350,7 @@ export function SessionGradingReviewPage() {
           ) : null}
 
           {advice ? (
-            <PastExamAdviceEditor
-              advice={advice}
-              includedQuestions={adviceIncludedQuestions}
-              onIncludedChange={handleIncludedChange}
-              onChange={setAdvice}
-            />
+            <PastExamAdviceEditor advice={advice} onChange={setAdvice} />
           ) : (
             !adviceError && (
               <Card className="p-4 font-ja text-sm text-slate-600">

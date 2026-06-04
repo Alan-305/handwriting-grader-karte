@@ -68,24 +68,11 @@ def format_previous_advice_block(
         if readiness:
             parts.append(f"準備度: {readiness}")
 
-        points = advice.get("teacherTalkingPoints") or []
-        if points:
-            parts.append("面談要点: " + " / ".join(str(p) for p in points[:5]))
-
-        for ins in advice.get("questionInsights") or []:
-            order = ins.get("questionOrder", "?")
-            parts.append(
-                f"第{order}問 [{ins.get('matchedTypeLabel', '')}]: "
-                f"出来={ins.get('performanceSummary', '')[:200]} | "
-                f"過去問={ins.get('pastExamConnection', '')[:200]} | "
-                f"次の一手={ins.get('studyAction', '')[:200]}"
-            )
-
         cards = advice.get("adviceCards") or []
         if cards:
             card_lines = [
                 f"・{c.get('title', '')}: {(c.get('body') or '')[:120]}"
-                for c in cards[:4]
+                for c in cards[:3]
             ]
             parts.append("アドバイスカード: " + " ".join(card_lines))
 

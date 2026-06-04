@@ -10,7 +10,7 @@ import {
   Bar,
 } from "recharts";
 import type { AggregatedStats } from "@/types/firestore";
-import { categorizeErrorTag, normalizeErrorTagLabel } from "@/lib/error-tag-label";
+import { categorizeErrorTag, errorCategorySeverityIndex, normalizeErrorTagLabel } from "@/lib/error-tag-label";
 
 export function ScoreTrendChart({ stats }: { stats: AggregatedStats | null }) {
   if (!stats?.scoreHistory?.length) {
@@ -59,7 +59,11 @@ function tagsToRows(tags: Array<{ tag: string; count: number }>): ErrorRow[] {
   }
   return [...map.entries()]
     .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "ja"));
+    .sort(
+      (a, b) =>
+        errorCategorySeverityIndex(a.name) - errorCategorySeverityIndex(b.name) ||
+        b.count - a.count,
+    );
 }
 
 function ErrorTagYAxisTick({
@@ -172,7 +176,7 @@ export function ErrorFrequencyChart({ stats }: { stats: AggregatedStats | null }
   return (
     <div className="w-full space-y-3 overflow-visible">
       <p className="font-ja text-center text-xs text-slate-500">
-        上から第1回、下に向かって第2回・第3回…と並びます（全{testCount}回・同一テストの再添削は上書き）
+        上から第1回、下に向かって第2回・第3回…と並びます（全{testCount}回・同一テストの再添削は上書き）。各回の棒は上ほど重大なミス傾向です。
       </p>
       {!hasPerSession && (
         <p className="font-ja text-center text-xs text-amber-700">

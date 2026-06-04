@@ -94,5 +94,4 @@ def test_format_previous_advice_block_contains_key_fields():
     assert "前回以前の過去問アドバイス" in block
     assert "模試第3回" in block
     assert "前回の総評" in block
-    assert "次の学習" in block
     assert "カード1" in block

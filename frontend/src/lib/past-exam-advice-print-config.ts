@@ -40,11 +40,11 @@ export const PAST_EXAM_ADVICE_SECTION_LABELS: Record<PastExamAdvicePrintSectionI
 export const DEFAULT_PAST_EXAM_ADVICE_SECTIONS: PastExamAdvicePrintSections = {
   overallSummary: true,
   readinessVsExam: true,
-  performanceSummary: true,
-  pastExamConnection: true,
-  studyAction: true,
-  referencedPastQuestions: true,
-  teacherTalkingPoints: true,
+  performanceSummary: false,
+  pastExamConnection: false,
+  studyAction: false,
+  referencedPastQuestions: false,
+  teacherTalkingPoints: false,
   adviceCards: true,
 };
 
@@ -128,28 +128,40 @@ export const PAST_EXAM_ADVICE_PRINT_PRESETS: Array<{
   name: string;
   sections: PastExamAdvicePrintSections;
 }> = [
-  { id: "advice-full", name: "すべて掲載", sections: { ...DEFAULT_PAST_EXAM_ADVICE_SECTIONS } },
   {
-    id: "advice-interview",
-    name: "面談用（コンパクト）",
+    id: "advice-compact",
+    name: "標準（コンパクト）",
+    sections: { ...DEFAULT_PAST_EXAM_ADVICE_SECTIONS },
+  },
+  {
+    id: "advice-summary-only",
+    name: "総評＋準備度のみ",
     sections: {
       ...DEFAULT_PAST_EXAM_ADVICE_SECTIONS,
-      referencedPastQuestions: false,
       adviceCards: false,
-      pastExamConnection: false,
+    },
+  },
+  {
+    id: "advice-cards-only",
+    name: "カード中心",
+    sections: {
+      ...DEFAULT_PAST_EXAM_ADVICE_SECTIONS,
+      overallSummary: false,
       readinessVsExam: false,
     },
   },
   {
-    id: "advice-study",
-    name: "学習計画用",
+    id: "advice-legacy-detail",
+    name: "旧形式（大問別も含む）",
     sections: {
-      ...DEFAULT_PAST_EXAM_ADVICE_SECTIONS,
-      teacherTalkingPoints: false,
-      adviceCards: false,
+      overallSummary: true,
+      readinessVsExam: true,
       performanceSummary: true,
-      studyAction: true,
       pastExamConnection: true,
+      studyAction: true,
+      referencedPastQuestions: true,
+      teacherTalkingPoints: true,
+      adviceCards: true,
     },
   },
 ];

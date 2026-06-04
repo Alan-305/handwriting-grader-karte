@@ -58,18 +58,23 @@ export function PastExamAdvicePrintLayout({
       {adviceSectionOn(sections, "overallSummary") && advice.overallSummary ? (
         <section className="grading-print-block space-y-2">
           <h2 className="font-ja text-sm font-semibold text-slate-800">総評</h2>
-          <p className="text-explanation font-ja text-slate-700">{advice.overallSummary}</p>
+          <p className="text-explanation whitespace-pre-line font-ja text-slate-700">
+            {advice.overallSummary}
+          </p>
         </section>
       ) : null}
 
       {adviceSectionOn(sections, "readinessVsExam") && advice.readinessVsExam ? (
         <section className="grading-print-block space-y-2">
           <h2 className="font-ja text-sm font-semibold text-slate-800">受験準備度</h2>
-          <p className="text-explanation font-ja text-slate-600">{advice.readinessVsExam}</p>
+          <p className="text-explanation whitespace-pre-line font-ja text-slate-600">
+            {advice.readinessVsExam}
+          </p>
         </section>
       ) : null}
 
-      {insights.map((item, index) => {
+      {insights.length > 0
+        ? insights.map((item, index) => {
         const breakBefore = shouldBreakBeforeQuestion(index, layout.sectionMode);
         const gapClass =
           shouldApplyQuestionGap(index, layout.sectionMode) ? "print-question-gap" : "";
@@ -122,7 +127,8 @@ export function PastExamAdvicePrintLayout({
             </section>
           </div>
         );
-      })}
+      })
+        : null}
 
       {adviceSectionOn(sections, "teacherTalkingPoints") &&
       advice.teacherTalkingPoints.length > 0 ? (

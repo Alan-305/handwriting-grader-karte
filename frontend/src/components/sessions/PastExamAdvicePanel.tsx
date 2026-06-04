@@ -34,7 +34,6 @@ export function PastExamAdvicePanel({ sessionId, initialAdvice }: PastExamAdvice
     prefs,
     setSections,
     setLayout,
-    setQuestionIncluded,
     resetLayout,
     resetSections,
     templates,
@@ -144,7 +143,7 @@ export function PastExamAdvicePanel({ sessionId, initialAdvice }: PastExamAdvice
             過去問視点のアドバイス
           </CardTitle>
           <CardDescription className="font-ja leading-relaxed">
-            添削結果と過去問の出題系統を結びつけたアドバイスです。前回のアドバイスがある場合はその内容を踏まえて生成します。文言の修正・掲載項目の選択のあと、印刷できます。
+            総評・受験準備度・アドバイスカード（2〜3枚）を短くまとめた資料です。設問別の解説は添削結果に任せ、ここでは過去問視点の全体アドバイスのみ印刷します。
           </CardDescription>
         </CardHeader>
         <div className="flex flex-wrap gap-2 px-6 pb-6">
@@ -215,12 +214,7 @@ export function PastExamAdvicePanel({ sessionId, initialAdvice }: PastExamAdvice
                   {saveError || "保存に失敗しました"}
                 </p>
               )}
-              <PastExamAdviceEditor
-                advice={advice}
-                includedQuestions={prefs.includedQuestions}
-                onIncludedChange={setQuestionIncluded}
-                onChange={setAdvice}
-              />
+              <PastExamAdviceEditor advice={advice} onChange={setAdvice} />
             </>
           )}
 
