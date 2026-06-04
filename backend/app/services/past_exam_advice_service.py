@@ -8,6 +8,10 @@ from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.past_exam_service import UNIVERSITY_REGISTRY, PastExamService
 from app.services.question_design_service import QuestionDesignService
 from app.services.university_context_service import UniversityContextService
+from app.services.past_exam_advice_history import (
+    format_previous_advice_block,
+    pick_previous_advice_sessions,
+)
 from app.services.session_service import SessionService
 
 logger = logging.getLogger(__name__)
@@ -47,6 +51,39 @@ class PastExamAdviceService:
                 f"エラータグ: {', '.join(r.get('errorTags') or [])}\n"
             )
         return "\n".join(lines) or "（結果なし）"
+
+    def _build_previous_advice_block(
+        self,
+        *,
+        student_id: str,
+        teacher_id: str,
+        current_session_id: str,
+        university_slug: str,
+    ) -> str:
+        if not student_id:
+            return ""
+        all_sessions = self.firebase.query_collection(
+            "sessions", "studentId", "==", student_id
+        )
+        previous = pick_previous_advice_sessions(
+            all_sessions,
+            current_session_id=current_session_id,
+            teacher_id=teacher_id,
+            university_slug=university_slug,
+            limit=1,
+        )
+        if not previous:
+            return ""
+
+        entries: list[tuple[dict, dict, str]] = []
+        for sess in previous:
+            advice = sess.get("pastExamAdvice") or {}
+            test_id = sess.get("testId")
+            test = self.session_service.get_test(test_id) if test_id else None
+            title = (test or {}).get("title", "")
+            entries.append((sess, advice, title))
+
+        return format_previous_advice_block(entries)
 
     def generate_for_session(
         self,
@@ -100,8 +137,16 @@ class PastExamAdviceService:
             if session.get("totalScore100") is not None:
                 score_line += f"（100点換算 {session['totalScore100']}点）"
 
+            student_id = session.get("studentId", "")
+            previous_block = self._build_previous_advice_block(
+                student_id=student_id,
+                teacher_id=teacher_id,
+                current_session_id=session_id,
+                university_slug=slug,
+            )
+
             user_prompt = build_past_exam_advice_user_prompt(
-                student_name=self._get_student_name(session.get("studentId", "")),
+                student_name=self._get_student_name(student_id),
                 university_name=self._university_name(slug),
                 university_slug=slug,
                 test_title=test.get("title", ""),
@@ -109,6 +154,7 @@ class PastExamAdviceService:
                 question_results_block=self._format_results_block(results, questions),
                 past_questions_context=context,
                 teacher_materials_context=materials,
+                previous_advice_block=previous_block,
             )
 
             advice: SessionPastExamAdviceResponse = self.gemini.complete_structured(

@@ -144,7 +144,7 @@ export function PastExamAdvicePanel({ sessionId, initialAdvice }: PastExamAdvice
             過去問視点のアドバイス
           </CardTitle>
           <CardDescription className="font-ja leading-relaxed">
-            添削結果を過去問の出題系統と結びつけたアドバイスです。文言の修正・掲載項目の選択のあと、印刷できます。
+            添削結果と過去問の出題系統を結びつけたアドバイスです。前回のアドバイスがある場合はその内容を踏まえて生成します。文言の修正・掲載項目の選択のあと、印刷できます。
           </CardDescription>
         </CardHeader>
         <div className="flex flex-wrap gap-2 px-6 pb-6">

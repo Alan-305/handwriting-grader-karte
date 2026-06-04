@@ -327,7 +327,7 @@ export function SessionGradingReviewPage() {
             <div>
               <h2 className="font-ja text-xl font-semibold text-slate-900">過去問視点のアドバイス</h2>
               <p className="mt-1 font-ja text-sm text-slate-600">
-                添削結果とは別の観点（過去問との対応・学習アクション）を編集します。
+                添削結果とは別の観点（過去問との対応・学習アクション）を編集します。前回のアドバイスがある場合は継続・変化を踏まえて生成されます。
               </p>
             </div>
             <Button
