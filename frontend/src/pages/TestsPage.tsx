@@ -153,6 +153,9 @@ export function TestsPage() {
                   >
                     <Link to={`/tests/${t.id}`}>編集</Link>
                   </Button>
+                  <Button asChild variant="outline" size="sm" className="min-h-11 font-ja">
+                    <Link to={`/tests/${t.id}/print/answer-key`}>解答・解説・全訳</Link>
+                  </Button>
                 </div>
                 <div className="mt-2 flex justify-end">
                   <Button

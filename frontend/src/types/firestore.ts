@@ -262,6 +262,7 @@ export interface QuestionResult {
   polishedAnswer?: string;
   teacherReviewed?: boolean;
   createdAt: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface PrintSection {

@@ -118,6 +118,9 @@ export function StudentHistoryModal({ open, onClose, studentId, studentName }: S
                   const score =
                     s.maxScore > 0 ? `${s.totalScore ?? 0} / ${s.maxScore}点` : "得点未反映";
                   const status = STATUS_LABEL[s.status] ?? s.status;
+                  const needsGradingReview =
+                    !s.gradingConfirmedAt &&
+                    (s.status === "review" || s.status === "grading");
                   return (
                     <li
                       key={s.id}
@@ -133,11 +136,19 @@ export function StudentHistoryModal({ open, onClose, studentId, studentName }: S
                       <p className="mt-1 text-slate-700">{title}</p>
                       <p className="mt-0.5 text-xs text-slate-500">{score}</p>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <Button asChild size="sm" className="min-h-10">
-                          <Link to={`/sessions/${s.id}`} onClick={onClose}>
-                            添削結果・解説を見る
-                          </Link>
-                        </Button>
+                        {needsGradingReview ? (
+                          <Button asChild size="sm" className="min-h-10">
+                            <Link to={`/sessions/${s.id}/grading-review`} onClick={onClose}>
+                              添削確認を続ける（下書き）
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button asChild size="sm" className="min-h-10">
+                            <Link to={`/sessions/${s.id}`} onClick={onClose}>
+                              添削結果・解説を見る
+                            </Link>
+                          </Button>
+                        )}
                         {s.gradingConfirmedAt ? (
                           <Button asChild variant="outline" size="sm" className="min-h-10">
                             <Link to={`/sessions/${s.id}/print/student`} onClick={onClose}>

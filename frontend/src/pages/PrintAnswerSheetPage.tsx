@@ -79,6 +79,9 @@ export function PrintAnswerSheetPage() {
             <Link to={`/tests/${testId}/print/test-paper`}>問題用紙を印刷</Link>
           </Button>
           <Button variant="outline" asChild>
+            <Link to={`/tests/${testId}/print/answer-key`}>解答・解説・全訳</Link>
+          </Button>
+          <Button variant="outline" asChild>
             <Link to={`/tests/${testId}`}>問題エディタに戻る</Link>
           </Button>
         </div>

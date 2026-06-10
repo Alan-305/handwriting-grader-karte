@@ -423,12 +423,20 @@ export function TestEditorPage() {
             />
           )}
           {testId && draftQuestions.length > 0 && (
-            <Button variant="outline" className="gap-2" asChild>
-              <Link to={`/tests/${testId}/print/test-paper`}>
-                <Printer className="h-4 w-4" />
-                問題用紙を印刷
-              </Link>
-            </Button>
+            <>
+              <Button variant="outline" className="gap-2" asChild>
+                <Link to={`/tests/${testId}/print/test-paper`}>
+                  <Printer className="h-4 w-4" />
+                  問題用紙を印刷
+                </Link>
+              </Button>
+              <Button variant="outline" className="gap-2" asChild>
+                <Link to={`/tests/${testId}/print/answer-key`}>
+                  <FileText className="h-4 w-4" />
+                  解答・解説・全訳
+                </Link>
+              </Button>
+            </>
           )}
           <Button
             variant="default"

@@ -71,6 +71,9 @@ export function PrintTestPaperPage() {
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => printRef.current && printElement(printRef.current)}>印刷 / PDF</Button>
           <Button variant="outline" asChild>
+            <Link to={`/tests/${testId}/print/answer-key`}>解答・解説・全訳</Link>
+          </Button>
+          <Button variant="outline" asChild>
             <Link to={`/tests/${testId}/print/answer-sheet`}>解答用紙を印刷</Link>
           </Button>
           <Button variant="outline" asChild>

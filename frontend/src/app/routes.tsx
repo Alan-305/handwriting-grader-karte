@@ -10,6 +10,7 @@ import { ViewerStudentDashboardPage } from "@/pages/viewer/ViewerStudentDashboar
 import { ViewerSessionResultPage } from "@/pages/viewer/ViewerSessionResultPage";
 import { PrintAnswerSheetPage } from "@/pages/PrintAnswerSheetPage";
 import { PrintTestPaperPage } from "@/pages/PrintTestPaperPage";
+import { PrintTestAnswerKeyPage } from "@/pages/PrintTestAnswerKeyPage";
 import { PrintStudentPage } from "@/pages/PrintStudentPage";
 import { PrintTeacherPage } from "@/pages/PrintTeacherPage";
 import { SessionNewPage } from "@/pages/SessionNewPage";
@@ -115,6 +116,7 @@ export function AppRoutes() {
         <Route path="test-drafts" element={<TestDraftsPage />} />
         <Route path="tests/:testId/print/answer-sheet" element={<PrintAnswerSheetPage />} />
         <Route path="tests/:testId/print/test-paper" element={<PrintTestPaperPage />} />
+        <Route path="tests/:testId/print/answer-key" element={<PrintTestAnswerKeyPage />} />
         <Route path="tests/new" element={<TestEditorPage />} />
         <Route path="sessions/new" element={<SessionNewPage />} />
         <Route path="sessions/:sessionId/crop-review" element={<SessionManualCropPage />} />

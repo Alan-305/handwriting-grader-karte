@@ -54,6 +54,7 @@ export function SessionGradingReviewPage() {
   const [generatingAdvice, setGeneratingAdvice] = useState(false);
   const [regrading, setRegrading] = useState(false);
   const [error, setError] = useState("");
+  const [draftSaved, setDraftSaved] = useState(false);
   const [adviceError, setAdviceError] = useState(
     () => (location.state as ReviewLocationState | null)?.adviceError ?? "",
   );
@@ -141,10 +142,12 @@ export function SessionGradingReviewPage() {
   const handleSaveDraft = async () => {
     setSaving(true);
     setError("");
+    setDraftSaved(false);
     try {
       await saveResults(sortedDrafts);
       await syncSessionScores(sortedDrafts);
       if (advice) await persistAdvice(advice);
+      setDraftSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存に失敗しました");
     } finally {
@@ -201,7 +204,20 @@ export function SessionGradingReviewPage() {
             「あなたの解答」を修正した場合は、<strong>修正内容で再採点</strong>を押してから確定してください。
             採点・講評・過去問アドバイスが解答内容に合わせて更新されます。
           </p>
+          <p className="mt-2 text-slate-600">
+            <strong>下書き保存</strong>したあと再開するには、
+            <strong>生徒</strong> → 該当生徒の<strong>「過去の添削・面談」</strong>
+            → <strong>「添削確認を続ける（下書き）」</strong>から開けます（サイドバーの「下書き」は問題生成用です）。
+          </p>
         </Card>
+
+        {draftSaved && (
+          <Card className="border-green-200 bg-green-50 p-4 font-ja text-sm text-green-900">
+            下書きを保存しました。あとから
+            <strong> 生徒 → 過去の添削・面談 → 添削確認を続ける（下書き）</strong>
+            で再開できます。
+          </Card>
+        )}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button className="min-h-11 w-full sm:w-auto" variant="outline" onClick={handleSaveDraft} disabled={saving || confirming || generatingAdvice || regrading}>

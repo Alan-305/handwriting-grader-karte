@@ -140,6 +140,11 @@ export function QuestionDraftsPage() {
         description="生成した問題文と模範解答の下書きです。新規問題セットとして使うのが基本で、必要なときだけ既存セットに追加できます"
       />
       <div className="page-content space-y-6">
+        <Card className="border-amber-100 bg-amber-50/80 p-4 font-ja text-sm leading-relaxed text-slate-700">
+          添削結果の<strong>下書き保存</strong>（講評の途中保存）はここではありません。
+          <strong>生徒</strong> → 該当生徒の<strong>「過去の添削・面談」</strong>
+          → <strong>「添削確認を続ける（下書き）」</strong>から再開してください。
+        </Card>
         <div className="flex flex-wrap gap-3">
           <Button asChild variant="ghost" className="min-h-11 gap-2">
             <Link to="/tests">
