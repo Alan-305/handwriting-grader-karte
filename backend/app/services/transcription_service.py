@@ -50,7 +50,9 @@ class TranscriptionService:
         self.firebase = FirebaseAdminService()
         self.gemini = GeminiAnalysisClient()
 
-    def transcribe_session(self, session_id: str, teacher_id: str) -> list[dict]:
+    def _load_transcription_context(
+        self, session_id: str, teacher_id: str
+    ) -> tuple[dict, list[dict], list[dict]]:
         session = self.session_svc.get_session(session_id)
         if not session or session.get("teacherId") != teacher_id:
             raise ValueError("セッションが見つかりません")
@@ -77,84 +79,111 @@ class TranscriptionService:
                 f"手動の切り出しが未設定です: {', '.join(labels)}{extra}。"
                 " 切り出し画面で各設問の範囲を指定してください。"
             )
+        return session, questions, targets
 
+    def begin_transcription(self, session_id: str, teacher_id: str) -> dict:
+        session, _, targets = self._load_transcription_context(session_id, teacher_id)
         if session.get("status") == "transcribing":
-            raise ValueError(
-                "読み取り処理が既に実行中です。完了するまでお待ちください。"
-            )
-
+            logger.info("Restarting interrupted transcription for session %s", session_id)
         self.session_svc.clear_question_results(session_id)
         self.session_svc.update_status(session_id, "transcribing")
+        return {"sessionId": session_id, "total": len(targets)}
 
-        saved: list[dict] = []
-        for i, target in enumerate(targets):
-            self.session_svc.update_progress(
-                session_id, i, len(targets), "読み取り中"
-            )
-
-            q = next((x for x in questions if x["id"] == target["questionId"]), None)
-            parts = (q or {}).get("answerParts") or []
-            has_parts = len(parts) > 0
-            crop_path = _resolve_crop_path(
-                session,
-                teacher_id=teacher_id,
-                session_id=session_id,
-                target=target,
-                has_parts=has_parts,
-            )
-            crop_bytes = self.firebase.download_bytes(crop_path) if crop_path else None
-            if not crop_bytes:
-                logger.warning("Crop missing: %s", crop_path)
-                continue
-
-            profile = infer_transcription_profile(target, q)
-            system = get_transcription_system(profile)
-            user_text = build_transcription_user_prompt(
-                target=target, question=q, profile=profile
-            )
-
-            if self.gemini.model:
-                try:
-                    text = self.gemini.transcribe_images(
-                        system=system,
-                        user_text=user_text,
-                        images_jpeg=[crop_bytes],
-                    )
-                except ValueError as exc:
-                    label = target.get("partLabel") or f"第{target.get('order')}問"
-                    logger.warning(
-                        "Transcription failed for %s: %s", crop_path, exc
-                    )
-                    text = (
-                        f"{label}\n"
-                        f"【読み取り未完了】{exc}\n"
-                        "（下の欄で手入力してください）"
-                    )
-            else:
-                text = _mock_transcription_text(profile, target)
-
-            result_data = {
-                "questionId": target["questionId"],
-                "order": target["order"],
-                "partIndex": target["partIndex"],
-                "partLabel": target.get("partLabel"),
-                "type": target["type"],
-                "croppedImagePath": crop_path,
-                "studentAnswerText": text.strip(),
-                "transcriptionStatus": "pending_review",
-                "transcriptionProfile": profile,
-                "modelAnswer": target.get("modelAnswer", ""),
-                "maxPoints": float(target.get("points", 10)),
-                "graded": False,
-            }
-            result_id = self.session_svc.save_question_result(session_id, result_data)
-            result_data["id"] = result_id
-            saved.append(result_data)
-
-        self.session_svc.dedupe_question_results(session_id)
-        self.session_svc.update_status(
-            session_id,
-            "transcription_review",
-            gradingProgress=None,
+    def transcribe_step(
+        self, session_id: str, teacher_id: str, step_index: int
+    ) -> dict:
+        session, questions, targets = self._load_transcription_context(
+            session_id, teacher_id
         )
+        if session.get("status") not in ("transcribing", "crop_review"):
+            raise ValueError("読み取りを開始できない状態です。切り出し画面からやり直してください。")
+        if step_index < 0 or step_index >= len(targets):
+            raise ValueError(f"設問インデックスが不正です: {step_index}")
+
+        if session.get("status") != "transcribing":
+            self.session_svc.update_status(session_id, "transcribing")
+
+        target = targets[step_index]
+        label = target.get("partLabel") or f"第{target.get('order')}問"
+        self.session_svc.update_progress(
+            session_id, step_index, len(targets), f"{label}を読み取り中"
+        )
+
+        q = next((x for x in questions if x["id"] == target["questionId"]), None)
+        parts = (q or {}).get("answerParts") or []
+        has_parts = len(parts) > 0
+        crop_path = _resolve_crop_path(
+            session,
+            teacher_id=teacher_id,
+            session_id=session_id,
+            target=target,
+            has_parts=has_parts,
+        )
+        crop_bytes = self.firebase.download_bytes(crop_path) if crop_path else None
+        if not crop_bytes:
+            raise ValueError(f"{label}の切り出し画像が見つかりません: {crop_path}")
+
+        profile = infer_transcription_profile(target, q)
+        system = get_transcription_system(profile)
+        user_text = build_transcription_user_prompt(
+            target=target, question=q, profile=profile
+        )
+
+        if self.gemini.model:
+            try:
+                text = self.gemini.transcribe_images(
+                    system=system,
+                    user_text=user_text,
+                    images_jpeg=[crop_bytes],
+                )
+            except ValueError as exc:
+                logger.warning("Transcription failed for %s: %s", crop_path, exc)
+                text = (
+                    f"{label}\n"
+                    f"【読み取り未完了】{exc}\n"
+                    "（下の欄で手入力してください）"
+                )
+        else:
+            text = _mock_transcription_text(profile, target)
+
+        result_data = {
+            "questionId": target["questionId"],
+            "order": target["order"],
+            "partIndex": target["partIndex"],
+            "partLabel": target.get("partLabel"),
+            "type": target["type"],
+            "croppedImagePath": crop_path,
+            "studentAnswerText": text.strip(),
+            "transcriptionStatus": "pending_review",
+            "transcriptionProfile": profile,
+            "modelAnswer": target.get("modelAnswer", ""),
+            "maxPoints": float(target.get("points", 10)),
+            "graded": False,
+        }
+        result_id = self.session_svc.save_question_result(session_id, result_data)
+        result_data["id"] = result_id
+
+        done = step_index >= len(targets) - 1
+        if done:
+            self.session_svc.dedupe_question_results(session_id)
+            self.session_svc.update_status(
+                session_id,
+                "transcription_review",
+                gradingProgress=None,
+            )
+
+        return {
+            "sessionId": session_id,
+            "stepIndex": step_index,
+            "total": len(targets),
+            "done": done,
+            "result": result_data,
+        }
+
+    def transcribe_session(self, session_id: str, teacher_id: str) -> list[dict]:
+        begin = self.begin_transcription(session_id, teacher_id)
+        saved: list[dict] = []
+        for i in range(begin["total"]):
+            payload = self.transcribe_step(session_id, teacher_id, i)
+            saved.append(payload["result"])
         return saved

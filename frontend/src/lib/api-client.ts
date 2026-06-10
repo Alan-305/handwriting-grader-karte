@@ -27,6 +27,34 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
+function formatApiErrorMessage(
+  err: unknown,
+  status: number,
+  statusText: string,
+): string {
+  if (typeof err === "object" && err !== null && "error" in err) {
+    const body = err as { error?: unknown };
+    if (typeof body.error === "string" && body.error.trim()) {
+      return body.error;
+    }
+    if (Array.isArray(body.error)) {
+      return body.error
+        .map((e: { msg?: string }) => e.msg ?? JSON.stringify(e))
+        .join("; ");
+    }
+  }
+  if (status === 502 || status === 504) {
+    return (
+      "サーバーとの通信が途切れたか、処理がタイムアウトしました。" +
+      " しばらく待ってから再試行してください。"
+    );
+  }
+  if (statusText && statusText !== "OK") {
+    return `${statusText} (${status})`;
+  }
+  return `API error (${status})`;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit & { token?: string } = {},
@@ -39,16 +67,22 @@ async function request<T>(
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/aborted|timeout|network|failed to fetch|load failed/i.test(msg)) {
+      throw new Error(
+        "サーバーに接続できませんでした。バックエンドが起動しているか、ネットワークを確認してください。",
+      );
+    }
+    throw new Error(msg || "通信エラーが発生しました");
+  }
+
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    const message =
-      typeof err.error === "string"
-        ? err.error
-        : Array.isArray(err.error)
-          ? err.error.map((e: { msg?: string }) => e.msg ?? JSON.stringify(e)).join("; ")
-          : res.statusText;
-    throw new Error(message || "API error");
+    const err = await res.json().catch(() => ({}));
+    throw new Error(formatApiErrorMessage(err, res.status, res.statusText));
   }
   return res.json() as Promise<T>;
 }
@@ -90,6 +124,23 @@ export const apiClient = {
       token,
     }),
 
+  beginTranscription: (token: string, sessionId: string) =>
+    request<{ sessionId: string; total: number }>(
+      `/api/sessions/${sessionId}/transcribe/begin`,
+      { method: "POST", token },
+    ),
+
+  transcribeStep: (token: string, sessionId: string, stepIndex: number) =>
+    request<import("@/types/api").TranscribeStepResponse>(
+      `/api/sessions/${sessionId}/transcribe/step`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepIndex }),
+        token,
+      },
+    ),
+
   transcribeSession: (token: string, sessionId: string) =>
     request<TranscribeSessionResponse>(`/api/sessions/${sessionId}/transcribe`, {
       method: "POST",
@@ -107,6 +158,23 @@ export const apiClient = {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        token,
+      },
+    ),
+
+  beginGrading: (token: string, sessionId: string) =>
+    request<{ sessionId: string; total: number }>(
+      `/api/sessions/${sessionId}/grade/begin`,
+      { method: "POST", token },
+    ),
+
+  gradeStep: (token: string, sessionId: string, stepIndex: number) =>
+    request<import("@/types/api").GradeStepResponse>(
+      `/api/sessions/${sessionId}/grade/step`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepIndex }),
         token,
       },
     ),

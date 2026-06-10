@@ -18,6 +18,28 @@ export interface TranscribeSessionResponse {
   results: Array<Record<string, unknown>>;
 }
 
+export interface TranscribeStepResponse {
+  sessionId: string;
+  stepIndex: number;
+  total: number;
+  done: boolean;
+  result: Record<string, unknown>;
+}
+
+export interface GradeStepResponse {
+  sessionId: string;
+  stepIndex: number;
+  total: number;
+  done: boolean;
+  result: {
+    order?: number;
+    partLabel?: string;
+  };
+  totalScore?: number;
+  maxScore?: number;
+  totalScore100?: number;
+}
+
 export interface CropPreviewTarget {
   questionId: string;
   order: number;

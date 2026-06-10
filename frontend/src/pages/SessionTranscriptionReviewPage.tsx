@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useSession, useUpdateQuestionResults } from "@/hooks/useSession";
 import { apiClient } from "@/lib/api-client";
+import { runGradingSteps } from "@/lib/session-pipeline";
 import { formatGradingProgressMessage } from "@/lib/session-progress-message";
 import type { QuestionResult, TranscriptionStatus } from "@/types/firestore";
 
@@ -24,6 +25,7 @@ export function SessionTranscriptionReviewPage() {
 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState(false);
+  const [pipelineMessage, setPipelineMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -40,11 +42,12 @@ export function SessionTranscriptionReviewPage() {
   );
 
   const progressMessage = useMemo(() => {
+    if (pipelineMessage) return pipelineMessage;
     const fromSession = formatGradingProgressMessage(session?.gradingProgress);
     if (fromSession) return fromSession;
     if (processing) return "添削を準備中";
     return null;
-  }, [session?.gradingProgress, processing]);
+  }, [session?.gradingProgress, processing, pipelineMessage]);
 
   const handleConfirmAndGrade = async () => {
     if (!sessionId || sortedResults.length === 0) return;
@@ -82,22 +85,16 @@ export function SessionTranscriptionReviewPage() {
         confirmAll: true,
       });
 
-      await apiClient.gradeSession(token, sessionId);
-
-      try {
-        await apiClient.generatePastExamAdvice(token, sessionId);
-        navigate(`/sessions/${sessionId}/grading-review`);
-      } catch (adviceErr) {
-        const adviceMessage =
-          adviceErr instanceof Error ? adviceErr.message : "過去問アドバイスの生成に失敗しました";
-        navigate(`/sessions/${sessionId}/grading-review`, {
-          state: { adviceError: adviceMessage },
-        });
-      }
+      setPipelineMessage("添削を開始しています…");
+      await runGradingSteps(token, sessionId, (_current, _total, message) => {
+        setPipelineMessage(message);
+      });
+      navigate(`/sessions/${sessionId}/grading-review`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "添削に失敗しました");
     } finally {
       setProcessing(false);
+      setPipelineMessage("");
     }
   };
 
@@ -132,7 +129,7 @@ export function SessionTranscriptionReviewPage() {
         onSafeSubmit={handleConfirmAndGrade}
       >
         <Card className="border-blue-100 bg-blue-50/80 p-4 font-ja text-sm text-slate-700">
-          手書きは試験中の字の乱れを想定して読み取っています。誤りがあればそのまま修正し、問題なければ「確定して添削へ」を押してください。添削のあと、過去問視点のアドバイスも自動で生成します。
+          手書きは試験中の字の乱れを想定して読み取っています。誤りがあればそのまま修正し、問題なければ「確定して添削へ」を押してください。設問ごとに添削するため、問数が多いと数分かかることがあります。
         </Card>
 
         {sortedResults.map((r) => (

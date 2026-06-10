@@ -20,6 +20,9 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:5001",
         changeOrigin: true,
+        // 読み取り・添削は設問ごとに分けたが、1設問あたり数十秒かかることがある
+        timeout: 900_000,
+        proxyTimeout: 900_000,
       },
     },
   },

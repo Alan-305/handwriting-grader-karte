@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { apiClient } from "@/lib/api-client";
+import { runTranscriptionSteps } from "@/lib/session-pipeline";
 import { getStorageInstance } from "@/lib/firebase";
 import type { CropTargetsResponse } from "@/types/api";
 import type { CropRegion } from "@/types/firestore";
@@ -32,6 +33,7 @@ export function SessionManualCropPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const [transcribeProgress, setTranscribeProgress] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -146,16 +148,20 @@ export function SessionManualCropPage() {
       return;
     }
     setTranscribing(true);
+    setTranscribeProgress("読み取りを開始しています…");
     setError("");
     try {
       const token = await getIdToken();
       if (!token) return;
-      await apiClient.transcribeSession(token, sessionId);
+      await runTranscriptionSteps(token, sessionId, (_current, _total, message) => {
+        setTranscribeProgress(message);
+      });
       navigate(`/sessions/${sessionId}/transcription`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "読み取りに失敗しました");
     } finally {
       setTranscribing(false);
+      setTranscribeProgress("");
     }
   };
 
@@ -180,7 +186,10 @@ export function SessionManualCropPage() {
 
   return (
     <div>
-      <LoadingOverlay visible={saving || transcribing} message={transcribing ? "読み取り中" : "保存中"} />
+      <LoadingOverlay
+        visible={saving || transcribing}
+        message={transcribing ? transcribeProgress || "読み取り中" : "保存中"}
+      />
       <PageHeader
         title="設問ごとに切り出し"
         description="教師が答案範囲を指定します（自動切り出しは使いません）"
