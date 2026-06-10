@@ -17,7 +17,7 @@ export function PrintLayoutSettingsPanel({
   onChange,
   onReset,
 }: {
-  documentLabel: "問題用紙" | "解答用紙";
+  documentLabel: "問題用紙" | "解答用紙" | "解答・解説・全訳";
   settings: PrintLayoutSettings;
   onChange: (settings: PrintLayoutSettings) => void;
   onReset: () => void;
