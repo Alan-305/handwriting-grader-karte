@@ -5,6 +5,7 @@ from google.cloud.firestore import DELETE_FIELD
 
 from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.karte_aggregation import session_activity_time
+from app.services.question_result_dedup import find_duplicate_ids
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +134,32 @@ class SessionService:
         return self.firebase.get_subcollection(
             ["sessions", session_id, "question_results"]
         )
+
+    def delete_question_result(self, session_id: str, result_id: str) -> None:
+        db = self.firebase.db()
+        if not db:
+            return
+        (
+            db.collection("sessions")
+            .document(session_id)
+            .collection("question_results")
+            .document(result_id)
+            .delete()
+        )
+
+    def dedupe_question_results(self, session_id: str) -> int:
+        """同一設問の重複ドキュメントを削除し、削除件数を返す。"""
+        rows = self.get_question_results(session_id)
+        duplicate_ids = find_duplicate_ids(rows)
+        for result_id in duplicate_ids:
+            self.delete_question_result(session_id, result_id)
+        if duplicate_ids:
+            logger.warning(
+                "Removed %d duplicate question_results from session %s",
+                len(duplicate_ids),
+                session_id,
+            )
+        return len(duplicate_ids)
 
     def update_question_result(self, session_id: str, result_id: str, data: dict) -> None:
         db = self.firebase.db()

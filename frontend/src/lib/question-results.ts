@@ -1,8 +1,28 @@
 import type { AnswerPart, Question, QuestionResult } from "@/types/firestore";
 
+function resultRank(r: QuestionResult): number {
+  const graded = r.graded ? 1 : 0;
+  const updated = r.updatedAt?.toMillis?.() ?? r.createdAt?.toMillis?.() ?? 0;
+  return graded * 1_000_000_000_000 + updated;
+}
+
+/** 同一 (questionId, partIndex) の重複を1件にまとめる（表示・採点の整合用） */
+export function dedupeQuestionResults(results: QuestionResult[]): QuestionResult[] {
+  const groups = new Map<string, QuestionResult[]>();
+  for (const r of results) {
+    const key = `${r.questionId}:${r.partIndex ?? 0}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(r);
+    else groups.set(key, [r]);
+  }
+  return [...groups.values()].map((rows) =>
+    rows.reduce((best, row) => (resultRank(row) > resultRank(best) ? row : best)),
+  );
+}
+
 /** Firestore は order のみでソートされるため、小問順 partIndex で整列 */
 export function sortQuestionResults(results: QuestionResult[]): QuestionResult[] {
-  return [...results].sort((a, b) => {
+  return dedupeQuestionResults(results).sort((a, b) => {
     if (a.order !== b.order) return a.order - b.order;
     const ai = a.partIndex ?? 0;
     const bi = b.partIndex ?? 0;

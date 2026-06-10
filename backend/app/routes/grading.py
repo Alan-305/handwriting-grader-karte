@@ -1,6 +1,7 @@
 import logging
 
 from flask import Blueprint, g, jsonify
+from google.cloud.firestore import DELETE_FIELD
 
 from app.ai.anthropic_client import AnthropicVisionClient
 from app.ai.schemas.grading import GradeResult
@@ -33,6 +34,8 @@ def grade_session(session_id: str):
     if not session or session.get("teacherId") != g.teacher_id:
         return jsonify({"error": "セッションが見つかりません"}), 404
 
+    prior_status = session.get("status")
+    session_svc.dedupe_question_results(session_id)
     existing = session_svc.get_question_results(session_id)
     if not existing:
         return jsonify(
@@ -130,12 +133,9 @@ def grade_session(session_id: str):
             content_eval = getattr(grade, "content_evaluation", None)
             grammar_eval = getattr(grade, "grammar_evaluation", None)
             polished = getattr(grade, "polished_answer", None)
-            if content_eval:
-                result_data["contentEvaluation"] = content_eval
-            if grammar_eval:
-                result_data["grammarEvaluation"] = grammar_eval
-            if polished:
-                result_data["polishedAnswer"] = polished
+            result_data["contentEvaluation"] = content_eval if content_eval else DELETE_FIELD
+            result_data["grammarEvaluation"] = grammar_eval if grammar_eval else DELETE_FIELD
+            result_data["polishedAnswer"] = polished if polished else DELETE_FIELD
             session_svc.update_question_result(session_id, stored["id"], result_data)
             result_data["id"] = stored["id"]
             result_data["questionId"] = stored.get("questionId")
@@ -144,7 +144,8 @@ def grade_session(session_id: str):
             results.append(result_data)
     except Exception as exc:
         logger.exception("Grading failed for session %s", session_id)
-        session_svc.update_status(session_id, "transcription_review")
+        revert_status = "review" if prior_status == "review" else "transcription_review"
+        session_svc.update_status(session_id, revert_status, gradingProgress=None)
         message = str(exc)
         if any(
             key in message
@@ -212,6 +213,7 @@ def confirm_grading(session_id: str):
     if session.get("status") not in ("review", "completed"):
         return jsonify({"error": "添削確認の対象となるセッションではありません"}), 400
 
+    session_svc.dedupe_question_results(session_id)
     results = session_svc.get_question_results(session_id)
     if not results or not all(r.get("graded") for r in results):
         return jsonify({"error": "未添削の設問があります"}), 400

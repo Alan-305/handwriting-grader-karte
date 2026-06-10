@@ -78,6 +78,11 @@ class TranscriptionService:
                 " 切り出し画面で各設問の範囲を指定してください。"
             )
 
+        if session.get("status") == "transcribing":
+            raise ValueError(
+                "読み取り処理が既に実行中です。完了するまでお待ちください。"
+            )
+
         self.session_svc.clear_question_results(session_id)
         self.session_svc.update_status(session_id, "transcribing")
 
@@ -146,6 +151,7 @@ class TranscriptionService:
             result_data["id"] = result_id
             saved.append(result_data)
 
+        self.session_svc.dedupe_question_results(session_id)
         self.session_svc.update_status(
             session_id,
             "transcription_review",

@@ -52,6 +52,7 @@ export function SessionGradingReviewPage() {
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [generatingAdvice, setGeneratingAdvice] = useState(false);
+  const [regrading, setRegrading] = useState(false);
   const [error, setError] = useState("");
   const [adviceError, setAdviceError] = useState(
     () => (location.state as ReviewLocationState | null)?.adviceError ?? "",
@@ -112,6 +113,31 @@ export function SessionGradingReviewPage() {
     }
   };
 
+  const handleRegrade = async () => {
+    if (!sessionId) return;
+    setRegrading(true);
+    setError("");
+    setAdviceError("");
+    try {
+      await saveResults(sortedDrafts);
+      const token = await getIdToken();
+      if (!token) return;
+      await apiClient.gradeSession(token, sessionId);
+      try {
+        const res = await apiClient.generatePastExamAdvice(token, sessionId);
+        setAdvice(res.advice);
+      } catch (adviceErr) {
+        setAdviceError(
+          adviceErr instanceof Error ? adviceErr.message : "過去問アドバイスの再生成に失敗しました",
+        );
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "再採点に失敗しました");
+    } finally {
+      setRegrading(false);
+    }
+  };
+
   const handleSaveDraft = async () => {
     setSaving(true);
     setError("");
@@ -155,8 +181,10 @@ export function SessionGradingReviewPage() {
   return (
     <div>
       <LoadingOverlay
-        visible={confirming || Boolean(progressMessage)}
-        message={confirming ? "確定中" : progressMessage ?? "処理中"}
+        visible={confirming || regrading || Boolean(progressMessage)}
+        message={
+          confirming ? "確定中" : regrading ? "修正内容で再採点中" : progressMessage ?? "処理中"
+        }
       />
       <PageHeader
         title="添削内容の確認"
@@ -169,13 +197,26 @@ export function SessionGradingReviewPage() {
             この画面で<strong>確定するまで</strong>、生徒への返却・カルテ集計は完了しません。
             自由英作文は「内容」「文法」「完成版英文」の3部構成で表示されます。
           </p>
+          <p className="mt-2">
+            「あなたの解答」を修正した場合は、<strong>修正内容で再採点</strong>を押してから確定してください。
+            採点・講評・過去問アドバイスが解答内容に合わせて更新されます。
+          </p>
         </Card>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Button className="min-h-11 w-full sm:w-auto" variant="outline" onClick={handleSaveDraft} disabled={saving || confirming || generatingAdvice}>
+          <Button className="min-h-11 w-full sm:w-auto" variant="outline" onClick={handleSaveDraft} disabled={saving || confirming || generatingAdvice || regrading}>
             下書き保存
           </Button>
-          <Button className="min-h-11 w-full gap-2 sm:w-auto" onClick={handleConfirm} disabled={saving || confirming || generatingAdvice || !advice}>
+          <Button
+            className="min-h-11 w-full gap-2 sm:w-auto"
+            variant="outline"
+            onClick={handleRegrade}
+            disabled={saving || confirming || generatingAdvice || regrading}
+          >
+            <RefreshCw className={`h-4 w-4 ${regrading ? "animate-spin" : ""}`} />
+            修正内容で再採点
+          </Button>
+          <Button className="min-h-11 w-full gap-2 sm:w-auto" onClick={handleConfirm} disabled={saving || confirming || generatingAdvice || regrading || !advice}>
             <Check className="h-4 w-4" />
             内容を確定する
           </Button>
@@ -360,7 +401,7 @@ export function SessionGradingReviewPage() {
           )}
         </section>
 
-        <Button className="min-h-11 w-full gap-2" onClick={handleConfirm} disabled={confirming || generatingAdvice || !advice}>
+        <Button className="min-h-11 w-full gap-2" onClick={handleConfirm} disabled={confirming || generatingAdvice || regrading || !advice}>
           <Check className="h-4 w-4" />
           内容を確定する
         </Button>
