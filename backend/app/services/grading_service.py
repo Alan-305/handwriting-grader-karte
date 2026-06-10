@@ -126,7 +126,7 @@ class GradingService:
         max_points = float(target.get("points", grade.max_points))
         score = clamp_score(grade.score, max_points)
 
-        result_data = {
+        update_data = {
             "grade": grade.grade,
             "score": score,
             "maxPoints": max_points,
@@ -143,10 +143,14 @@ class GradingService:
         content_eval = getattr(grade, "content_evaluation", None)
         grammar_eval = getattr(grade, "grammar_evaluation", None)
         polished = getattr(grade, "polished_answer", None)
-        result_data["contentEvaluation"] = content_eval if content_eval else DELETE_FIELD
-        result_data["grammarEvaluation"] = grammar_eval if grammar_eval else DELETE_FIELD
-        result_data["polishedAnswer"] = polished if polished else DELETE_FIELD
-        self.session_svc.update_question_result(session_id, stored["id"], result_data)
+        update_data["contentEvaluation"] = content_eval if content_eval else DELETE_FIELD
+        update_data["grammarEvaluation"] = grammar_eval if grammar_eval else DELETE_FIELD
+        update_data["polishedAnswer"] = polished if polished else DELETE_FIELD
+        self.session_svc.update_question_result(session_id, stored["id"], update_data)
+
+        result_data = {
+            k: v for k, v in update_data.items() if v is not DELETE_FIELD
+        }
         result_data["id"] = stored["id"]
         result_data["questionId"] = stored.get("questionId")
         result_data["order"] = stored.get("order")
