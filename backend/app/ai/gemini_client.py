@@ -302,6 +302,12 @@ _MOCK_PAYLOADS: dict[str, dict] = {
         "issues": [],
         "summary": "東大型の設問として成立。",
     },
+    "PassageTranslationResponse": {
+        "paragraphs": [
+            "¶1\nこれはモック用の和訳です。",
+            "¶2\n二段落目の和訳です。",
+        ],
+    },
     "Q5TeacherPackResult": {
         "modelAnswerSummary": "1 A, 2 恥ずかしく思った心情, 3 A。",
         "explanations": [

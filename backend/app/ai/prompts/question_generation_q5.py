@@ -64,7 +64,7 @@ Q5_TEACHER_PACK_SYSTEM = """あなたは入試英語・第5問の教師用資料
 
 - modelAnswerSummary: 各問の正答（記号または日本語）を列挙し、要点を2文以内
 - explanations: 各問の解説（日本語・簡潔）。和訳の英語は「」で囲む
-- fullTranslationJa: 本文の日本語全訳
+- fullTranslationJa: 本文の日本語全訳（2段落以上の長文は各段落の先頭に ¶1、¶2… を付ける）
 - vocabularyList: 重要語句5〜10個（英 — 日）
 
 出力 JSON のみ:

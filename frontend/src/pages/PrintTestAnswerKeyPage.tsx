@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Check, Edit3, Printer } from "lucide-react";
+import { Check, Edit3, Printer, Sparkles } from "lucide-react";
 import {
   collection,
   doc,
@@ -22,14 +22,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/useAuth";
 import { usePrintLayoutSettings } from "@/hooks/usePrintLayoutSettings";
 import { usePrintShortcut } from "@/hooks/usePrintShortcut";
+import { apiClient } from "@/lib/api-client";
 import { getDb } from "@/lib/firebase";
 import { unitHeading } from "@/lib/model-answer-sections";
 import {
   applyAnswerKeyUnitsToQuestions,
   buildAnswerKeyUnitsFromDraft,
   initAnswerKeyDraftState,
+  questionNeedsAiPassageTranslation,
   questionShowsPassageTranslationField,
   type AnswerKeyDraftState,
 } from "@/lib/test-answer-key";
@@ -38,6 +41,7 @@ import type { Question, Test } from "@/types/firestore";
 
 type PrintMode = "edit" | "preview";
 type SaveState = "idle" | "saving" | "saved" | "error";
+type GenerateState = "idle" | "generating" | "error";
 
 function AnswerKeySectionsPanel({
   sections,
@@ -57,7 +61,7 @@ function AnswerKeySectionsPanel({
     <Card className="space-y-3 p-4">
       <p className="font-ja text-sm font-semibold text-slate-800">印刷に含める項目</p>
       <p className="font-ja text-xs leading-relaxed text-slate-500">
-        英語の長文がある設問（第1問・第3問など）は「本文の全訳」を編集欄に表示します。印刷の有無はここで選べます。
+        英語の長文がある設問の「本文の全訳」は AI が自動生成します。印刷の有無はここで選べます。
       </p>
       <div className="flex flex-wrap gap-x-5 gap-y-2">
         {items.map(({ key, label }) => (
@@ -78,6 +82,7 @@ function AnswerKeySectionsPanel({
 
 export function PrintTestAnswerKeyPage() {
   const { testId } = useParams<{ testId: string }>();
+  const { getIdToken } = useAuth();
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [draft, setDraft] = useState<AnswerKeyDraftState>({
@@ -95,6 +100,10 @@ export function PrintTestAnswerKeyPage() {
   );
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState("");
+  const [generateState, setGenerateState] = useState<GenerateState>("idle");
+  const [generateError, setGenerateError] = useState("");
+  const [generatingQuestionIds, setGeneratingQuestionIds] = useState<string[]>([]);
+  const autoGenerateStarted = useRef(false);
 
   const layoutKey = testId ? `${testId}-answer-key` : "answer-key";
   const { settings, setSettings, reset } = usePrintLayoutSettings(layoutKey);
@@ -109,8 +118,59 @@ export function PrintTestAnswerKeyPage() {
     };
   }, []);
 
+  const applyGeneratedTranslations = useCallback(
+    (translations: Record<string, string>) => {
+      if (Object.keys(translations).length === 0) return;
+      setDraft((prev) => ({
+        ...prev,
+        passageByQuestion: { ...prev.passageByQuestion, ...translations },
+      }));
+      setSaveState("idle");
+    },
+    [],
+  );
+
+  const runPassageTranslation = useCallback(
+    async (questionIds?: string[], force = false) => {
+      if (!testId) return;
+      const token = await getIdToken();
+      if (!token) {
+        setGenerateError("ログインが必要です");
+        setGenerateState("error");
+        return;
+      }
+
+      setGenerateState("generating");
+      setGenerateError("");
+      setGeneratingQuestionIds(questionIds ?? []);
+
+      try {
+        const result = await apiClient.generatePassageTranslations(token, testId, {
+          questionIds,
+          force,
+        });
+        applyGeneratedTranslations(result.translations);
+
+        const errorMessages = Object.values(result.errors);
+        if (errorMessages.length > 0) {
+          setGenerateError(errorMessages.join(" / "));
+          setGenerateState("error");
+        } else {
+          setGenerateState("idle");
+        }
+      } catch (e) {
+        setGenerateState("error");
+        setGenerateError(e instanceof Error ? e.message : "全訳の生成に失敗しました");
+      } finally {
+        setGeneratingQuestionIds([]);
+      }
+    },
+    [applyGeneratedTranslations, getIdToken, testId],
+  );
+
   useEffect(() => {
     if (!testId) return;
+    autoGenerateStarted.current = false;
     (async () => {
       const testSnap = await getDoc(doc(getDb(), "tests", testId));
       if (!testSnap.exists()) {
@@ -128,8 +188,41 @@ export function PrintTestAnswerKeyPage() {
       setDraft(initial);
       setSavedDraft(initial);
       setLoading(false);
+
+      const missingIds = loaded
+        .filter((q) =>
+          questionNeedsAiPassageTranslation(q, initial.passageByQuestion[q.id] ?? ""),
+        )
+        .map((q) => q.id);
+
+      if (missingIds.length > 0 && !autoGenerateStarted.current) {
+        autoGenerateStarted.current = true;
+        const token = await getIdToken();
+        if (!token) return;
+
+        setGenerateState("generating");
+        setGeneratingQuestionIds(missingIds);
+        try {
+          const result = await apiClient.generatePassageTranslations(token, testId, {
+            questionIds: missingIds,
+          });
+          applyGeneratedTranslations(result.translations);
+          const errorMessages = Object.values(result.errors);
+          if (errorMessages.length > 0) {
+            setGenerateError(errorMessages.join(" / "));
+            setGenerateState("error");
+          } else {
+            setGenerateState("idle");
+          }
+        } catch (e) {
+          setGenerateState("error");
+          setGenerateError(e instanceof Error ? e.message : "全訳の生成に失敗しました");
+        } finally {
+          setGeneratingQuestionIds([]);
+        }
+      }
     })();
-  }, [testId]);
+  }, [applyGeneratedTranslations, getIdToken, testId]);
 
   const isDirty = useMemo(
     () => JSON.stringify(draft) !== JSON.stringify(savedDraft),
@@ -220,10 +313,17 @@ export function PrintTestAnswerKeyPage() {
       <div className="no-print space-y-4 p-8 pb-0">
         <Card className="border-blue-100 bg-blue-50/80 p-4 font-ja text-sm leading-relaxed text-slate-700">
           <p>
-            英語の長文が出題される設問には<strong>本文の全訳</strong>欄を表示します（第1問・第3問など）。
-            解答・解説とは分けて編集し、印刷に含めるかは下のチェックで選べます。
+            英語の長文が出題される設問（第1問・第3問など）の<strong>本文の全訳</strong>は AI が自動生成します。
+            長文は段落ごとに ¶1、¶2… を付けます。内容を確認して保存し、印刷に含めるかは下のチェックで選べます。
           </p>
         </Card>
+
+        {generateState === "generating" && (
+          <InlineLoading message="本文の全訳をAIが生成しています…" />
+        )}
+        {generateState === "error" && generateError && (
+          <p className="font-ja text-sm text-red-600">{generateError}</p>
+        )}
 
         <div className="flex flex-wrap gap-2">
           <Button
@@ -341,18 +441,36 @@ export function PrintTestAnswerKeyPage() {
 
                 {showPassage ? (
                   <div className="space-y-2 border-t border-slate-100 pt-4">
-                    <label className="font-ja text-sm font-medium text-slate-700">
-                      本文の全訳
-                    </label>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <label className="font-ja text-sm font-medium text-slate-700">
+                        本文の全訳（AI生成）
+                      </label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="min-h-11 gap-2"
+                        disabled={generateState === "generating"}
+                        onClick={() => void runPassageTranslation([q.id], true)}
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        {generatingQuestionIds.includes(q.id) ? "生成中…" : "再生成"}
+                      </Button>
+                    </div>
                     <p className="font-ja text-xs text-slate-500">
-                      問題文の英語本文に対する和訳です。第1問・第3問など長文がある設問で入力してください。
+                      問題文の英語本文を AI が和訳します。長文は ¶1、¶2… 付きで表示されます。必要なら手直しもできます。
                     </p>
                     <Textarea
                       value={passage}
                       onChange={(e) => updatePassage(q.id, e.target.value)}
                       className="min-h-[200px] font-ja text-base leading-relaxed"
                       rows={12}
-                      placeholder="【全訳】として印刷される本文の和訳を入力"
+                      placeholder={
+                        generatingQuestionIds.includes(q.id)
+                          ? "AIが本文の全訳を生成しています…"
+                          : "未生成の場合は自動で生成されます"
+                      }
+                      readOnly={generatingQuestionIds.includes(q.id)}
                     />
                   </div>
                 ) : null}

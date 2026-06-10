@@ -473,6 +473,22 @@ export const apiClient = {
       token,
     }),
 
+  generatePassageTranslations: (
+    token: string,
+    testId: string,
+    body?: { questionIds?: string[]; force?: boolean },
+  ) =>
+    request<{
+      translations: Record<string, string>;
+      skippedQuestionIds: string[];
+      errors: Record<string, string>;
+    }>(`/api/tests/${testId}/generate-passage-translations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+      token,
+    }),
+
   generateQuestions: (
     token: string,
     slug: string,

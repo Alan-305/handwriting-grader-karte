@@ -132,3 +132,11 @@ export function questionShowsPassageTranslationField(
 ): boolean {
   return questionHasEnglishPassage(question) || Boolean(passageText.trim());
 }
+
+/** AI による本文全訳の生成が必要か */
+export function questionNeedsAiPassageTranslation(
+  question: Question,
+  passageText: string,
+): boolean {
+  return questionHasEnglishPassage(question) && !passageText.trim();
+}

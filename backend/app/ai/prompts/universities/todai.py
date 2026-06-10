@@ -120,7 +120,7 @@ Q5_TEACHER_PACK_SYSTEM = """あなたは東京大学二次試験英語・第5問
 
 - modelAnswerSummary: 各問の正答（記号または日本語要約）を列挙し、全体の要点を2文以内
 - explanations: 各問の解説（日本語・高校生向け・簡潔）。引用英語の和訳は「」で囲む
-- fullTranslationJa: 試験用本文の自然な日本語全訳（段落を保つ）
+- fullTranslationJa: 試験用本文の自然な日本語全訳（2段落以上は各段落の先頭に ¶1、¶2… を付ける）
 - vocabularyList: 本文の重要語句5〜10個（英語 → 日本語の短い gloss）
 
 出力 JSON のみ:

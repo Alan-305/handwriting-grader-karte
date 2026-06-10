@@ -3,6 +3,7 @@ import logging
 from flask import Blueprint, g, jsonify, request
 from pydantic import BaseModel, Field, ValidationError
 
+from app.services.passage_translation_service import PassageTranslationService
 from app.services.question_design_service import QuestionDesignService
 from app.services.question_q2_service import QuestionQ2Service
 from app.services.question_q1_service import QuestionQ1Service
@@ -73,6 +74,13 @@ class BuildTestDraftBody(BaseModel):
 
 class PromoteDraftAsNewTestBody(BaseModel):
     title: str | None = None
+
+    model_config = {"populate_by_name": True}
+
+
+class GeneratePassageTranslationsBody(BaseModel):
+    question_ids: list[str] | None = Field(alias="questionIds", default=None)
+    force: bool = False
 
     model_config = {"populate_by_name": True}
 
@@ -435,6 +443,33 @@ def list_question_types(slug: str):
     try:
         types = service.list_question_types(g.teacher_id, slug)
         return jsonify({"questionTypes": types})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+
+@question_design_bp.post("/tests/<test_id>/generate-passage-translations")
+@require_auth
+def generate_passage_translations(test_id: str):
+    try:
+        body = GeneratePassageTranslationsBody.model_validate(
+            request.get_json(silent=True) or {}
+        )
+    except ValidationError as exc:
+        return jsonify({"error": exc.errors()}), 400
+
+    service = PassageTranslationService()
+    try:
+        payload = service.generate_for_test(
+            teacher_id=g.teacher_id,
+            test_id=test_id,
+            question_ids=body.question_ids,
+            force=body.force,
+        )
+        return jsonify(payload)
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 403
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 503
 
