@@ -1,4 +1,3 @@
-import { TtsButton } from "@/components/grading/ModelAnswerPanel";
 import { PrintFlowDocument } from "@/components/print/PrintA4Page";
 import { QuestionPromptBlock } from "@/lib/question-text-format";
 import {
@@ -8,9 +7,10 @@ import {
   type PrintLayoutSettings,
 } from "@/lib/print-layout-settings";
 import {
+  extractPassageTranslation,
+  questionHasEnglishPassage,
   splitModelAnswerSections,
   unitHeading,
-  type ModelAnswerSections,
 } from "@/lib/model-answer-sections";
 import type { AnswerKeyUnit } from "@/lib/test-answer-key";
 import type { Question } from "@/types/firestore";
@@ -18,68 +18,30 @@ import type { Question } from "@/types/firestore";
 export interface AnswerKeyPrintSections {
   body: boolean;
   vocabulary: boolean;
-  translation: boolean;
+  /** 本文の全訳（英語長文がある設問）／その他の全訳 */
+  passageTranslation: boolean;
   prompt: boolean;
 }
 
 export const DEFAULT_ANSWER_KEY_PRINT_SECTIONS: AnswerKeyPrintSections = {
   body: true,
   vocabulary: true,
-  translation: true,
+  passageTranslation: true,
   prompt: false,
 };
 
 function SectionBlock({
   title,
   children,
-  ttsText,
-  ttsLang = "ja",
 }: {
   title: string;
   children: React.ReactNode;
-  ttsText?: string;
-  ttsLang?: "en" | "ja";
 }) {
   if (!children) return null;
   return (
     <div className="print-break-avoid space-y-2">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="font-ja text-sm font-semibold text-slate-700">{title}</h3>
-        {ttsText ? (
-          <span className="no-print">
-            <TtsButton text={ttsText} lang={ttsLang} />
-          </span>
-        ) : null}
-      </div>
+      <h3 className="font-ja text-sm font-semibold text-slate-700">{title}</h3>
       <div className="text-explanation leading-relaxed text-slate-900">{children}</div>
-    </div>
-  );
-}
-
-function RenderSections({
-  sections,
-  parsed,
-}: {
-  sections: AnswerKeyPrintSections;
-  parsed: ModelAnswerSections;
-}) {
-  return (
-    <div className="space-y-5">
-      {sections.body && parsed.body ? (
-        <SectionBlock title="解答・解説" ttsText={parsed.body} ttsLang="ja">
-          <p className="whitespace-pre-wrap font-ja">{parsed.body}</p>
-        </SectionBlock>
-      ) : null}
-      {sections.vocabulary && parsed.vocabulary ? (
-        <SectionBlock title="重要語句" ttsText={parsed.vocabulary} ttsLang="ja">
-          <p className="whitespace-pre-wrap font-ja">{parsed.vocabulary}</p>
-        </SectionBlock>
-      ) : null}
-      {sections.translation && parsed.translation ? (
-        <SectionBlock title="全訳" ttsText={parsed.translation} ttsLang="ja">
-          <p className="whitespace-pre-wrap font-ja">{parsed.translation}</p>
-        </SectionBlock>
-      ) : null}
     </div>
   );
 }
@@ -90,14 +52,25 @@ export function TeacherAnswerKeyPrintLayout({
   units,
   settings,
   sections,
+  passageTranslations = {},
 }: {
   testTitle: string;
   questions: Question[];
   units: AnswerKeyUnit[];
   settings: PrintLayoutSettings;
   sections: AnswerKeyPrintSections;
+  /** 編集画面で入力した本文全訳（questionId → テキスト） */
+  passageTranslations?: Record<string, string>;
 }) {
   const questionById = new Map(questions.map((q) => [q.id, q]));
+  const unitsByQuestion = new Map<string, AnswerKeyUnit[]>();
+  for (const unit of units) {
+    const list = unitsByQuestion.get(unit.questionId) ?? [];
+    list.push(unit);
+    unitsByQuestion.set(unit.questionId, list);
+  }
+
+  const renderedQuestionIds = new Set<string>();
 
   return (
     <PrintFlowDocument
@@ -113,14 +86,32 @@ export function TeacherAnswerKeyPrintLayout({
 
       {units.map((unit, index) => {
         const question = questionById.get(unit.questionId);
-        const parsed = splitModelAnswerSections(unit.modelAnswer);
-        const hasContent =
-          (sections.body && parsed.body) ||
-          (sections.vocabulary && parsed.vocabulary) ||
-          (sections.translation && parsed.translation) ||
-          (sections.prompt && question?.prompt);
+        if (!question) return null;
 
-        if (!hasContent) return null;
+        const parsed = splitModelAnswerSections(unit.modelAnswer);
+        const isFirstForQuestion = !renderedQuestionIds.has(unit.questionId);
+        if (isFirstForQuestion) renderedQuestionIds.add(unit.questionId);
+
+        const questionUnits = unitsByQuestion.get(unit.questionId) ?? [unit];
+        const storedTranslation =
+          passageTranslations[unit.questionId]?.trim() ||
+          extractPassageTranslation(
+            question,
+            questionUnits.map((u) => u.modelAnswer),
+          );
+        const showPassageTranslation =
+          sections.passageTranslation && Boolean(storedTranslation);
+        const translationTitle = questionHasEnglishPassage(question)
+          ? "本文の全訳"
+          : "全訳";
+
+        const hasContent =
+          parsed.body ||
+          parsed.vocabulary ||
+          (isFirstForQuestion && showPassageTranslation) ||
+          (sections.prompt && isFirstForQuestion && question.prompt);
+
+        if (!hasContent && !unit.modelAnswer.trim()) return null;
 
         const breakBefore = shouldBreakBeforeQuestion(index, settings.sectionMode);
         const applyGap = shouldApplyQuestionGap(index, settings.sectionMode);
@@ -141,16 +132,39 @@ export function TeacherAnswerKeyPrintLayout({
                 {unitHeading(unit.order, unit.partLabel)}
               </h2>
 
-              {sections.prompt && question?.prompt ? (
+              {isFirstForQuestion && sections.prompt && question.prompt ? (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 print:border-black/20 print:bg-transparent">
                   <p className="mb-2 font-ja text-sm font-semibold text-slate-600">問題文</p>
                   <QuestionPromptBlock prompt={question.prompt} />
                 </div>
               ) : null}
 
-              <RenderSections sections={sections} parsed={parsed} />
+              <div className="space-y-5">
+                {sections.body && parsed.body ? (
+                  <SectionBlock title="解答・解説">
+                    <p className="whitespace-pre-wrap font-ja">{parsed.body}</p>
+                  </SectionBlock>
+                ) : null}
+                {sections.vocabulary && parsed.vocabulary ? (
+                  <SectionBlock title="重要語句">
+                    <p className="whitespace-pre-wrap font-ja">{parsed.vocabulary}</p>
+                  </SectionBlock>
+                ) : null}
+              </div>
 
-              {!unit.modelAnswer.trim() ? (
+              {isFirstForQuestion && showPassageTranslation ? (
+                <SectionBlock title={translationTitle}>
+                  <p className="whitespace-pre-wrap font-ja">{storedTranslation}</p>
+                </SectionBlock>
+              ) : null}
+
+              {!unit.modelAnswer.trim() &&
+              isFirstForQuestion &&
+              questionHasEnglishPassage(question) &&
+              !storedTranslation ? (
+                <p className="font-ja text-sm text-slate-400">（本文の全訳未入力）</p>
+              ) : null}
+              {!unit.modelAnswer.trim() && !questionHasEnglishPassage(question) ? (
                 <p className="font-ja text-sm text-slate-400">（模範解答未入力）</p>
               ) : null}
             </section>

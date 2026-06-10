@@ -28,8 +28,10 @@ import { getDb } from "@/lib/firebase";
 import { unitHeading } from "@/lib/model-answer-sections";
 import {
   applyAnswerKeyUnitsToQuestions,
-  expandAnswerKeyUnits,
-  type AnswerKeyUnit,
+  buildAnswerKeyUnitsFromDraft,
+  initAnswerKeyDraftState,
+  questionShowsPassageTranslationField,
+  type AnswerKeyDraftState,
 } from "@/lib/test-answer-key";
 import { exportElementToPdf, printElement } from "@/lib/pdf-export";
 import type { Question, Test } from "@/types/firestore";
@@ -47,13 +49,16 @@ function AnswerKeySectionsPanel({
   const items: { key: keyof AnswerKeyPrintSections; label: string }[] = [
     { key: "body", label: "解答・解説" },
     { key: "vocabulary", label: "重要語句" },
-    { key: "translation", label: "全訳" },
+    { key: "passageTranslation", label: "本文の全訳" },
     { key: "prompt", label: "問題文（参考）" },
   ];
 
   return (
     <Card className="space-y-3 p-4">
       <p className="font-ja text-sm font-semibold text-slate-800">印刷に含める項目</p>
+      <p className="font-ja text-xs leading-relaxed text-slate-500">
+        英語の長文がある設問（第1問・第3問など）は「本文の全訳」を編集欄に表示します。印刷の有無はここで選べます。
+      </p>
       <div className="flex flex-wrap gap-x-5 gap-y-2">
         {items.map(({ key, label }) => (
           <label key={key} className="inline-flex min-h-11 cursor-pointer items-center gap-2 font-ja text-sm">
@@ -75,8 +80,14 @@ export function PrintTestAnswerKeyPage() {
   const { testId } = useParams<{ testId: string }>();
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [draftUnits, setDraftUnits] = useState<AnswerKeyUnit[]>([]);
-  const [savedUnits, setSavedUnits] = useState<AnswerKeyUnit[]>([]);
+  const [draft, setDraft] = useState<AnswerKeyDraftState>({
+    bodyByKey: {},
+    passageByQuestion: {},
+  });
+  const [savedDraft, setSavedDraft] = useState<AnswerKeyDraftState>({
+    bodyByKey: {},
+    passageByQuestion: {},
+  });
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<PrintMode>("edit");
   const [sections, setSections] = useState<AnswerKeyPrintSections>(
@@ -113,16 +124,21 @@ export function PrintTestAnswerKeyPage() {
       );
       const loaded = qSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Question);
       setQuestions(loaded);
-      const units = expandAnswerKeyUnits(loaded);
-      setDraftUnits(units);
-      setSavedUnits(units);
+      const initial = initAnswerKeyDraftState(loaded);
+      setDraft(initial);
+      setSavedDraft(initial);
       setLoading(false);
     })();
   }, [testId]);
 
   const isDirty = useMemo(
-    () => JSON.stringify(draftUnits) !== JSON.stringify(savedUnits),
-    [draftUnits, savedUnits],
+    () => JSON.stringify(draft) !== JSON.stringify(savedDraft),
+    [draft, savedDraft],
+  );
+
+  const draftUnits = useMemo(
+    () => buildAnswerKeyUnitsFromDraft(questions, draft),
+    [questions, draft],
   );
 
   const previewQuestions = useMemo(
@@ -130,13 +146,19 @@ export function PrintTestAnswerKeyPage() {
     [questions, draftUnits],
   );
 
-  const previewUnits = useMemo(
-    () => expandAnswerKeyUnits(previewQuestions),
-    [previewQuestions],
-  );
+  const updateBody = (key: string, value: string) => {
+    setDraft((prev) => ({
+      ...prev,
+      bodyByKey: { ...prev.bodyByKey, [key]: value },
+    }));
+    setSaveState("idle");
+  };
 
-  const updateUnit = (key: string, modelAnswer: string) => {
-    setDraftUnits((prev) => prev.map((u) => (u.key === key ? { ...u, modelAnswer } : u)));
+  const updatePassage = (questionId: string, value: string) => {
+    setDraft((prev) => ({
+      ...prev,
+      passageByQuestion: { ...prev.passageByQuestion, [questionId]: value },
+    }));
     setSaveState("idle");
   };
 
@@ -145,26 +167,26 @@ export function PrintTestAnswerKeyPage() {
     setSaveState("saving");
     setSaveError("");
     try {
-      const nextQuestions = applyAnswerKeyUnitsToQuestions(questions, draftUnits);
+      const units = buildAnswerKeyUnitsFromDraft(questions, draft);
+      const nextQuestions = applyAnswerKeyUnitsToQuestions(questions, units);
       const batch = writeBatch(getDb());
       for (const q of nextQuestions) {
-        const { id, ...rest } = q;
         const patch: Record<string, unknown> = {};
         if (q.answerParts?.length) {
           patch.answerParts = q.answerParts;
         } else {
           patch.modelAnswer = q.modelAnswer;
         }
-        batch.update(doc(getDb(), "tests", testId, "questions", id), patch);
+        batch.update(doc(getDb(), "tests", testId, "questions", q.id), patch);
       }
       batch.update(doc(getDb(), "tests", testId), {
         updatedAt: serverTimestamp(),
       });
       await batch.commit();
       setQuestions(nextQuestions);
-      const units = expandAnswerKeyUnits(nextQuestions);
-      setDraftUnits(units);
-      setSavedUnits(units);
+      const nextDraft = initAnswerKeyDraftState(nextQuestions);
+      setDraft(nextDraft);
+      setSavedDraft(nextDraft);
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
     } catch (e) {
@@ -198,8 +220,8 @@ export function PrintTestAnswerKeyPage() {
       <div className="no-print space-y-4 p-8 pb-0">
         <Card className="border-blue-100 bg-blue-50/80 p-4 font-ja text-sm leading-relaxed text-slate-700">
           <p>
-            問題生成で登録した模範解答・解説・全訳（【全訳】など）をここで一覧できます。
-            編集モードで文言を直し、保存してから印刷してください。生徒への配布は問題用紙のみを想定しています。
+            英語の長文が出題される設問には<strong>本文の全訳</strong>欄を表示します（第1問・第3問など）。
+            解答・解説とは分けて編集し、印刷に含めるかは下のチェックで選べます。
           </p>
         </Card>
 
@@ -285,32 +307,68 @@ export function PrintTestAnswerKeyPage() {
       </div>
 
       {mode === "edit" ? (
-        <div className="page-content mx-auto max-w-4xl space-y-6 pb-12">
-          {draftUnits.map((unit) => (
-            <Card key={unit.key} className="space-y-3 p-5">
-              <h2 className="font-ja text-lg font-semibold text-slate-900">
-                {unitHeading(unit.order, unit.partLabel)}
-              </h2>
-              <p className="font-ja text-xs text-slate-500">
-                解答・解説・【重要語句】・【全訳】をこの欄にまとめて入力できます（問題生成の形式のまま編集可）。
-              </p>
-              <Textarea
-                value={unit.modelAnswer}
-                onChange={(e) => updateUnit(unit.key, e.target.value)}
-                className="min-h-[220px] font-ja text-base leading-relaxed"
-                rows={12}
-              />
-            </Card>
-          ))}
+        <div className="page-content mx-auto max-w-4xl space-y-8 pb-12">
+          {questions.map((q) => {
+            const qUnits = draftUnits.filter((u) => u.questionId === q.id);
+            const passage = draft.passageByQuestion[q.id] ?? "";
+            const showPassage = questionShowsPassageTranslationField(q, passage);
+
+            return (
+              <Card key={q.id} className="space-y-5 p-5">
+                <h2 className="font-ja text-lg font-semibold text-slate-900">
+                  第{q.order}問
+                </h2>
+
+                {qUnits.map((unit) => (
+                  <div key={unit.key} className="space-y-2">
+                    {qUnits.length > 1 ? (
+                      <h3 className="font-ja text-sm font-semibold text-slate-700">
+                        {unitHeading(unit.order, unit.partLabel)}
+                      </h3>
+                    ) : null}
+                    <label className="font-ja text-sm font-medium text-slate-700">
+                      解答・解説
+                      {qUnits.length > 1 ? `（${unit.partLabel ?? ""}）` : ""}
+                    </label>
+                    <Textarea
+                      value={draft.bodyByKey[unit.key] ?? ""}
+                      onChange={(e) => updateBody(unit.key, e.target.value)}
+                      className="min-h-[180px] font-ja text-base leading-relaxed"
+                      rows={10}
+                    />
+                  </div>
+                ))}
+
+                {showPassage ? (
+                  <div className="space-y-2 border-t border-slate-100 pt-4">
+                    <label className="font-ja text-sm font-medium text-slate-700">
+                      本文の全訳
+                    </label>
+                    <p className="font-ja text-xs text-slate-500">
+                      問題文の英語本文に対する和訳です。第1問・第3問など長文がある設問で入力してください。
+                    </p>
+                    <Textarea
+                      value={passage}
+                      onChange={(e) => updatePassage(q.id, e.target.value)}
+                      className="min-h-[200px] font-ja text-base leading-relaxed"
+                      rows={12}
+                      placeholder="【全訳】として印刷される本文の和訳を入力"
+                    />
+                  </div>
+                ) : null}
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <div ref={printRef} className="bg-slate-100 p-8 print:bg-white print:p-0">
           <TeacherAnswerKeyPrintLayout
             testTitle={test.title}
             questions={previewQuestions}
-            units={previewUnits}
+            units={draftUnits}
             settings={settings}
             sections={sections}
+            passageTranslations={draft.passageByQuestion}
           />
         </div>
       )}

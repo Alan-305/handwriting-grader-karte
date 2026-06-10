@@ -1,3 +1,9 @@
+import {
+  answerBodyWithoutPassageTranslation,
+  extractPassageTranslation,
+  mergeModelAnswerSections,
+  questionHasEnglishPassage,
+} from "@/lib/model-answer-sections";
 import type { AnswerPart, Question } from "@/types/firestore";
 
 export interface AnswerKeyUnit {
@@ -64,4 +70,65 @@ export function applyAnswerKeyUnitsToQuestions(
 
     return { ...q, modelAnswer: rowUnits[0]?.modelAnswer ?? q.modelAnswer };
   });
+}
+
+export interface AnswerKeyDraftState {
+  bodyByKey: Record<string, string>;
+  passageByQuestion: Record<string, string>;
+}
+
+export function initAnswerKeyDraftState(questions: Question[]): AnswerKeyDraftState {
+  const units = expandAnswerKeyUnits(questions);
+  const bodyByKey: Record<string, string> = {};
+  const passageByQuestion: Record<string, string> = {};
+
+  for (const q of questions) {
+    const qUnits = units.filter((u) => u.questionId === q.id);
+    const modelAnswers = qUnits.map((u) => u.modelAnswer);
+    const extracted = extractPassageTranslation(q, modelAnswers);
+    if (questionHasEnglishPassage(q) || extracted) {
+      passageByQuestion[q.id] = extracted;
+    }
+    for (const unit of qUnits) {
+      bodyByKey[unit.key] = answerBodyWithoutPassageTranslation(unit.modelAnswer);
+    }
+  }
+
+  return { bodyByKey, passageByQuestion };
+}
+
+/** 編集ドラフトから保存用 modelAnswer を組み立てる */
+export function buildAnswerKeyUnitsFromDraft(
+  questions: Question[],
+  draft: AnswerKeyDraftState,
+): AnswerKeyUnit[] {
+  const base = expandAnswerKeyUnits(questions);
+  return base.map((unit) => {
+    const question = questions.find((q) => q.id === unit.questionId);
+    if (!question) return unit;
+
+    const qUnits = base.filter((u) => u.questionId === unit.questionId);
+    const isFirst = qUnits[0]?.key === unit.key;
+    const body = draft.bodyByKey[unit.key] ?? "";
+
+    if (!isFirst) {
+      return { ...unit, modelAnswer: body.trim() };
+    }
+
+    const passage = draft.passageByQuestion[unit.questionId] ?? "";
+    const needsPassage =
+      questionHasEnglishPassage(question) || Boolean(passage.trim());
+    const modelAnswer = needsPassage
+      ? mergeModelAnswerSections(body, passage)
+      : body.trim();
+
+    return { ...unit, modelAnswer };
+  });
+}
+
+export function questionShowsPassageTranslationField(
+  question: Question,
+  passageText: string,
+): boolean {
+  return questionHasEnglishPassage(question) || Boolean(passageText.trim());
 }
