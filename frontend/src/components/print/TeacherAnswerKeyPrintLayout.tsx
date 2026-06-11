@@ -62,7 +62,6 @@ export function TeacherAnswerKeyPrintLayout({
   /** 編集画面で入力した本文全訳（questionId → テキスト） */
   passageTranslations?: Record<string, string>;
 }) {
-  const questionById = new Map(questions.map((q) => [q.id, q]));
   const unitsByQuestion = new Map<string, AnswerKeyUnit[]>();
   for (const unit of units) {
     const list = unitsByQuestion.get(unit.questionId) ?? [];
@@ -70,7 +69,7 @@ export function TeacherAnswerKeyPrintLayout({
     unitsByQuestion.set(unit.questionId, list);
   }
 
-  const renderedQuestionIds = new Set<string>();
+  const orderedQuestions = questions.filter((q) => (unitsByQuestion.get(q.id)?.length ?? 0) > 0);
 
   return (
     <PrintFlowDocument
@@ -84,17 +83,10 @@ export function TeacherAnswerKeyPrintLayout({
         <p className="mt-2 font-ja text-base text-slate-700">解答・解説・全訳（教師用）</p>
       </header>
 
-      {units.map((unit, index) => {
-        const question = questionById.get(unit.questionId);
-        if (!question) return null;
-
-        const parsed = splitModelAnswerSections(unit.modelAnswer);
-        const isFirstForQuestion = !renderedQuestionIds.has(unit.questionId);
-        if (isFirstForQuestion) renderedQuestionIds.add(unit.questionId);
-
-        const questionUnits = unitsByQuestion.get(unit.questionId) ?? [unit];
+      {orderedQuestions.map((question, questionIndex) => {
+        const questionUnits = unitsByQuestion.get(question.id) ?? [];
         const storedTranslation =
-          passageTranslations[unit.questionId]?.trim() ||
+          passageTranslations[question.id]?.trim() ||
           extractPassageTranslation(
             question,
             questionUnits.map((u) => u.modelAnswer),
@@ -104,21 +96,24 @@ export function TeacherAnswerKeyPrintLayout({
         const translationTitle = questionHasEnglishPassage(question)
           ? "本文の全訳"
           : "全訳";
+        const hasMultipleParts = questionUnits.length > 1;
 
         const hasContent =
-          parsed.body ||
-          parsed.vocabulary ||
-          (isFirstForQuestion && showPassageTranslation) ||
-          (sections.prompt && isFirstForQuestion && question.prompt);
+          questionUnits.some((unit) => {
+            const parsed = splitModelAnswerSections(unit.modelAnswer);
+            return parsed.body || parsed.vocabulary;
+          }) ||
+          showPassageTranslation ||
+          (sections.prompt && question.prompt);
 
-        if (!hasContent && !unit.modelAnswer.trim()) return null;
+        if (!hasContent) return null;
 
-        const breakBefore = shouldBreakBeforeQuestion(index, settings.sectionMode);
-        const applyGap = shouldApplyQuestionGap(index, settings.sectionMode);
+        const breakBefore = shouldBreakBeforeQuestion(questionIndex, settings.sectionMode);
+        const applyGap = shouldApplyQuestionGap(questionIndex, settings.sectionMode);
 
         return (
           <div
-            key={unit.key}
+            key={question.id}
             className={[
               "print-question-wrap print-question-block",
               breakBefore ? "print-break-before-page" : "",
@@ -127,45 +122,59 @@ export function TeacherAnswerKeyPrintLayout({
               .filter(Boolean)
               .join(" ")}
           >
-            <section className="print-break-avoid space-y-4 border-b border-slate-200 pb-6 print:border-black/20">
-              <h2 className="font-ja text-lg font-semibold">
-                {unitHeading(unit.order, unit.partLabel)}
-              </h2>
+            <section className="print-break-avoid space-y-5 border-b border-slate-200 pb-6 print:border-black/20">
+              <h2 className="font-ja text-lg font-semibold">第{question.order}問</h2>
 
-              {isFirstForQuestion && sections.prompt && question.prompt ? (
+              {sections.prompt && question.prompt ? (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 print:border-black/20 print:bg-transparent">
                   <p className="mb-2 font-ja text-sm font-semibold text-slate-600">問題文</p>
                   <QuestionPromptBlock prompt={question.prompt} />
                 </div>
               ) : null}
 
-              <div className="space-y-5">
-                {sections.body && parsed.body ? (
-                  <SectionBlock title="解答・解説">
-                    <p className="whitespace-pre-wrap font-ja">{parsed.body}</p>
-                  </SectionBlock>
-                ) : null}
-                {sections.vocabulary && parsed.vocabulary ? (
-                  <SectionBlock title="重要語句">
-                    <p className="whitespace-pre-wrap font-ja">{parsed.vocabulary}</p>
-                  </SectionBlock>
-                ) : null}
-              </div>
+              {questionUnits.map((unit) => {
+                const parsed = splitModelAnswerSections(unit.modelAnswer);
+                const unitHasContent = parsed.body || parsed.vocabulary;
+                if (!unitHasContent && hasMultipleParts) return null;
 
-              {isFirstForQuestion && showPassageTranslation ? (
-                <SectionBlock title={translationTitle}>
-                  <p className="whitespace-pre-wrap font-ja">{storedTranslation}</p>
-                </SectionBlock>
+                return (
+                  <div key={unit.key} className="space-y-4">
+                    {hasMultipleParts ? (
+                      <h3 className="font-ja text-base font-semibold text-slate-800">
+                        {unitHeading(unit.order, unit.partLabel)}
+                      </h3>
+                    ) : null}
+
+                    <div className="space-y-5">
+                      {sections.body && parsed.body ? (
+                        <SectionBlock title="解答・解説">
+                          <p className="whitespace-pre-wrap font-ja">{parsed.body}</p>
+                        </SectionBlock>
+                      ) : null}
+                      {sections.vocabulary && parsed.vocabulary ? (
+                        <SectionBlock title="重要語句">
+                          <p className="whitespace-pre-wrap font-ja">{parsed.vocabulary}</p>
+                        </SectionBlock>
+                      ) : null}
+                    </div>
+
+                    {!unit.modelAnswer.trim() && !hasMultipleParts ? (
+                      <p className="font-ja text-sm text-slate-400">（模範解答未入力）</p>
+                    ) : null}
+                  </div>
+                );
+              })}
+
+              {showPassageTranslation ? (
+                <div className="print-break-avoid mt-2 rounded-lg border-2 border-slate-300 bg-slate-50/80 p-5 print:border-black/30 print:bg-transparent">
+                  <SectionBlock title={translationTitle}>
+                    <p className="whitespace-pre-wrap font-ja">{storedTranslation}</p>
+                  </SectionBlock>
+                </div>
               ) : null}
 
-              {!unit.modelAnswer.trim() &&
-              isFirstForQuestion &&
-              questionHasEnglishPassage(question) &&
-              !storedTranslation ? (
+              {questionHasEnglishPassage(question) && !storedTranslation ? (
                 <p className="font-ja text-sm text-slate-400">（本文の全訳未入力）</p>
-              ) : null}
-              {!unit.modelAnswer.trim() && !questionHasEnglishPassage(question) ? (
-                <p className="font-ja text-sm text-slate-400">（模範解答未入力）</p>
               ) : null}
             </section>
           </div>

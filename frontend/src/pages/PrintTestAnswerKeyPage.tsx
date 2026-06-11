@@ -440,11 +440,16 @@ export function PrintTestAnswerKeyPage() {
                 ))}
 
                 {showPassage ? (
-                  <div className="space-y-2 border-t border-slate-100 pt-4">
+                  <Card className="space-y-3 border-2 border-slate-200 bg-slate-50/70 p-5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <label className="font-ja text-sm font-medium text-slate-700">
-                        本文の全訳（AI生成）
-                      </label>
+                      <div>
+                        <label className="font-ja text-sm font-semibold text-slate-800">
+                          本文の全訳（AI生成）
+                        </label>
+                        <p className="mt-1 font-ja text-xs text-slate-500">
+                          小問 (A)(B)(C) などの解答・解説の<strong>後</strong>に印刷される別枠です。長文は ¶1、¶2… 付き。
+                        </p>
+                      </div>
                       <Button
                         type="button"
                         variant="outline"
@@ -457,13 +462,10 @@ export function PrintTestAnswerKeyPage() {
                         {generatingQuestionIds.includes(q.id) ? "生成中…" : "再生成"}
                       </Button>
                     </div>
-                    <p className="font-ja text-xs text-slate-500">
-                      問題文の英語本文を AI が和訳します。長文は ¶1、¶2… 付きで表示されます。必要なら手直しもできます。
-                    </p>
                     <Textarea
                       value={passage}
                       onChange={(e) => updatePassage(q.id, e.target.value)}
-                      className="min-h-[200px] font-ja text-base leading-relaxed"
+                      className="min-h-[200px] border-slate-200 bg-white font-ja text-base leading-relaxed"
                       rows={12}
                       placeholder={
                         generatingQuestionIds.includes(q.id)
@@ -472,7 +474,7 @@ export function PrintTestAnswerKeyPage() {
                       }
                       readOnly={generatingQuestionIds.includes(q.id)}
                     />
-                  </div>
+                  </Card>
                 ) : null}
               </Card>
             );

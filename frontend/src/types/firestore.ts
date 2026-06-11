@@ -23,6 +23,9 @@ export type SessionStatus =
 
 export type TranscriptionStatus = "pending_review" | "confirmed";
 
+/** 解答用紙の小問ラベル: (1)(2)… または (A)(B)… */
+export type PartLabelScheme = "numeric" | "alpha";
+
 /** 解答用紙形式ごとの数値設定（設問入力時に教師が指定） */
 export interface AnswerFormatOptions {
   /** マス目：行数 */
@@ -168,6 +171,8 @@ export interface Question {
   formatOptions?: AnswerFormatOptions;
   /** 小問 (1)(2)(3) ごとの解答欄。2件以上のときのみ使用 */
   answerParts?: AnswerPart[];
+  /** 小問ラベル形式: (1)(2)… または (A)(B)… */
+  partLabelScheme?: PartLabelScheme;
   /** 未指定時は answerFormat / 問題文から自動判定 */
   gradingMode?: GradingMode;
   prompt: string;

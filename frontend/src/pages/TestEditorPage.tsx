@@ -27,7 +27,9 @@ import {
   addAnswerPart,
   applyLayoutCropRegions,
   expandAnswerUnits,
+  relabelAnswerParts,
   removeAnswerPart,
+  resolvePartLabelScheme,
   updateAnswerPart,
 } from "@/lib/answer-parts";
 import {
@@ -43,6 +45,7 @@ import { QUESTION_TEXT_HINT, QuestionPromptBlock } from "@/lib/question-text-for
 import type {
   AnswerSheetTemplate,
   CropRegion,
+  PartLabelScheme,
   Question,
   QuestionType,
   Test,
@@ -375,7 +378,7 @@ export function TestEditorPage() {
             ① 設問・模範解答を入力 → ② 各問の「解答用紙形式」を指定 → ③「保存」
             → ④「問題用紙を印刷」で生徒に配布 → ⑤「解答用紙を自動生成」で別紙を印刷
             <br />
-            形式の例：1問の中に (1)(2)(3) がある場合は「小問を追加」で解答欄を分けて指定できます。
+            形式の例：1問の中に (1)(2)(3) や (A)(B)(C) がある場合は「小問を追加」で解答欄を分け、ラベル形式を選べます。
           </p>
         </Card>
         <Card className="space-y-4">
@@ -566,17 +569,36 @@ export function TestEditorPage() {
                 </div>
               </div>
               <div className="space-y-3 border-t border-slate-100 pt-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label className="font-ja text-sm font-medium text-slate-700">解答欄</label>
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div className="space-y-1">
+                    <label className="font-ja text-sm font-medium text-slate-700">解答欄</label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="font-ja text-xs text-slate-500">小問ラベル</label>
+                      <select
+                        className="flex h-10 min-w-[9rem] rounded-lg border px-3 font-ja text-sm"
+                        value={resolvePartLabelScheme(q)}
+                        onChange={(e) => {
+                          const scheme = e.target.value as PartLabelScheme;
+                          const patch: Partial<Question> = { partLabelScheme: scheme };
+                          if (q.answerParts?.length) {
+                            patch.answerParts = relabelAnswerParts(q.answerParts, scheme);
+                          }
+                          updateDraftQuestion(i, patch);
+                        }}
+                      >
+                        <option value="numeric">(1)(2)(3)…</option>
+                        <option value="alpha">(A)(B)(C)…</option>
+                      </select>
+                    </div>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      updateDraftQuestion(i, addAnswerPart(q))
-                    }
+                    className="min-h-11"
+                    onClick={() => updateDraftQuestion(i, addAnswerPart(q))}
                   >
-                    小問 (1)(2)… を追加
+                    小問を追加
                   </Button>
                 </div>
 

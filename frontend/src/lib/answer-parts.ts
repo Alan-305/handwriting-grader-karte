@@ -4,21 +4,59 @@ import type {
   AnswerPart,
   AnswerSheetFormat,
   CropRegion,
+  PartLabelScheme,
   Question,
   QuestionType,
 } from "@/types/firestore";
 
-export function partLabel(index: number): string {
+export type { PartLabelScheme };
+
+/** 小問ラベル（(1) または (A)） */
+export function partLabel(index: number, scheme: PartLabelScheme = "numeric"): string {
+  if (scheme === "alpha") {
+    if (index >= 1 && index <= 26) {
+      return `(${String.fromCharCode(64 + index)})`;
+    }
+  }
   return `(${index})`;
 }
 
+export function resolvePartLabelScheme(
+  question: Pick<Question, "partLabelScheme" | "answerParts">,
+): PartLabelScheme {
+  if (question.partLabelScheme) return question.partLabelScheme;
+  const first = question.answerParts?.[0]?.label?.trim() ?? "";
+  if (/^\([A-Z]\)$/i.test(first)) return "alpha";
+  return "numeric";
+}
+
+export function relabelAnswerParts(
+  answerParts: AnswerPart[],
+  scheme: PartLabelScheme,
+): AnswerPart[] {
+  return answerParts.map((part, index) => ({
+    ...part,
+    label: partLabel(index + 1, scheme),
+  }));
+}
+
 export function createAnswerPart(
-  question: Pick<Question, "type" | "answerFormat" | "formatOptions" | "cropRegion" | "modelAnswer">,
+  question: Pick<
+    Question,
+    | "type"
+    | "answerFormat"
+    | "formatOptions"
+    | "cropRegion"
+    | "modelAnswer"
+    | "partLabelScheme"
+    | "answerParts"
+  >,
   index: number,
 ): AnswerPart {
   const answerFormat = question.answerFormat ?? DEFAULT_FORMAT[question.type];
+  const scheme = resolvePartLabelScheme(question);
   return {
-    label: partLabel(index),
+    label: partLabel(index, scheme),
     answerFormat,
     formatOptions: { ...(question.formatOptions ?? DEFAULT_OPTIONS[answerFormat]) },
     modelAnswer: index === 1 ? question.modelAnswer ?? "" : "",
@@ -123,9 +161,10 @@ export function removeAnswerPart(question: Question, partIndex: number): Questio
     };
   }
 
+  const scheme = resolvePartLabelScheme(question);
   const answerParts = question.answerParts
     .filter((_, i) => i !== partIndex)
-    .map((part, i) => ({ ...part, label: partLabel(i + 1) }));
+    .map((part, i) => ({ ...part, label: partLabel(i + 1, scheme) }));
 
   if (answerParts.length === 1) {
     const only = answerParts[0];
