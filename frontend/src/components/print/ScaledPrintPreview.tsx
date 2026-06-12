@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * A4幅（210mm）固定の印刷プレビューを、表示枠の幅に合わせて縮小表示する。
+ * A4幅（210mm）固定の印刷プレビューを、表示枠の幅に合わせて拡大・縮小表示する。
  * 中身は実寸のままなので、印刷・PDF出力には影響しない。
  */
 export function ScaledPrintPreview({
@@ -16,7 +16,9 @@ export function ScaledPrintPreview({
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  const [scaledHeight, setScaledHeight] = useState<number | undefined>(undefined);
+  const [scaledSize, setScaledSize] = useState<{ width: number; height: number } | undefined>(
+    undefined,
+  );
 
   useEffect(() => {
     const outer = outerRef.current;
@@ -27,9 +29,15 @@ export function ScaledPrintPreview({
       const innerWidth = inner.offsetWidth;
       const innerHeight = inner.offsetHeight;
       if (innerWidth <= 0) return;
-      const next = Math.min(1, outer.clientWidth / innerWidth);
+
+      // 枠幅に合わせて拡大・縮小（1倍上限なし。ペインを広げれば文字も大きくなる）
+      const availableWidth = outer.clientWidth;
+      const next = availableWidth / innerWidth;
       setScale(next);
-      setScaledHeight(innerHeight * next);
+      setScaledSize({
+        width: innerWidth * next,
+        height: innerHeight * next,
+      });
     };
 
     const observer = new ResizeObserver(update);
@@ -37,11 +45,18 @@ export function ScaledPrintPreview({
     observer.observe(inner);
     update();
     return () => observer.disconnect();
-  }, []);
+  }, [children]);
 
   return (
     <div ref={outerRef} className={cn("min-w-0", className)}>
-      <div style={{ height: scaledHeight }} className="print:h-auto">
+      <div
+        className="print:h-auto"
+        style={
+          scaledSize
+            ? { width: scaledSize.width, height: scaledSize.height }
+            : undefined
+        }
+      >
         <div
           ref={innerRef}
           className="w-fit print:w-auto print:transform-none"

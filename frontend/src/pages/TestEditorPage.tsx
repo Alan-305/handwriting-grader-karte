@@ -831,8 +831,8 @@ export function TestEditorPage() {
           解答・解説・全訳
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-        <ScaledPrintPreview className="p-4 pb-8">
+      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-y-contain">
+        <ScaledPrintPreview className="box-border p-4 pb-8">
           {previewDoc === "paper" ? (
             <TestPaperPrintLayout
               testTitle={draftTitle || "テスト"}

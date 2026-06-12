@@ -411,8 +411,8 @@ export function PrintTestAnswerKeyPage() {
           印刷プレビュー（編集内容が即時反映されます）
         </span>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-        <ScaledPrintPreview className="p-4 pb-8 print:p-0">
+      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-y-contain">
+        <ScaledPrintPreview className="box-border p-4 pb-8 print:p-0">
           <div ref={printRef}>
             <TeacherAnswerKeyPrintLayout
               testTitle={test.title}
