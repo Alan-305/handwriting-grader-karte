@@ -14,6 +14,21 @@
   box-sizing: border-box;
 }
 
+/* PC サイドバーの幅（AppShell の折りたたみ状態と同期。固定フッター等の左端合わせに使う） */
+:root {
+  --app-sidebar-width: 0px;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --app-sidebar-width: 16rem;
+  }
+
+  :root[data-sidebar-collapsed="true"] {
+    --app-sidebar-width: 3rem;
+  }
+}
+
 body {
   margin: 0;
   min-height: 100vh;

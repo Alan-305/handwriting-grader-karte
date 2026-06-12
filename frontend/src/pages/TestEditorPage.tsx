@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   addDoc,
@@ -15,7 +15,14 @@ import {
 } from "firebase/firestore";
 import { Check, FileText, Printer, Save } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
+import { ResizableSplit } from "@/components/layout/ResizableSplit";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
+import { ScaledPrintPreview } from "@/components/print/ScaledPrintPreview";
+import {
+  DEFAULT_ANSWER_KEY_PRINT_SECTIONS,
+  TeacherAnswerKeyPrintLayout,
+} from "@/components/print/TeacherAnswerKeyPrintLayout";
+import { TestPaperPrintLayout } from "@/components/print/TestPaperPrintLayout";
 import { CropPreview } from "@/components/upload/CropPreview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,7 +48,18 @@ import { AnswerPartCard, AnswerPartFormatFields } from "@/components/tests/Answe
 import { TestValidityPanel } from "@/components/tests/TestValidityPanel";
 import { getDb } from "@/lib/firebase";
 import { NO_MODEL_ANSWER_HINT, resolveGradingMode } from "@/lib/grading-mode";
-import { QUESTION_TEXT_HINT, QuestionPromptBlock } from "@/lib/question-text-format";
+import {
+  answerBodyWithoutPassageTranslation,
+  splitModelAnswerSections,
+  translationBody,
+} from "@/lib/model-answer-sections";
+import { QUESTION_TEXT_HINT } from "@/lib/question-text-format";
+import {
+  expandAnswerKeyUnits,
+  mergePassageTranslationsIntoQuestions,
+  stripPassageTranslationsFromQuestions,
+} from "@/lib/test-answer-key";
+import { usePrintLayoutSettings } from "@/hooks/usePrintLayoutSettings";
 import type {
   AnswerSheetTemplate,
   CropRegion,
@@ -84,11 +102,18 @@ export function TestEditorPage() {
   const [draftTitle, setDraftTitle] = useState("");
   const [draftTemplateId, setDraftTemplateId] = useState("");
   const [draftQuestions, setDraftQuestions] = useState<Question[]>([]);
+  const [draftTranslations, setDraftTranslations] = useState<Record<string, string>>({});
+  const [savedTranslations, setSavedTranslations] = useState<Record<string, string>>({});
   const [templates, setTemplates] = useState<AnswerSheetTemplate[]>([]);
   const [selectedQ, setSelectedQ] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<"paper" | "answer_key">("paper");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState("");
+  const paperPrintSettings = usePrintLayoutSettings(testId);
+  const answerKeyPrintSettings = usePrintLayoutSettings(
+    testId ? `${testId}-answer-key` : undefined,
+  );
 
   useEffect(() => {
     if (!testId) return;
@@ -107,8 +132,13 @@ export function TestEditorPage() {
     const q = query(collection(getDb(), "tests", testId, "questions"), orderBy("order"));
     return onSnapshot(q, (snap) => {
       const loaded = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Question);
-      setQuestions(loaded);
-      setDraftQuestions(loaded);
+      // 模範解答内の【全訳】は編集用に分離し、常に独立した「全訳」欄で扱う
+      const { questions: stripped, translations } =
+        stripPassageTranslationsFromQuestions(loaded);
+      setQuestions(stripped);
+      setDraftQuestions(stripped);
+      setSavedTranslations(translations);
+      setDraftTranslations(translations);
     });
   }, [testId]);
 
@@ -128,12 +158,21 @@ export function TestEditorPage() {
     if (draftTitle !== test.title) return true;
     if (draftTemplateId !== (test.templateId ?? "")) return true;
     if (draftQuestions.length !== questions.length) return true;
+    if (JSON.stringify(draftTranslations) !== JSON.stringify(savedTranslations)) return true;
     return draftQuestions.some((dq) => {
       const orig = questions.find((q) => q.id === dq.id);
       if (!orig) return true;
       return JSON.stringify(dq) !== JSON.stringify(orig);
     });
-  }, [test, draftTitle, draftTemplateId, draftQuestions, questions]);
+  }, [
+    test,
+    draftTitle,
+    draftTemplateId,
+    draftQuestions,
+    questions,
+    draftTranslations,
+    savedTranslations,
+  ]);
 
   const updateDraftQuestion = (index: number, patch: Partial<Question>) => {
     setDraftQuestions((prev) =>
@@ -142,7 +181,27 @@ export function TestEditorPage() {
     setSaveState("idle");
   };
 
+  const updateDraftTranslation = (questionId: string, value: string) => {
+    setDraftTranslations((prev) => ({ ...prev, [questionId]: value }));
+    setSaveState("idle");
+  };
+
   const applyRevision = (questionOrder: number, field: string, value: string) => {
+    let nextValue = value;
+    if (field === "modelAnswer") {
+      // 修正案に【全訳】が含まれる場合も、独立した全訳欄へ振り分ける
+      const { translation } = splitModelAnswerSections(value);
+      if (translation.trim()) {
+        nextValue = answerBodyWithoutPassageTranslation(value);
+        const target = draftQuestions.find((q) => q.order === questionOrder);
+        if (target) {
+          setDraftTranslations((prev) => ({
+            ...prev,
+            [target.id]: translationBody(translation),
+          }));
+        }
+      }
+    }
     setDraftQuestions((prev) =>
       prev.map((q) => {
         if (q.order !== questionOrder) return q;
@@ -151,12 +210,30 @@ export function TestEditorPage() {
           return Number.isFinite(points) ? { ...q, points } : q;
         }
         if (field === "prompt") return { ...q, prompt: value };
-        if (field === "modelAnswer") return { ...q, modelAnswer: value };
+        if (field === "modelAnswer") return { ...q, modelAnswer: nextValue };
         return q;
       }),
     );
     setSaveState("idle");
   };
+
+  /**
+   * 保存・プレビュー用に、分離している全訳を modelAnswer へ戻す。
+   * 模範解答欄に直接【全訳】と書かれた場合も末尾の全訳へ合流させる。
+   */
+  const buildQuestionsWithTranslations = useCallback(
+    (qs: Question[]): Question[] => {
+      const { questions: cleaned, translations: typed } =
+        stripPassageTranslationsFromQuestions(qs);
+      const merged: Record<string, string> = { ...draftTranslations };
+      for (const [qid, t] of Object.entries(typed)) {
+        const existing = (merged[qid] ?? "").trim();
+        merged[qid] = existing && existing !== t.trim() ? `${existing}\n\n${t}` : t;
+      }
+      return mergePassageTranslationsIntoQuestions(cleaned, merged);
+    },
+    [draftTranslations],
+  );
 
   const addQuestion = async () => {
     if (!testId) return;
@@ -278,17 +355,18 @@ export function TestEditorPage() {
     setSaveError("");
     try {
       const batch = writeBatch(getDb());
-      const totalPoints = draftQuestions.reduce((s, q) => s + q.points, 0);
+      const questionsToSave = buildQuestionsWithTranslations(draftQuestions);
+      const totalPoints = questionsToSave.reduce((s, q) => s + q.points, 0);
 
       batch.update(doc(getDb(), "tests", testId), {
         title: draftTitle,
         templateId: draftTemplateId,
         totalPoints,
-        questionCount: draftQuestions.length,
+        questionCount: questionsToSave.length,
         updatedAt: serverTimestamp(),
       });
 
-      for (const q of draftQuestions) {
+      for (const q of questionsToSave) {
         batch.update(
           doc(getDb(), "tests", testId, "questions", q.id),
           questionPatchForFirestore(q),
@@ -325,15 +403,16 @@ export function TestEditorPage() {
       setDraftTemplateId(tplRef.id);
 
       const batch = writeBatch(getDb());
-      const totalPoints = updatedQuestions.reduce((s, q) => s + q.points, 0);
+      const questionsToSave = buildQuestionsWithTranslations(updatedQuestions);
+      const totalPoints = questionsToSave.reduce((s, q) => s + q.points, 0);
       batch.update(doc(getDb(), "tests", testId), {
         title: draftTitle,
         templateId: tplRef.id,
         totalPoints,
-        questionCount: updatedQuestions.length,
+        questionCount: questionsToSave.length,
         updatedAt: serverTimestamp(),
       });
-      for (const q of updatedQuestions) {
+      for (const q of questionsToSave) {
         batch.update(
           doc(getDb(), "tests", testId, "questions", q.id),
           questionPatchForFirestore(q),
@@ -365,13 +444,21 @@ export function TestEditorPage() {
 
   const regions = cropTargets.map((t) => t.region);
 
-  return (
-    <div>
-      <PageHeader
-        title="問題エディタ"
-        description="問題を入力 →「解答用紙を自動生成」で印刷用用紙と切り出し位置を一括設定"
-      />
-      <div className="page-content space-y-6">
+  const previewQuestions = useMemo(
+    () => buildQuestionsWithTranslations(draftQuestions),
+    [buildQuestionsWithTranslations, draftQuestions],
+  );
+  const previewUnits = useMemo(
+    () => expandAnswerKeyUnits(previewQuestions),
+    [previewQuestions],
+  );
+  const previewTotalPoints = useMemo(
+    () => draftQuestions.reduce((s, q) => s + q.points, 0),
+    [draftQuestions],
+  );
+
+  const editorPane = (
+    <div className="space-y-6 p-4 pb-44 sm:p-6 lg:pb-40">
         <Card className="border-blue-100 bg-blue-50/40 p-4">
           <p className="font-ja text-sm leading-relaxed text-slate-700">
             <strong>おすすめの流れ：</strong>
@@ -651,12 +738,6 @@ export function TestEditorPage() {
                   rows={5}
                 />
                 <p className="mt-1 font-ja text-xs text-slate-500">{QUESTION_TEXT_HINT}</p>
-                {q.prompt.trim() && (
-                  <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <p className="mb-1 font-ja text-xs font-medium text-slate-500">印刷プレビュー</p>
-                    <QuestionPromptBlock prompt={q.prompt} />
-                  </div>
-                )}
               </div>
               {!q.answerParts?.length && (
                 <div>
@@ -677,14 +758,94 @@ export function TestEditorPage() {
                   )}
                 </div>
               )}
+              {(q.type === "english" || (draftTranslations[q.id] ?? "").trim()) && (
+                <div className="rounded-lg border-2 border-slate-200 bg-slate-50/70 p-4">
+                  <label className="font-ja text-sm font-semibold text-slate-800">
+                    全訳（第{q.order}問のいちばん最後に印刷されます）
+                  </label>
+                  <p className="mt-1 font-ja text-xs leading-relaxed text-slate-500">
+                    本文の全訳はここに入力してください。模範解答の中に【全訳】と書いた場合も、自動でこの欄に移動します。
+                  </p>
+                  <Textarea
+                    value={draftTranslations[q.id] ?? ""}
+                    onChange={(e) => updateDraftTranslation(q.id, e.target.value)}
+                    className="mt-2 font-ja"
+                    rows={5}
+                    placeholder="（任意）「解答・解説・全訳」画面で AI に自動生成させることもできます"
+                  />
+                </div>
+              )}
             </Card>
           ))}
         </div>
+    </div>
+  );
+
+  const previewPane = (
+    <div className="no-print min-h-full bg-slate-100">
+      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur">
+        <span className="mr-1 font-ja text-sm font-medium text-slate-600">印刷プレビュー</span>
+        <Button
+          type="button"
+          size="sm"
+          className="min-h-11"
+          variant={previewDoc === "paper" ? "default" : "outline"}
+          onClick={() => setPreviewDoc("paper")}
+        >
+          問題用紙
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          className="min-h-11"
+          variant={previewDoc === "answer_key" ? "default" : "outline"}
+          onClick={() => setPreviewDoc("answer_key")}
+        >
+          解答・解説・全訳
+        </Button>
       </div>
+      <ScaledPrintPreview className="p-4 pb-40">
+        {previewDoc === "paper" ? (
+          <TestPaperPrintLayout
+            testTitle={draftTitle || "テスト"}
+            totalPoints={previewTotalPoints}
+            questions={draftQuestions}
+            settings={paperPrintSettings.settings}
+          />
+        ) : (
+          <TeacherAnswerKeyPrintLayout
+            testTitle={draftTitle || "テスト"}
+            questions={previewQuestions}
+            units={previewUnits}
+            settings={answerKeyPrintSettings.settings}
+            sections={DEFAULT_ANSWER_KEY_PRINT_SECTIONS}
+            passageTranslations={draftTranslations}
+          />
+        )}
+      </ScaledPrintPreview>
+    </div>
+  );
+
+  return (
+    <div className="lg:flex lg:h-full lg:min-h-0 lg:flex-col">
+      <PageHeader
+        title="問題エディタ"
+        description="左で編集、右で印刷プレビュー（境界をドラッグで幅を調整）"
+      />
+      <ResizableSplit
+        storageKey="test-editor"
+        defaultRatio={0.55}
+        className="lg:flex-1"
+        left={editorPane}
+        right={previewPane}
+      />
 
       <div
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6 lg:left-64 lg:px-8 lg:py-4"
-        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        className="no-print fixed bottom-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8 lg:py-4"
+        style={{
+          paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+          left: "var(--app-sidebar-width, 0px)",
+        }}
       >
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
           <div className="font-ja text-sm text-slate-600">

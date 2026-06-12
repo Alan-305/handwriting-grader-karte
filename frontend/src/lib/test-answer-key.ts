@@ -3,6 +3,7 @@ import {
   extractPassageTranslation,
   mergeModelAnswerSections,
   questionHasEnglishPassage,
+  splitModelAnswerSections,
 } from "@/lib/model-answer-sections";
 import type { AnswerPart, Question } from "@/types/firestore";
 
@@ -123,6 +124,79 @@ export function buildAnswerKeyUnitsFromDraft(
       : body.trim();
 
     return { ...unit, modelAnswer };
+  });
+}
+
+/** 【全訳】を含むテキストなら全訳を取り除いた本文を返す（含まなければそのまま） */
+function stripTranslationIfPresent(text: string | undefined): string | undefined {
+  if (!text) return text;
+  const { translation } = splitModelAnswerSections(text);
+  if (!translation.trim()) return text;
+  return answerBodyWithoutPassageTranslation(text);
+}
+
+export interface QuestionsWithTranslations {
+  questions: Question[];
+  /** questionId → 全訳本文（見出しなし） */
+  translations: Record<string, string>;
+}
+
+/**
+ * 各設問の modelAnswer / 小問から【全訳】を抜き出し、
+ * 編集画面用に「解答・解説」と「全訳」へ分離する
+ */
+export function stripPassageTranslationsFromQuestions(
+  questions: Question[],
+): QuestionsWithTranslations {
+  const translations: Record<string, string> = {};
+
+  const stripped = questions.map((q) => {
+    const units = expandAnswerKeyUnits([q]);
+    const extracted = extractPassageTranslation(
+      q,
+      units.map((u) => u.modelAnswer),
+    );
+    if (!extracted.trim()) return q;
+
+    translations[q.id] = extracted;
+
+    if (q.answerParts && q.answerParts.length > 0) {
+      return {
+        ...q,
+        modelAnswer: stripTranslationIfPresent(q.modelAnswer) ?? q.modelAnswer,
+        answerParts: q.answerParts.map((part) => ({
+          ...part,
+          modelAnswer: stripTranslationIfPresent(part.modelAnswer),
+        })),
+      };
+    }
+    return { ...q, modelAnswer: stripTranslationIfPresent(q.modelAnswer) ?? "" };
+  });
+
+  return { questions: stripped, translations };
+}
+
+/**
+ * 分離していた全訳を保存用に modelAnswer へ戻す
+ * （最初の解答欄の末尾に【全訳】付きで結合。表示時は常に最後の別枠に出る）
+ */
+export function mergePassageTranslationsIntoQuestions(
+  questions: Question[],
+  translations: Record<string, string>,
+): Question[] {
+  return questions.map((q) => {
+    const passage = (translations[q.id] ?? "").trim();
+    if (!passage) return q;
+
+    if (q.answerParts && q.answerParts.length > 0) {
+      const answerParts = q.answerParts.map((part, index) =>
+        index === 0
+          ? { ...part, modelAnswer: mergeModelAnswerSections(part.modelAnswer ?? "", passage) }
+          : part,
+      );
+      return { ...q, answerParts };
+    }
+    return { ...q, modelAnswer: mergeModelAnswerSections(q.modelAnswer ?? "", passage) };
   });
 }
 

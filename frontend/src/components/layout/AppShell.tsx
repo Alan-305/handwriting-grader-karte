@@ -9,6 +9,8 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Users,
   X,
 } from "lucide-react";
@@ -54,9 +56,18 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+const SIDEBAR_COLLAPSED_KEY = "app-sidebar-collapsed";
+
 export function AppShell() {
   const { logout, user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -66,6 +77,16 @@ export function AppShell() {
       document.body.style.overflow = prev;
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+    // 固定フッターなどが --app-sidebar-width で左端を合わせられるようにする
+    document.documentElement.dataset.sidebarCollapsed = sidebarCollapsed ? "true" : "false";
+  }, [sidebarCollapsed]);
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -135,25 +156,88 @@ export function AppShell() {
         </>
       )}
 
-      {/* PC: サイドバー */}
-      <aside className="no-print hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
-        <div className="border-b border-slate-200 p-6">
-          <div className="flex items-center gap-2">
-            <LayoutDashboard className="h-6 w-6 text-blue-800" />
-            <span className="font-ja text-sm font-semibold text-slate-900">大学別個人指導カルテ</span>
+      {/* PC: サイドバー（折りたたみ可能） */}
+      {sidebarCollapsed ? (
+        <aside className="no-print hidden w-12 shrink-0 flex-col items-center border-r border-slate-200 bg-white lg:flex">
+          <div className="border-b border-slate-200 py-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11"
+              onClick={() => setSidebarCollapsed(false)}
+              aria-label="メニューを表示"
+              title="メニューを表示"
+            >
+              <PanelLeftOpen className="h-5 w-5" />
+            </Button>
           </div>
-          <p className="mt-1 truncate font-ja text-xs text-slate-500">{user?.email}</p>
-        </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-          <NavItems />
-        </nav>
-        <div className="border-t border-slate-200 p-4">
-          <Button variant="ghost" className="min-h-11 w-full justify-start gap-2" onClick={() => logout()}>
-            <LogOut className="h-4 w-4" />
-            ログアウト
-          </Button>
-        </div>
-      </aside>
+          <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto py-3">
+            {navItems.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                title={label}
+                className={({ isActive }) =>
+                  cn(
+                    "flex h-11 w-11 items-center justify-center rounded-lg transition-colors",
+                    isActive
+                      ? "bg-blue-50 text-blue-800"
+                      : "text-slate-600 hover:bg-slate-100 active:bg-slate-200",
+                  )
+                }
+              >
+                <Icon className="h-5 w-5" />
+              </NavLink>
+            ))}
+          </nav>
+          <div className="border-t border-slate-200 py-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11"
+              onClick={() => logout()}
+              aria-label="ログアウト"
+              title="ログアウト"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
+        </aside>
+      ) : (
+        <aside className="no-print hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
+          <div className="border-b border-slate-200 p-6 pr-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <LayoutDashboard className="h-6 w-6 shrink-0 text-blue-800" />
+                <span className="truncate font-ja text-sm font-semibold text-slate-900">大学別個人指導カルテ</span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 shrink-0"
+                onClick={() => setSidebarCollapsed(true)}
+                aria-label="メニューを隠して画面を広く使う"
+                title="メニューを隠して画面を広く使う"
+              >
+                <PanelLeftClose className="h-5 w-5" />
+              </Button>
+            </div>
+            <p className="mt-1 truncate font-ja text-xs text-slate-500">{user?.email}</p>
+          </div>
+          <nav className="flex-1 space-y-1 overflow-y-auto p-4">
+            <NavItems />
+          </nav>
+          <div className="border-t border-slate-200 p-4">
+            <Button variant="ghost" className="min-h-11 w-full justify-start gap-2" onClick={() => logout()}>
+              <LogOut className="h-4 w-4" />
+              ログアウト
+            </Button>
+          </div>
+        </aside>
+      )}
 
       <main className="main-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
         <Outlet />

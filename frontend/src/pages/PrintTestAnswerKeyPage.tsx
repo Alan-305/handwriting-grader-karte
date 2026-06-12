@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Check, Edit3, Printer, Sparkles } from "lucide-react";
+import { Check, Printer, Sparkles } from "lucide-react";
 import {
   collection,
   doc,
@@ -12,8 +12,10 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { PageHeader } from "@/components/layout/AppShell";
+import { ResizableSplit } from "@/components/layout/ResizableSplit";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { PrintLayoutSettingsPanel } from "@/components/print/PrintLayoutSettingsPanel";
+import { ScaledPrintPreview } from "@/components/print/ScaledPrintPreview";
 import {
   DEFAULT_ANSWER_KEY_PRINT_SECTIONS,
   TeacherAnswerKeyPrintLayout,
@@ -39,7 +41,6 @@ import {
 import { exportElementToPdf, printElement } from "@/lib/pdf-export";
 import type { Question, Test } from "@/types/firestore";
 
-type PrintMode = "edit" | "preview";
 type SaveState = "idle" | "saving" | "saved" | "error";
 type GenerateState = "idle" | "generating" | "error";
 
@@ -94,7 +95,6 @@ export function PrintTestAnswerKeyPage() {
     passageByQuestion: {},
   });
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<PrintMode>("edit");
   const [sections, setSections] = useState<AnswerKeyPrintSections>(
     DEFAULT_ANSWER_KEY_PRINT_SECTIONS,
   );
@@ -303,60 +303,151 @@ export function PrintTestAnswerKeyPage() {
     );
   }
 
-  return (
-    <div>
-      <PageHeader
-        title="解答・解説・全訳（教師用）"
-        description={`${test.title} — 模範解答の確認・修正・印刷`}
+  const editPane = (
+    <div className="space-y-4 p-4 pb-12 sm:p-6">
+      <Card className="border-blue-100 bg-blue-50/80 p-4 font-ja text-sm leading-relaxed text-slate-700">
+        <p>
+          英語の長文が出題される設問（第1問・第3問など）の<strong>本文の全訳</strong>は AI が自動生成します。
+          全訳は常に各問の<strong>いちばん最後</strong>の別枠に印刷されます。長文は段落ごとに ¶1、¶2… を付けます。
+        </p>
+      </Card>
+
+      <AnswerKeySectionsPanel sections={sections} onChange={setSections} />
+
+      <PrintLayoutSettingsPanel
+        documentLabel="解答・解説・全訳"
+        settings={settings}
+        onChange={setSettings}
+        onReset={reset}
       />
 
-      <div className="no-print space-y-4 p-8 pb-0">
-        <Card className="border-blue-100 bg-blue-50/80 p-4 font-ja text-sm leading-relaxed text-slate-700">
-          <p>
-            英語の長文が出題される設問（第1問・第3問など）の<strong>本文の全訳</strong>は AI が自動生成します。
-            長文は段落ごとに ¶1、¶2… を付けます。内容を確認して保存し、印刷に含めるかは下のチェックで選べます。
-          </p>
-        </Card>
+      {questions.map((q) => {
+        const qUnits = draftUnits.filter((u) => u.questionId === q.id);
+        const passage = draft.passageByQuestion[q.id] ?? "";
+        const showPassage = questionShowsPassageTranslationField(q, passage);
 
-        {generateState === "generating" && (
-          <InlineLoading message="本文の全訳をAIが生成しています…" />
-        )}
-        {generateState === "error" && generateError && (
-          <p className="font-ja text-sm text-red-600">{generateError}</p>
-        )}
+        return (
+          <Card key={q.id} className="space-y-5 p-5">
+            <h2 className="font-ja text-lg font-semibold text-slate-900">
+              第{q.order}問
+            </h2>
 
-        <div className="flex flex-wrap gap-2">
+            {qUnits.map((unit) => (
+              <div key={unit.key} className="space-y-2">
+                {qUnits.length > 1 ? (
+                  <h3 className="font-ja text-sm font-semibold text-slate-700">
+                    {unitHeading(unit.order, unit.partLabel)}
+                  </h3>
+                ) : null}
+                <label className="font-ja text-sm font-medium text-slate-700">
+                  解答・解説
+                  {qUnits.length > 1 ? `（${unit.partLabel ?? ""}）` : ""}
+                </label>
+                <Textarea
+                  value={draft.bodyByKey[unit.key] ?? ""}
+                  onChange={(e) => updateBody(unit.key, e.target.value)}
+                  className="min-h-[180px] font-ja text-base leading-relaxed"
+                  rows={10}
+                />
+              </div>
+            ))}
+
+            {showPassage ? (
+              <Card className="space-y-3 border-2 border-slate-200 bg-slate-50/70 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <label className="font-ja text-sm font-semibold text-slate-800">
+                      本文の全訳（AI生成）
+                    </label>
+                    <p className="mt-1 font-ja text-xs text-slate-500">
+                      第{q.order}問のいちばん最後に印刷される別枠です。長文は ¶1、¶2… 付き。
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="min-h-11 gap-2"
+                    disabled={generateState === "generating"}
+                    onClick={() => void runPassageTranslation([q.id], true)}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {generatingQuestionIds.includes(q.id) ? "生成中…" : "再生成"}
+                  </Button>
+                </div>
+                <Textarea
+                  value={passage}
+                  onChange={(e) => updatePassage(q.id, e.target.value)}
+                  className="min-h-[200px] border-slate-200 bg-white font-ja text-base leading-relaxed"
+                  rows={12}
+                  placeholder={
+                    generatingQuestionIds.includes(q.id)
+                      ? "AIが本文の全訳を生成しています…"
+                      : "未生成の場合は自動で生成されます"
+                  }
+                  readOnly={generatingQuestionIds.includes(q.id)}
+                />
+              </Card>
+            ) : null}
+          </Card>
+        );
+      })}
+    </div>
+  );
+
+  const previewPane = (
+    <div className="min-h-full bg-slate-100">
+      <div className="no-print sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur">
+        <span className="font-ja text-sm font-medium text-slate-600">
+          印刷プレビュー（編集内容が即時反映されます）
+        </span>
+      </div>
+      <ScaledPrintPreview className="p-4 pb-12 print:p-0">
+        <div ref={printRef}>
+          <TeacherAnswerKeyPrintLayout
+            testTitle={test.title}
+            questions={previewQuestions}
+            units={draftUnits}
+            settings={settings}
+            sections={sections}
+            passageTranslations={draft.passageByQuestion}
+          />
+        </div>
+      </ScaledPrintPreview>
+    </div>
+  );
+
+  return (
+    <div className="lg:flex lg:h-full lg:min-h-0 lg:flex-col">
+      <PageHeader
+        title="解答・解説・全訳（教師用）"
+        description={`${test.title} — 左で編集、右で印刷プレビュー（境界をドラッグで幅を調整）`}
+      />
+
+      <div className="no-print space-y-2 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
-            variant={mode === "edit" ? "default" : "outline"}
             className="min-h-11 gap-2"
-            onClick={() => setMode("edit")}
+            disabled={!isDirty || saveState === "saving"}
+            onClick={() => void handleSave()}
           >
-            <Edit3 className="h-4 w-4" />
-            編集
+            <Check className="h-4 w-4" />
+            保存
           </Button>
           <Button
             type="button"
-            variant={mode === "preview" ? "default" : "outline"}
+            variant="outline"
             className="min-h-11 gap-2"
-            onClick={() => setMode("preview")}
-          >
-            <Printer className="h-4 w-4" />
-            印刷プレビュー
-          </Button>
-          <Button
-            type="button"
-            className="min-h-11 gap-2"
-            disabled={mode !== "preview"}
             onClick={() => printRef.current && printElement(printRef.current)}
           >
+            <Printer className="h-4 w-4" />
             印刷 / PDF
           </Button>
           <Button
             type="button"
             variant="outline"
             className="min-h-11"
-            disabled={mode !== "preview"}
             onClick={() =>
               printRef.current &&
               exportElementToPdf(printRef.current, `${test.title}-解答解説`)
@@ -370,128 +461,32 @@ export function PrintTestAnswerKeyPage() {
           <Button variant="outline" className="min-h-11" asChild>
             <Link to={`/tests/${testId}`}>問題エディタ</Link>
           </Button>
+
+          <span className="font-ja text-sm">
+            {saveState === "saving" && <InlineLoading message="保存中..." />}
+            {saveState === "saved" && <span className="text-green-700">保存しました</span>}
+            {saveState === "error" && <span className="text-red-600">{saveError}</span>}
+            {saveState === "idle" && isDirty && (
+              <span className="text-amber-700">未保存の変更があります</span>
+            )}
+          </span>
         </div>
 
-        {mode === "edit" && (
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              className="min-h-11 gap-2"
-              disabled={!isDirty || saveState === "saving"}
-              onClick={() => void handleSave()}
-            >
-              <Check className="h-4 w-4" />
-              保存
-            </Button>
-            {saveState === "saving" && <InlineLoading message="保存中..." />}
-            {saveState === "saved" && (
-              <span className="font-ja text-sm text-green-700">保存しました</span>
-            )}
-            {saveState === "error" && (
-              <span className="font-ja text-sm text-red-600">{saveError}</span>
-            )}
-            {saveState === "idle" && isDirty && (
-              <span className="font-ja text-sm text-amber-700">未保存の変更があります</span>
-            )}
-          </div>
+        {generateState === "generating" && (
+          <InlineLoading message="本文の全訳をAIが生成しています…" />
         )}
-
-        <AnswerKeySectionsPanel sections={sections} onChange={setSections} />
-
-        <PrintLayoutSettingsPanel
-          documentLabel="解答・解説・全訳"
-          settings={settings}
-          onChange={setSettings}
-          onReset={reset}
-        />
+        {generateState === "error" && generateError && (
+          <p className="font-ja text-sm text-red-600">{generateError}</p>
+        )}
       </div>
 
-      {mode === "edit" ? (
-        <div className="page-content mx-auto max-w-4xl space-y-8 pb-12">
-          {questions.map((q) => {
-            const qUnits = draftUnits.filter((u) => u.questionId === q.id);
-            const passage = draft.passageByQuestion[q.id] ?? "";
-            const showPassage = questionShowsPassageTranslationField(q, passage);
-
-            return (
-              <Card key={q.id} className="space-y-5 p-5">
-                <h2 className="font-ja text-lg font-semibold text-slate-900">
-                  第{q.order}問
-                </h2>
-
-                {qUnits.map((unit) => (
-                  <div key={unit.key} className="space-y-2">
-                    {qUnits.length > 1 ? (
-                      <h3 className="font-ja text-sm font-semibold text-slate-700">
-                        {unitHeading(unit.order, unit.partLabel)}
-                      </h3>
-                    ) : null}
-                    <label className="font-ja text-sm font-medium text-slate-700">
-                      解答・解説
-                      {qUnits.length > 1 ? `（${unit.partLabel ?? ""}）` : ""}
-                    </label>
-                    <Textarea
-                      value={draft.bodyByKey[unit.key] ?? ""}
-                      onChange={(e) => updateBody(unit.key, e.target.value)}
-                      className="min-h-[180px] font-ja text-base leading-relaxed"
-                      rows={10}
-                    />
-                  </div>
-                ))}
-
-                {showPassage ? (
-                  <Card className="space-y-3 border-2 border-slate-200 bg-slate-50/70 p-5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <label className="font-ja text-sm font-semibold text-slate-800">
-                          本文の全訳（AI生成）
-                        </label>
-                        <p className="mt-1 font-ja text-xs text-slate-500">
-                          小問 (A)(B)(C) などの解答・解説の<strong>後</strong>に印刷される別枠です。長文は ¶1、¶2… 付き。
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="min-h-11 gap-2"
-                        disabled={generateState === "generating"}
-                        onClick={() => void runPassageTranslation([q.id], true)}
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        {generatingQuestionIds.includes(q.id) ? "生成中…" : "再生成"}
-                      </Button>
-                    </div>
-                    <Textarea
-                      value={passage}
-                      onChange={(e) => updatePassage(q.id, e.target.value)}
-                      className="min-h-[200px] border-slate-200 bg-white font-ja text-base leading-relaxed"
-                      rows={12}
-                      placeholder={
-                        generatingQuestionIds.includes(q.id)
-                          ? "AIが本文の全訳を生成しています…"
-                          : "未生成の場合は自動で生成されます"
-                      }
-                      readOnly={generatingQuestionIds.includes(q.id)}
-                    />
-                  </Card>
-                ) : null}
-              </Card>
-            );
-          })}
-        </div>
-      ) : (
-        <div ref={printRef} className="bg-slate-100 p-8 print:bg-white print:p-0">
-          <TeacherAnswerKeyPrintLayout
-            testTitle={test.title}
-            questions={previewQuestions}
-            units={draftUnits}
-            settings={settings}
-            sections={sections}
-            passageTranslations={draft.passageByQuestion}
-          />
-        </div>
-      )}
+      <ResizableSplit
+        storageKey="answer-key"
+        defaultRatio={0.5}
+        className="lg:flex-1"
+        left={editPane}
+        right={previewPane}
+      />
     </div>
   );
 }
