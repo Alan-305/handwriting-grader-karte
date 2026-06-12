@@ -396,29 +396,31 @@ export function PrintTestAnswerKeyPage() {
   );
 
   const previewPane = (
-    <div className="min-h-full bg-slate-100">
-      <div className="no-print sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur">
+    <div className="flex h-full min-h-0 flex-col bg-slate-100">
+      <div className="no-print shrink-0 border-b border-slate-200 bg-white px-4 py-2">
         <span className="font-ja text-sm font-medium text-slate-600">
           印刷プレビュー（編集内容が即時反映されます）
         </span>
       </div>
-      <ScaledPrintPreview className="p-4 pb-12 print:p-0">
-        <div ref={printRef}>
-          <TeacherAnswerKeyPrintLayout
-            testTitle={test.title}
-            questions={previewQuestions}
-            units={draftUnits}
-            settings={settings}
-            sections={sections}
-            passageTranslations={draft.passageByQuestion}
-          />
-        </div>
-      </ScaledPrintPreview>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+        <ScaledPrintPreview className="p-4 pb-8 print:p-0">
+          <div ref={printRef}>
+            <TeacherAnswerKeyPrintLayout
+              testTitle={test.title}
+              questions={previewQuestions}
+              units={draftUnits}
+              settings={settings}
+              sections={sections}
+              passageTranslations={draft.passageByQuestion}
+            />
+          </div>
+        </ScaledPrintPreview>
+      </div>
     </div>
   );
 
   return (
-    <div className="lg:flex lg:h-full lg:min-h-0 lg:flex-col">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden">
       <PageHeader
         title="解答・解説・全訳（教師用）"
         description={`${test.title} — 左で編集、右で印刷プレビュー（境界をドラッグで幅を調整）`}
@@ -483,7 +485,7 @@ export function PrintTestAnswerKeyPage() {
       <ResizableSplit
         storageKey="answer-key"
         defaultRatio={0.5}
-        className="lg:flex-1"
+        className="min-h-0 flex-1"
         left={editPane}
         right={previewPane}
       />

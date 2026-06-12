@@ -655,6 +655,16 @@ export function TestEditorPage() {
                   />
                 </div>
               </div>
+              <div>
+                <label className="font-ja text-sm font-medium text-slate-800">問題文</label>
+                <Textarea
+                  value={q.prompt}
+                  onChange={(e) => updateDraftQuestion(i, { prompt: e.target.value })}
+                  rows={6}
+                  className="mt-1"
+                />
+                <p className="mt-1 font-ja text-xs text-slate-500">{QUESTION_TEXT_HINT}</p>
+              </div>
               <div className="space-y-3 border-t border-slate-100 pt-3">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div className="space-y-1">
@@ -730,15 +740,6 @@ export function TestEditorPage() {
                   />
                 )}
               </div>
-              <div>
-                <label className="font-ja text-sm">問題文</label>
-                <Textarea
-                  value={q.prompt}
-                  onChange={(e) => updateDraftQuestion(i, { prompt: e.target.value })}
-                  rows={5}
-                />
-                <p className="mt-1 font-ja text-xs text-slate-500">{QUESTION_TEXT_HINT}</p>
-              </div>
               {!q.answerParts?.length && (
                 <div>
                   <label className="font-ja text-sm">模範解答</label>
@@ -782,8 +783,8 @@ export function TestEditorPage() {
   );
 
   const previewPane = (
-    <div className="no-print min-h-full bg-slate-100">
-      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur">
+    <div className="no-print flex h-full min-h-0 flex-col bg-slate-100">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
         <span className="mr-1 font-ja text-sm font-medium text-slate-600">印刷プレビュー</span>
         <Button
           type="button"
@@ -804,38 +805,40 @@ export function TestEditorPage() {
           解答・解説・全訳
         </Button>
       </div>
-      <ScaledPrintPreview className="p-4 pb-40">
-        {previewDoc === "paper" ? (
-          <TestPaperPrintLayout
-            testTitle={draftTitle || "テスト"}
-            totalPoints={previewTotalPoints}
-            questions={draftQuestions}
-            settings={paperPrintSettings.settings}
-          />
-        ) : (
-          <TeacherAnswerKeyPrintLayout
-            testTitle={draftTitle || "テスト"}
-            questions={previewQuestions}
-            units={previewUnits}
-            settings={answerKeyPrintSettings.settings}
-            sections={DEFAULT_ANSWER_KEY_PRINT_SECTIONS}
-            passageTranslations={draftTranslations}
-          />
-        )}
-      </ScaledPrintPreview>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+        <ScaledPrintPreview className="p-4 pb-8">
+          {previewDoc === "paper" ? (
+            <TestPaperPrintLayout
+              testTitle={draftTitle || "テスト"}
+              totalPoints={previewTotalPoints}
+              questions={draftQuestions}
+              settings={paperPrintSettings.settings}
+            />
+          ) : (
+            <TeacherAnswerKeyPrintLayout
+              testTitle={draftTitle || "テスト"}
+              questions={previewQuestions}
+              units={previewUnits}
+              settings={answerKeyPrintSettings.settings}
+              sections={DEFAULT_ANSWER_KEY_PRINT_SECTIONS}
+              passageTranslations={draftTranslations}
+            />
+          )}
+        </ScaledPrintPreview>
+      </div>
     </div>
   );
 
   return (
-    <div className="lg:flex lg:h-full lg:min-h-0 lg:flex-col">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden">
       <PageHeader
         title="問題エディタ"
-        description="左で編集、右で印刷プレビュー（境界をドラッグで幅を調整）"
+        description="左で編集、右で印刷プレビュー（それぞれ独立してスクロール・境界をドラッグで幅調整）"
       />
       <ResizableSplit
         storageKey="test-editor"
         defaultRatio={0.55}
-        className="lg:flex-1"
+        className="min-h-0 flex-1"
         left={editorPane}
         right={previewPane}
       />

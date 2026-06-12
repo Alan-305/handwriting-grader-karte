@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Archive,
   BookOpen,
@@ -58,8 +58,18 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
 
 const SIDEBAR_COLLAPSED_KEY = "app-sidebar-collapsed";
 
+/** 左右分割エディタ（各ペインが独立スクロール） */
+function isSplitEditorRoute(pathname: string): boolean {
+  return (
+    /^\/tests\/[^/]+$/.test(pathname) ||
+    /^\/tests\/[^/]+\/print\/answer-key$/.test(pathname)
+  );
+}
+
 export function AppShell() {
   const { logout, user } = useAuth();
+  const { pathname } = useLocation();
+  const splitEditor = isSplitEditorRoute(pathname);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -239,7 +249,14 @@ export function AppShell() {
         </aside>
       )}
 
-      <main className="main-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <main
+        className={cn(
+          "main-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden",
+          splitEditor
+            ? "lg:flex lg:flex-col lg:overflow-hidden"
+            : "overflow-y-auto",
+        )}
+      >
         <Outlet />
       </main>
 

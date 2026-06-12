@@ -70,19 +70,20 @@ export function ResizableSplit({
     setDragging(false);
   }, []);
 
+  const paneClass =
+    "min-w-0 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-y-contain";
+
   return (
     <div
       ref={containerRef}
       className={cn(
-        "lg:flex lg:min-h-0 lg:flex-row",
+        "lg:flex lg:min-h-0 lg:flex-row lg:overflow-hidden",
         dragging && "cursor-col-resize select-none",
         className,
       )}
       style={{ "--split-left": `${(ratio * 100).toFixed(2)}%` } as CSSProperties}
     >
-      <div className="min-w-0 lg:h-full lg:w-[var(--split-left)] lg:shrink-0 lg:overflow-y-auto">
-        {left}
-      </div>
+      <div className={cn(paneClass, "lg:w-[var(--split-left)] lg:shrink-0")}>{left}</div>
       <div
         role="separator"
         aria-orientation="vertical"
@@ -97,7 +98,7 @@ export function ResizableSplit({
       >
         <div className="h-10 w-1 rounded-full bg-slate-400" />
       </div>
-      <div className="min-w-0 lg:h-full lg:flex-1 lg:overflow-y-auto">{right}</div>
+      <div className={cn(paneClass, "lg:flex-1")}>{right}</div>
     </div>
   );
 }
