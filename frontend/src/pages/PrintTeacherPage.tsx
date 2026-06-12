@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Edit3, Printer } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
-import { ResizableSplit } from "@/components/layout/ResizableSplit";
+import { SyncPreviewSplit } from "@/components/layout/SyncPreviewSplit";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { GradingPrintControlsPanel } from "@/components/print/GradingPrintControlsPanel";
 import { GradingPrintQuestionEditor } from "@/components/print/GradingPrintQuestionEditor";
@@ -28,6 +28,7 @@ export function PrintTeacherPage() {
   const { saveArtifact } = useSavePrintArtifact(sessionId ?? "");
   const { getIdToken } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
+  const previewScrollRef = useRef<HTMLDivElement>(null);
   usePrintShortcut(printRef);
 
   const {
@@ -179,6 +180,7 @@ export function PrintTeacherPage() {
       title="印刷プレビュー"
       hint="チェックした項目のみ印刷・PDFに含まれます"
       printRef={printRef}
+      scrollRef={previewScrollRef}
     >
       <TeacherPrintLayout
         results={activeResults}
@@ -239,10 +241,11 @@ export function PrintTeacherPage() {
         )}
       </div>
 
-      <ResizableSplit
+      <SyncPreviewSplit
         storageKey="print-teacher"
         defaultRatio={0.5}
         className="min-h-0 flex-1"
+        previewScrollRef={previewScrollRef}
         left={editPane}
         right={previewPane}
       />

@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { PageHeader } from "@/components/layout/AppShell";
 import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
-import { ResizableSplit } from "@/components/layout/ResizableSplit";
+import { SyncPreviewSplit } from "@/components/layout/SyncPreviewSplit";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { PrintLayoutSettingsPanel } from "@/components/print/PrintLayoutSettingsPanel";
 import { ScaledPrintPreview } from "@/components/print/ScaledPrintPreview";
@@ -23,6 +23,11 @@ import {
   type AnswerKeyPrintSections,
 } from "@/components/print/TeacherAnswerKeyPrintLayout";
 import { Button } from "@/components/ui/button";
+import {
+  questionAnchor,
+  questionPassageAnchor,
+  questionUnitAnchor,
+} from "@/lib/preview-anchor";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
@@ -110,6 +115,7 @@ export function PrintTestAnswerKeyPage() {
   const layoutKey = testId ? `${testId}-answer-key` : "answer-key";
   const { settings, setSettings, reset } = usePrintLayoutSettings(layoutKey);
   const printRef = useRef<HTMLDivElement>(null);
+  const previewScrollRef = useRef<HTMLDivElement>(null);
   usePrintShortcut(printRef);
 
   useEffect(() => {
@@ -339,7 +345,7 @@ export function PrintTestAnswerKeyPage() {
             title={`第${q.order}問`}
             defaultOpen={qi === 0}
           >
-            <div className="space-y-5">
+            <div className="space-y-5" data-preview-anchor={questionAnchor(q.id)}>
             {qUnits.map((unit) => (
               <div key={unit.key} className="space-y-2">
                 {qUnits.length > 1 ? (
@@ -356,6 +362,7 @@ export function PrintTestAnswerKeyPage() {
                   onChange={(e) => updateBody(unit.key, e.target.value)}
                   className="min-h-[180px] font-ja text-base leading-relaxed"
                   rows={10}
+                  data-preview-anchor={questionUnitAnchor(q.id, unit.key)}
                 />
               </div>
             ))}
@@ -394,6 +401,7 @@ export function PrintTestAnswerKeyPage() {
                       : "未生成の場合は自動で生成されます"
                   }
                   readOnly={generatingQuestionIds.includes(q.id)}
+                  data-preview-anchor={questionPassageAnchor(q.id)}
                 />
               </Card>
             ) : null}
@@ -411,7 +419,10 @@ export function PrintTestAnswerKeyPage() {
           印刷プレビュー（編集内容が即時反映されます）
         </span>
       </div>
-      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-y-contain">
+      <div
+        ref={previewScrollRef}
+        className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-y-contain"
+      >
         <ScaledPrintPreview className="box-border p-4 pb-8 print:p-0">
           <div ref={printRef}>
             <TeacherAnswerKeyPrintLayout
@@ -491,10 +502,11 @@ export function PrintTestAnswerKeyPage() {
         )}
       </div>
 
-      <ResizableSplit
+      <SyncPreviewSplit
         storageKey="answer-key"
         defaultRatio={0.5}
         className="min-h-0 flex-1"
+        previewScrollRef={previewScrollRef}
         left={editPane}
         right={previewPane}
       />

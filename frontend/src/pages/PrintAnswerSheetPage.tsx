@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
 import { PageHeader } from "@/components/layout/AppShell";
-import { ResizableSplit } from "@/components/layout/ResizableSplit";
+import { SyncPreviewSplit } from "@/components/layout/SyncPreviewSplit";
 import { AnswerSheetPrintLayout } from "@/components/print/AnswerSheetPrintLayout";
 import { PrintLayoutSettingsPanel } from "@/components/print/PrintLayoutSettingsPanel";
 import { PrintPreviewPane } from "@/components/print/PrintPreviewPane";
@@ -19,9 +19,11 @@ export function PrintAnswerSheetPage() {
   const { testId } = useParams<{ testId: string }>();
   const [test, setTest] = useState<Test | null>(null);
   const [slots, setSlots] = useState<LayoutSlot[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const { settings, setSettings, reset } = usePrintLayoutSettings(testId);
   const printRef = useRef<HTMLDivElement>(null);
+  const previewScrollRef = useRef<HTMLDivElement>(null);
   usePrintShortcut(printRef);
 
   useEffect(() => {
@@ -46,8 +48,9 @@ export function PrintAnswerSheetPage() {
       const qSnap = await getDocs(
         query(collection(getDb(), "tests", testId, "questions"), orderBy("order")),
       );
-      const questions = qSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Question);
-      const layout = generateAnswerSheetLayout(questions);
+      const loaded = qSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Question);
+      setQuestions(loaded);
+      const layout = generateAnswerSheetLayout(loaded);
       setSlots(layout.slots);
       setLoading(false);
     })();
@@ -80,8 +83,13 @@ export function PrintAnswerSheetPage() {
   );
 
   const previewPane = (
-    <PrintPreviewPane title="印刷プレビュー" printRef={printRef}>
-      <AnswerSheetPrintLayout testTitle={test.title} slots={slots} settings={settings} />
+    <PrintPreviewPane title="印刷プレビュー" printRef={printRef} scrollRef={previewScrollRef}>
+      <AnswerSheetPrintLayout
+        testTitle={test.title}
+        slots={slots}
+        settings={settings}
+        questionIdByOrder={Object.fromEntries(questions.map((q) => [q.order, q.id]))}
+      />
     </PrintPreviewPane>
   );
 
@@ -109,10 +117,12 @@ export function PrintAnswerSheetPage() {
         </div>
       </div>
 
-      <ResizableSplit
+      <SyncPreviewSplit
         storageKey="print-answer-sheet"
         defaultRatio={0.38}
         className="min-h-0 flex-1"
+        previewScrollRef={previewScrollRef}
+        syncEnabled={false}
         left={settingsPane}
         right={previewPane}
       />

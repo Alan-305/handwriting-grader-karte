@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
 import { PageHeader } from "@/components/layout/AppShell";
-import { ResizableSplit } from "@/components/layout/ResizableSplit";
+import { SyncPreviewSplit } from "@/components/layout/SyncPreviewSplit";
 import { PrintLayoutSettingsPanel } from "@/components/print/PrintLayoutSettingsPanel";
 import { PrintPreviewPane } from "@/components/print/PrintPreviewPane";
 import { TestPaperPrintLayout } from "@/components/print/TestPaperPrintLayout";
@@ -20,6 +20,7 @@ export function PrintTestPaperPage() {
   const [loading, setLoading] = useState(true);
   const { settings, setSettings, reset } = usePrintLayoutSettings(testId);
   const printRef = useRef<HTMLDivElement>(null);
+  const previewScrollRef = useRef<HTMLDivElement>(null);
   usePrintShortcut(printRef);
 
   useEffect(() => {
@@ -75,7 +76,7 @@ export function PrintTestPaperPage() {
   );
 
   const previewPane = (
-    <PrintPreviewPane title="印刷プレビュー" printRef={printRef}>
+    <PrintPreviewPane title="印刷プレビュー" printRef={printRef} scrollRef={previewScrollRef}>
       <TestPaperPrintLayout
         testTitle={test.title}
         totalPoints={test.totalPoints}
@@ -109,10 +110,12 @@ export function PrintTestPaperPage() {
         </div>
       </div>
 
-      <ResizableSplit
+      <SyncPreviewSplit
         storageKey="print-test-paper"
         defaultRatio={0.38}
         className="min-h-0 flex-1"
+        previewScrollRef={previewScrollRef}
+        syncEnabled={false}
         left={settingsPane}
         right={previewPane}
       />

@@ -6,6 +6,7 @@ import {
   resolveFormatOptions,
 } from "@/lib/answer-format";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { questionUnitAnchor } from "@/lib/preview-anchor";
 import { NO_MODEL_ANSWER_HINT, resolveGradingMode } from "@/lib/grading-mode";
 import type { AnswerFormatOptions, AnswerPart, AnswerSheetFormat, Question } from "@/types/firestore";
 
@@ -236,13 +237,15 @@ export function AnswerPartFormatFields({
 
 export function AnswerPartCard({
   part,
+  partIndex,
   question,
   canRemove,
   onChange,
   onRemove,
 }: {
   part: AnswerPart;
-  question: Pick<Question, "modelAnswer" | "gradingMode">;
+  partIndex: number;
+  question: Pick<Question, "id" | "modelAnswer" | "gradingMode">;
   canRemove: boolean;
   onChange: (patch: Partial<AnswerPart>) => void;
   onRemove: () => void;
@@ -283,6 +286,7 @@ export function AnswerPartCard({
           className="font-en mt-1"
           rows={2}
           placeholder="空欄のままでも可（自由英作文など）"
+          data-preview-anchor={questionUnitAnchor(question.id, `${question.id}-${partIndex}`)}
         />
         {resolveGradingMode(question, part) === "no_model" && (
           <p className="mt-1 font-ja text-xs text-blue-700">{NO_MODEL_ANSWER_HINT}</p>

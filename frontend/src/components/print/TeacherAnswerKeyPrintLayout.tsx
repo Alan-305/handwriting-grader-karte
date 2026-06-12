@@ -1,4 +1,10 @@
+import { PreviewAnchor } from "@/components/print/PreviewAnchor";
 import { PrintFlowDocument } from "@/components/print/PrintA4Page";
+import {
+  questionAnchor,
+  questionPassageAnchor,
+  questionUnitAnchor,
+} from "@/lib/preview-anchor";
 import { QuestionPromptBlock } from "@/lib/question-text-format";
 import {
   printLayoutDocumentStyle,
@@ -112,8 +118,9 @@ export function TeacherAnswerKeyPrintLayout({
         const applyGap = shouldApplyQuestionGap(questionIndex, settings.sectionMode);
 
         return (
-          <div
+          <PreviewAnchor
             key={question.id}
+            anchor={questionAnchor(question.id)}
             className={[
               "print-question-wrap print-question-block",
               breakBefore ? "print-break-before-page" : "",
@@ -138,7 +145,7 @@ export function TeacherAnswerKeyPrintLayout({
                 if (!unitHasContent && hasMultipleParts) return null;
 
                 return (
-                  <div key={unit.key} className="space-y-4">
+                  <PreviewAnchor key={unit.key} anchor={questionUnitAnchor(question.id, unit.key)} className="space-y-4">
                     {hasMultipleParts ? (
                       <h3 className="font-ja text-base font-semibold text-slate-800">
                         {unitHeading(unit.order, unit.partLabel)}
@@ -161,23 +168,26 @@ export function TeacherAnswerKeyPrintLayout({
                     {!unit.modelAnswer.trim() && !hasMultipleParts ? (
                       <p className="font-ja text-sm text-slate-400">（模範解答未入力）</p>
                     ) : null}
-                  </div>
+                  </PreviewAnchor>
                 );
               })}
 
               {showPassageTranslation ? (
-                <div className="print-break-avoid mt-2 rounded-lg border-2 border-slate-300 bg-slate-50/80 p-5 print:border-black/30 print:bg-transparent">
+                <PreviewAnchor
+                  anchor={questionPassageAnchor(question.id)}
+                  className="print-break-avoid mt-2 rounded-lg border-2 border-slate-300 bg-slate-50/80 p-5 print:border-black/30 print:bg-transparent"
+                >
                   <SectionBlock title={translationTitle}>
                     <p className="whitespace-pre-wrap font-ja">{storedTranslation}</p>
                   </SectionBlock>
-                </div>
+                </PreviewAnchor>
               ) : null}
 
               {questionHasEnglishPassage(question) && !storedTranslation ? (
                 <p className="font-ja text-sm text-slate-400">（本文の全訳未入力）</p>
               ) : null}
             </section>
-          </div>
+          </PreviewAnchor>
         );
       })}
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, Edit3, Printer, RefreshCw } from "lucide-react";
 import { doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
-import { ResizableSplit } from "@/components/layout/ResizableSplit";
+import { SyncPreviewSplit } from "@/components/layout/SyncPreviewSplit";
 import { PrintPreviewPane } from "@/components/print/PrintPreviewPane";
 import { PastExamAdviceEditor } from "@/components/sessions/PastExamAdviceEditor";
 import { PastExamAdvicePrintControlsPanel } from "@/components/sessions/PastExamAdvicePrintControlsPanel";
@@ -28,6 +28,7 @@ interface PastExamAdvicePanelProps {
 export function PastExamAdvicePanel({ sessionId, initialAdvice }: PastExamAdvicePanelProps) {
   const { getIdToken } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
+  const previewScrollRef = useRef<HTMLDivElement>(null);
   const { session } = useSession(sessionId);
   const studentSessions = useSessionsForStudent(session?.studentId);
   const [studentName, setStudentName] = useState("");
@@ -200,10 +201,11 @@ export function PastExamAdvicePanel({ sessionId, initialAdvice }: PastExamAdvice
             </div>
           )}
 
-          <ResizableSplit
+          <SyncPreviewSplit
             storageKey="past-exam-advice"
             defaultRatio={0.5}
             className="min-h-[32rem] lg:min-h-0 lg:flex-1"
+            previewScrollRef={previewScrollRef}
             left={
               <div className="space-y-4 p-4 pb-8">
                 <PastExamAdvicePrintControlsPanel
@@ -240,6 +242,7 @@ export function PastExamAdvicePanel({ sessionId, initialAdvice }: PastExamAdvice
                 title="印刷プレビュー"
                 hint="チェックした項目のみ印刷・PDFに含まれます"
                 printRef={printRef}
+                scrollRef={previewScrollRef}
               >
                 <PastExamAdvicePrintLayout
                   advice={advice}

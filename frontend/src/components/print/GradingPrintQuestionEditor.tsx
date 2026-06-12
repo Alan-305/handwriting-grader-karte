@@ -5,6 +5,7 @@ import {
   modelAnswerForPrint,
   studentAnswerForPrint,
 } from "@/lib/question-results";
+import { resultAnchor } from "@/lib/preview-anchor";
 import type { GradeLevel, QuestionResult } from "@/types/firestore";
 
 const GRADES: GradeLevel[] = ["優", "良", "不可"];
@@ -35,6 +36,7 @@ export function GradingPrintQuestionEditor({
   const isComposition = Boolean(
     result.contentEvaluation || result.grammarEvaluation || result.polishedAnswer,
   );
+  const anchor = resultAnchor(result.id);
 
   return (
     <CollapsiblePanel
@@ -95,6 +97,7 @@ export function GradingPrintQuestionEditor({
             rows={2}
             value={studentText}
             onChange={(e) => onChange({ studentAnswerText: e.target.value })}
+            data-preview-anchor={anchor}
           />
         </div>
 
@@ -105,6 +108,7 @@ export function GradingPrintQuestionEditor({
             rows={2}
             value={result.feedback ?? ""}
             onChange={(e) => onChange({ feedback: e.target.value })}
+            data-preview-anchor={anchor}
           />
         </div>
 
@@ -117,6 +121,7 @@ export function GradingPrintQuestionEditor({
                 rows={3}
                 value={result.teacherNotes ?? ""}
                 onChange={(e) => onChange({ teacherNotes: e.target.value })}
+                data-preview-anchor={anchor}
               />
             </div>
             <div>
@@ -132,6 +137,7 @@ export function GradingPrintQuestionEditor({
                       .filter(Boolean),
                   })
                 }
+                data-preview-anchor={anchor}
               />
             </div>
           </>
@@ -146,6 +152,7 @@ export function GradingPrintQuestionEditor({
                 rows={3}
                 value={result.contentEvaluation ?? ""}
                 onChange={(e) => onChange({ contentEvaluation: e.target.value })}
+                data-preview-anchor={anchor}
               />
             </div>
             <div>
@@ -155,6 +162,7 @@ export function GradingPrintQuestionEditor({
                 rows={3}
                 value={result.grammarEvaluation ?? ""}
                 onChange={(e) => onChange({ grammarEvaluation: e.target.value })}
+                data-preview-anchor={anchor}
               />
             </div>
             <div>
@@ -164,6 +172,7 @@ export function GradingPrintQuestionEditor({
                 rows={3}
                 value={result.polishedAnswer ?? ""}
                 onChange={(e) => onChange({ polishedAnswer: e.target.value })}
+                data-preview-anchor={anchor}
               />
             </div>
           </>
@@ -175,6 +184,7 @@ export function GradingPrintQuestionEditor({
               rows={4}
               value={result.explanation ?? ""}
               onChange={(e) => onChange({ explanation: e.target.value })}
+              data-preview-anchor={anchor}
             />
           </div>
         )}
@@ -186,6 +196,7 @@ export function GradingPrintQuestionEditor({
             rows={2}
             value={modelText}
             onChange={(e) => onChange({ modelAnswer: e.target.value })}
+            data-preview-anchor={anchor}
           />
         </div>
       </div>

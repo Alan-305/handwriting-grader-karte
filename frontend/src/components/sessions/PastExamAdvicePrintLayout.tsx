@@ -1,4 +1,11 @@
+import { PreviewAnchor } from "@/components/print/PreviewAnchor";
 import { PrintFlowDocument } from "@/components/print/PrintA4Page";
+import {
+  adviceCardAnchor,
+  adviceQuestionAnchor,
+  adviceReadinessAnchor,
+  adviceSummaryAnchor,
+} from "@/lib/preview-anchor";
 import {
   adviceSectionOn,
   gradingPrintDocumentStyle,
@@ -56,21 +63,21 @@ export function PastExamAdvicePrintLayout({
       </header>
 
       {adviceSectionOn(sections, "overallSummary") && advice.overallSummary ? (
-        <section className="grading-print-block space-y-2">
+        <PreviewAnchor anchor={adviceSummaryAnchor()} as="section" className="grading-print-block space-y-2">
           <h2 className="font-ja text-sm font-semibold text-slate-800">総評</h2>
           <p className="text-explanation whitespace-pre-line font-ja text-slate-700">
             {advice.overallSummary}
           </p>
-        </section>
+        </PreviewAnchor>
       ) : null}
 
       {adviceSectionOn(sections, "readinessVsExam") && advice.readinessVsExam ? (
-        <section className="grading-print-block space-y-2">
+        <PreviewAnchor anchor={adviceReadinessAnchor()} as="section" className="grading-print-block space-y-2">
           <h2 className="font-ja text-sm font-semibold text-slate-800">受験準備度</h2>
           <p className="text-explanation whitespace-pre-line font-ja text-slate-600">
             {advice.readinessVsExam}
           </p>
-        </section>
+        </PreviewAnchor>
       ) : null}
 
       {insights.length > 0
@@ -80,8 +87,9 @@ export function PastExamAdvicePrintLayout({
           shouldApplyQuestionGap(index, layout.sectionMode) ? "print-question-gap" : "";
 
         return (
-          <div
+          <PreviewAnchor
             key={item.questionOrder}
+            anchor={adviceQuestionAnchor(item.questionOrder)}
             className={`print-question-wrap print-question-block ${gapClass} ${breakBefore ? "print-break-before-page" : ""}`}
           >
             <section className="grading-print-question space-y-3 border-b border-slate-100 pb-6 print:border-black/20">
@@ -125,7 +133,7 @@ export function PastExamAdvicePrintLayout({
                 </p>
               ) : null}
             </section>
-          </div>
+          </PreviewAnchor>
         );
       })
         : null}
@@ -146,9 +154,10 @@ export function PastExamAdvicePrintLayout({
         <section className="grading-print-block space-y-3">
           <h2 className="font-ja text-sm font-semibold text-slate-800">アドバイスカード</h2>
           <div className="space-y-3">
-            {advice.adviceCards.map((card) => (
-              <div
+            {advice.adviceCards.map((card, cardIndex) => (
+              <PreviewAnchor
                 key={card.title}
+                anchor={adviceCardAnchor(cardIndex)}
                 className="rounded-lg border border-slate-200 p-4 print:border-black/20"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -158,7 +167,7 @@ export function PastExamAdvicePrintLayout({
                   </span>
                 </div>
                 <p className="text-explanation mt-2 font-ja text-slate-700">{card.body}</p>
-              </div>
+              </PreviewAnchor>
             ))}
           </div>
         </section>

@@ -1,10 +1,12 @@
 import { groupLayoutSlots, type LayoutSlot } from "@/lib/answer-sheet-layout";
+import { PreviewAnchor } from "@/components/print/PreviewAnchor";
 import {
   printLayoutDocumentStyle,
   shouldApplyQuestionGap,
   shouldBreakBeforeQuestion,
   type PrintLayoutSettings,
 } from "@/lib/print-layout-settings";
+import { questionAnchor, questionOrderAnchor } from "@/lib/preview-anchor";
 import { DEFAULT_OPTIONS } from "@/lib/answer-format";
 import { AnswerField } from "@/components/print/AnswerField";
 import { PrintFixedCornerMarks, PrintFlowDocument } from "@/components/print/PrintA4Page";
@@ -114,10 +116,13 @@ export function AnswerSheetPrintLayout({
   testTitle,
   slots,
   settings,
+  questionIdByOrder,
 }: {
   testTitle: string;
   slots: LayoutSlot[];
   settings: PrintLayoutSettings;
+  /** 設問 order → Firestore id（プレビュー連動用） */
+  questionIdByOrder?: Record<number, string>;
 }) {
   const groups = groupLayoutSlots(slots);
 
@@ -143,9 +148,14 @@ export function AnswerSheetPrintLayout({
         const applyGap = shouldApplyQuestionGap(index, settings.sectionMode);
         const isLast = index === groups.length - 1;
 
+        const syncAnchor = questionIdByOrder?.[order]
+          ? questionAnchor(questionIdByOrder[order])
+          : questionOrderAnchor(order);
+
         return (
-          <div
+          <PreviewAnchor
             key={order}
+            anchor={syncAnchor}
             className={[
               "print-question-wrap",
               breakBefore ? "print-break-before-page" : "",
@@ -155,7 +165,7 @@ export function AnswerSheetPrintLayout({
               .join(" ")}
           >
             <AnswerQuestionSection order={order} parts={parts} showEndMarker={isLast} />
-          </div>
+          </PreviewAnchor>
         );
       })}
     </PrintFlowDocument>

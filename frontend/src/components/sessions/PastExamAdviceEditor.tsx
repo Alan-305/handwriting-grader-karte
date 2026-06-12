@@ -1,6 +1,11 @@
 import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  adviceCardAnchor,
+  adviceReadinessAnchor,
+  adviceSummaryAnchor,
+} from "@/lib/preview-anchor";
 import type { SessionPastExamAdvice } from "@/types/past-exam-advice";
 import type { AdviceCard } from "@/types/firestore";
 
@@ -35,6 +40,7 @@ export function PastExamAdviceEditor({
               rows={4}
               value={advice.overallSummary}
               onChange={(e) => patch({ overallSummary: e.target.value })}
+              data-preview-anchor={adviceSummaryAnchor()}
             />
           </div>
           <div>
@@ -44,6 +50,7 @@ export function PastExamAdviceEditor({
               rows={3}
               value={advice.readinessVsExam}
               onChange={(e) => patch({ readinessVsExam: e.target.value })}
+              data-preview-anchor={adviceReadinessAnchor()}
             />
           </div>
         </div>
@@ -63,6 +70,7 @@ export function PastExamAdviceEditor({
                 className="mt-1 font-ja"
                 value={card.title}
                 onChange={(e) => patchCard(index, { title: e.target.value })}
+                data-preview-anchor={adviceCardAnchor(index)}
               />
             </div>
             <div>
@@ -72,6 +80,7 @@ export function PastExamAdviceEditor({
                 rows={2}
                 value={card.body}
                 onChange={(e) => patchCard(index, { body: e.target.value })}
+                data-preview-anchor={adviceCardAnchor(index)}
               />
             </div>
           </div>

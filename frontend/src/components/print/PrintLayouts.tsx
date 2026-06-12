@@ -3,7 +3,9 @@ import { GradeBadge } from "@/components/grading/GradeBadge";
 import { TtsButton } from "@/components/grading/ModelAnswerPanel";
 import type { GradeLevel, QuestionResult } from "@/types/firestore";
 import { CompositionFeedbackSections } from "@/components/grading/CompositionFeedbackSections";
+import { PreviewAnchor } from "@/components/print/PreviewAnchor";
 import { PrintFlowDocument } from "@/components/print/PrintA4Page";
+import { resultAnchor } from "@/lib/preview-anchor";
 import {
   gradingPrintDocumentStyle,
   isQuestionIncluded,
@@ -102,8 +104,9 @@ export function StudentPrintLayout({
           shouldApplyQuestionGap(index, layout.sectionMode) ? "print-question-gap" : "";
 
         return (
-          <div
+          <PreviewAnchor
             key={r.id}
+            anchor={resultAnchor(r.id)}
             className={`print-question-wrap print-question-block ${gapClass} ${breakBefore ? "print-break-before-page" : ""}`}
           >
             <section className="grading-print-question space-y-4 border-b border-slate-100 pb-8 print:border-black/20">
@@ -180,7 +183,7 @@ export function StudentPrintLayout({
                 </p>
               )}
             </section>
-          </div>
+          </PreviewAnchor>
         );
       })}
     </PrintFlowDocument>
@@ -221,8 +224,9 @@ export function TeacherPrintLayout({
           shouldApplyQuestionGap(index, layout.sectionMode) ? "print-question-gap" : "";
 
         return (
-          <div
+          <PreviewAnchor
             key={r.id}
+            anchor={resultAnchor(r.id)}
             className={`print-question-wrap print-question-block ${gapClass} ${breakBefore ? "print-break-before-page" : ""}`}
           >
             <section className="grading-print-question space-y-3 border-b border-slate-100 pb-6 print:border-black/20">
@@ -292,7 +296,7 @@ export function TeacherPrintLayout({
                 </div>
               ) : null}
             </section>
-          </div>
+          </PreviewAnchor>
         );
       })}
     </PrintFlowDocument>

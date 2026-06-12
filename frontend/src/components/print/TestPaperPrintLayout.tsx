@@ -5,7 +5,9 @@ import {
   shouldBreakBeforeQuestion,
   type PrintLayoutSettings,
 } from "@/lib/print-layout-settings";
+import { PreviewAnchor } from "@/components/print/PreviewAnchor";
 import { PrintFlowDocument } from "@/components/print/PrintA4Page";
+import { questionAnchor, questionPromptAnchor } from "@/lib/preview-anchor";
 import type { Question } from "@/types/firestore";
 
 function QuestionSection({
@@ -14,18 +16,20 @@ function QuestionSection({
   question: Question;
 }) {
   return (
-    <section className="print-question-block print-question-block--split-ok">
+    <PreviewAnchor anchor={questionAnchor(q.id)} as="section" className="print-question-block print-question-block--split-ok">
       <div className="print-break-avoid mb-3 flex items-baseline justify-between gap-4 border-b border-slate-300 pb-1">
         <h2 className="font-ja text-lg font-semibold">第{q.order}問</h2>
         <span className="shrink-0 font-ja text-sm text-slate-700">{q.points}点</span>
       </div>
 
-      {q.prompt ? (
-        <QuestionPromptBlock prompt={q.prompt} />
-      ) : (
-        <p className="font-ja text-sm text-slate-400">（問題文未入力）</p>
-      )}
-    </section>
+      <PreviewAnchor anchor={questionPromptAnchor(q.id)}>
+        {q.prompt ? (
+          <QuestionPromptBlock prompt={q.prompt} />
+        ) : (
+          <p className="font-ja text-sm text-slate-400">（問題文未入力）</p>
+        )}
+      </PreviewAnchor>
+    </PreviewAnchor>
   );
 }
 

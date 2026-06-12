@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   addDoc,
@@ -16,7 +16,7 @@ import {
 import { Check, FileText, Printer, Save } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
-import { ResizableSplit } from "@/components/layout/ResizableSplit";
+import { SyncPreviewSplit } from "@/components/layout/SyncPreviewSplit";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { ScaledPrintPreview } from "@/components/print/ScaledPrintPreview";
 import {
@@ -32,6 +32,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { confirmDeleteTarget } from "@/lib/confirm-delete";
+import {
+  questionAnchor,
+  questionPassageAnchor,
+  questionPromptAnchor,
+  questionUnitAnchor,
+} from "@/lib/preview-anchor";
 import { generateAnswerSheetLayout } from "@/lib/answer-sheet-layout";
 import {
   addAnswerPart,
@@ -111,6 +117,7 @@ export function TestEditorPage() {
   const [selectedQ, setSelectedQ] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<"paper" | "answer_sheet" | "answer_key">("paper");
+  const previewScrollRef = useRef<HTMLDivElement>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState("");
   const paperPrintSettings = usePrintLayoutSettings(testId);
@@ -638,7 +645,7 @@ export function TestEditorPage() {
                 </>
               }
             >
-              <div className="space-y-3">
+              <div className="space-y-3" data-preview-anchor={questionAnchor(q.id)}>
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
                   <label className="font-ja text-sm">添削タイプ</label>
@@ -678,6 +685,7 @@ export function TestEditorPage() {
                   onChange={(e) => updateDraftQuestion(i, { prompt: e.target.value })}
                   rows={6}
                   className="mt-1"
+                  data-preview-anchor={questionPromptAnchor(q.id)}
                 />
                 <p className="mt-1 font-ja text-xs text-slate-500">{QUESTION_TEXT_HINT}</p>
               </div>
@@ -721,6 +729,7 @@ export function TestEditorPage() {
                       <AnswerPartCard
                         key={`${q.id}-${partIndex}`}
                         part={part}
+                        partIndex={partIndex}
                         question={q}
                         canRemove
                         onChange={(patch) =>
@@ -765,6 +774,7 @@ export function TestEditorPage() {
                     className="font-en"
                     rows={3}
                     placeholder="自由英作文など模範解答がない場合は空欄のままで構いません"
+                    data-preview-anchor={questionUnitAnchor(q.id, q.id)}
                   />
                   {resolveGradingMode(q) === "no_model" ? (
                     <p className="mt-1 font-ja text-xs text-blue-700">{NO_MODEL_ANSWER_HINT}</p>
@@ -789,6 +799,7 @@ export function TestEditorPage() {
                     className="mt-2 font-ja"
                     rows={5}
                     placeholder="（任意）「解答・解説・全訳」画面で AI に自動生成させることもできます"
+                    data-preview-anchor={questionPassageAnchor(q.id)}
                   />
                 </div>
               )}
@@ -832,7 +843,10 @@ export function TestEditorPage() {
           解答・解説・全訳
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-y-contain">
+      <div
+        ref={previewScrollRef}
+        className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-y-contain"
+      >
         <ScaledPrintPreview className="box-border p-4 pb-8">
           {previewDoc === "paper" ? (
             <TestPaperPrintLayout
@@ -846,6 +860,9 @@ export function TestEditorPage() {
               testTitle={draftTitle || "テスト"}
               slots={answerSheetSlots}
               settings={paperPrintSettings.settings}
+              questionIdByOrder={Object.fromEntries(
+                draftQuestions.map((q) => [q.order, q.id]),
+              )}
             />
           ) : (
             <TeacherAnswerKeyPrintLayout
@@ -868,10 +885,11 @@ export function TestEditorPage() {
         title="問題エディタ"
         description="左で編集、右で印刷プレビュー（それぞれ独立してスクロール・境界をドラッグで幅調整）"
       />
-      <ResizableSplit
+      <SyncPreviewSplit
         storageKey="test-editor"
         defaultRatio={0.55}
         className="min-h-0 flex-1"
+        previewScrollRef={previewScrollRef}
         left={editorPane}
         right={previewPane}
       />
