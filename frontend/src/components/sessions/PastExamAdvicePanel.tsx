@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, Edit3, Printer, RefreshCw } from "lucide-react";
 import { doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
+import { ResizableSplit } from "@/components/layout/ResizableSplit";
+import { PrintPreviewPane } from "@/components/print/PrintPreviewPane";
 import { PastExamAdviceEditor } from "@/components/sessions/PastExamAdviceEditor";
 import { PastExamAdvicePrintControlsPanel } from "@/components/sessions/PastExamAdvicePrintControlsPanel";
 import { PastExamAdvicePrintLayout } from "@/components/sessions/PastExamAdvicePrintLayout";
@@ -175,64 +177,82 @@ export function PastExamAdvicePanel({ sessionId, initialAdvice }: PastExamAdvice
       </Card>
 
       {advice && (
-        <>
-          <PastExamAdvicePrintControlsPanel
-            prefs={prefs}
-            onSectionsChange={setSections}
-            onLayoutChange={setLayout}
-            onResetLayout={resetLayout}
-            onResetSections={resetSections}
-            templates={templates}
-            onSaveTemplate={saveTemplate}
-            onApplyTemplate={applyTemplate}
-            onDeleteTemplate={deleteTemplate}
-          />
-
+        <div className="no-print lg:min-h-[calc(100dvh-14rem)] lg:overflow-hidden">
           {editMode && (
-            <>
-              <Card className="no-print border-blue-100 bg-blue-50/40 p-4">
-                <p className="font-ja text-sm leading-relaxed text-slate-700">
-                  総評・各大問の解説・面談要点などを<strong>直接編集</strong>できます。下のプレビューに反映されます。
-                </p>
-              </Card>
-              <div className="no-print flex flex-wrap gap-2">
-                <Button
-                  className="min-h-11"
-                  variant="outline"
-                  onClick={() => void handleSave()}
-                  disabled={saveState === "saving" || !isDirty}
-                >
-                  修正を保存
-                </Button>
-              </div>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Button
+                className="min-h-11"
+                variant="outline"
+                onClick={() => void handleSave()}
+                disabled={saveState === "saving" || !isDirty}
+              >
+                修正を保存
+              </Button>
               {saveState === "saving" && <InlineLoading message="保存中..." />}
               {saveState === "saved" && (
-                <p className="no-print font-ja text-sm text-green-700">保存しました</p>
+                <span className="font-ja text-sm text-green-700">保存しました</span>
               )}
               {saveState === "error" && (
-                <p className="no-print font-ja text-sm text-red-600">
+                <span className="font-ja text-sm text-red-600">
                   {saveError || "保存に失敗しました"}
-                </p>
+                </span>
               )}
-              <PastExamAdviceEditor advice={advice} onChange={setAdvice} />
-            </>
+            </div>
           )}
 
-          <p className="no-print font-ja text-sm text-slate-500">
-            下のプレビューが印刷・PDFの内容です（チェックした項目のみ）。
-          </p>
-
-          <div ref={printRef} className="bg-slate-100 p-8 print:bg-white print:p-0">
-            <PastExamAdvicePrintLayout
-              advice={advice}
-              studentName={studentName}
-              sessionNumber={sessionNumber}
-              sections={prefs.sections}
-              layout={prefs.layout}
-              includedQuestions={prefs.includedQuestions}
-            />
-          </div>
-        </>
+          <ResizableSplit
+            storageKey="past-exam-advice"
+            defaultRatio={0.5}
+            className="min-h-[32rem] lg:min-h-0 lg:flex-1"
+            left={
+              <div className="space-y-4 p-4 pb-8">
+                <PastExamAdvicePrintControlsPanel
+                  prefs={prefs}
+                  onSectionsChange={setSections}
+                  onLayoutChange={setLayout}
+                  onResetLayout={resetLayout}
+                  onResetSections={resetSections}
+                  templates={templates}
+                  onSaveTemplate={saveTemplate}
+                  onApplyTemplate={applyTemplate}
+                  onDeleteTemplate={deleteTemplate}
+                />
+                {editMode ? (
+                  <>
+                    <Card className="border-blue-100 bg-blue-50/40 p-4">
+                      <p className="font-ja text-sm leading-relaxed text-slate-700">
+                        総評・各大問の解説・面談要点などを<strong>直接編集</strong>できます。右のプレビューに反映されます。
+                      </p>
+                    </Card>
+                    <PastExamAdviceEditor advice={advice} onChange={setAdvice} />
+                  </>
+                ) : (
+                  <Card className="border-slate-200 bg-slate-50 p-4">
+                    <p className="font-ja text-sm leading-relaxed text-slate-700">
+                      プレビュー専用モードです。「文言を編集」で左ペインの編集欄を表示できます。
+                    </p>
+                  </Card>
+                )}
+              </div>
+            }
+            right={
+              <PrintPreviewPane
+                title="印刷プレビュー"
+                hint="チェックした項目のみ印刷・PDFに含まれます"
+                printRef={printRef}
+              >
+                <PastExamAdvicePrintLayout
+                  advice={advice}
+                  studentName={studentName}
+                  sessionNumber={sessionNumber}
+                  sections={prefs.sections}
+                  layout={prefs.layout}
+                  includedQuestions={prefs.includedQuestions}
+                />
+              </PrintPreviewPane>
+            }
+          />
+        </div>
       )}
     </div>
   );

@@ -3,9 +3,11 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { doc, onSnapshot } from "firebase/firestore";
 import { Check, Edit3, Printer } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
+import { ResizableSplit } from "@/components/layout/ResizableSplit";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { GradingPrintControlsPanel } from "@/components/print/GradingPrintControlsPanel";
 import { GradingPrintQuestionEditor } from "@/components/print/GradingPrintQuestionEditor";
+import { PrintPreviewPane } from "@/components/print/PrintPreviewPane";
 import { StudentPrintLayout } from "@/components/print/PrintLayouts";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -190,42 +192,88 @@ export function PrintStudentPage() {
 
   if (loading) return <div className="page-content font-ja">読み込み中...</div>;
 
+  const editPane = (
+    <div className="space-y-4 p-4 pb-8 sm:p-6">
+      <GradingPrintControlsPanel
+        kind="student"
+        prefs={prefs}
+        onSectionsChange={setSections}
+        onLayoutChange={setLayout}
+        onResetLayout={resetLayout}
+        onResetSections={resetSections}
+        templates={templates}
+        onSaveTemplate={saveTemplate}
+        onApplyTemplate={applyTemplate}
+        onDeleteTemplate={deleteTemplate}
+      />
+
+      {mode === "edit" ? (
+        <>
+          <Card className="border-blue-100 bg-blue-50/40 p-4">
+            <p className="font-ja text-sm leading-relaxed text-slate-700">
+              解説・講評・模範解答などの<strong>文言を修正</strong>できます。右のプレビューで掲載項目とレイアウトを確認し、
+              <strong>「確定」</strong>のあと印刷してください。
+            </p>
+          </Card>
+          <div className="space-y-4">
+            {sortedDrafts.map((r) => (
+              <GradingPrintQuestionEditor
+                key={r.id}
+                result={r}
+                allResults={sortedDrafts}
+                kind="student"
+                included={isQuestionIncluded(prefs.includedQuestions, r.id)}
+                onIncludedChange={(included) => setQuestionIncluded(r.id, included)}
+                onChange={(patch) => updateDraft(r.id, patch)}
+              />
+            ))}
+          </div>
+        </>
+      ) : (
+        <Card className="border-slate-200 bg-slate-50 p-4">
+          <p className="font-ja text-sm leading-relaxed text-slate-700">
+            確定済みです。右のプレビューを確認して印刷・PDF保存できます。「文言を編集」で修正に戻れます。
+          </p>
+        </Card>
+      )}
+    </div>
+  );
+
+  const previewPane = (
+    <PrintPreviewPane
+      title="印刷プレビュー"
+      hint="掲載項目のチェックを変えるとすぐ反映されます"
+      printRef={printRef}
+    >
+      <StudentPrintLayout
+        results={activeResults}
+        studentName={studentName}
+        sessionNumber={sessionNumber}
+        totalScore100={totalScore100}
+        sections={prefs.sections as StudentPrintSections}
+        layout={prefs.layout}
+        includedQuestions={prefs.includedQuestions}
+      />
+    </PrintPreviewPane>
+  );
+
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden">
       <PageHeader
         title="生徒用返却プリント"
         description={
           mode === "edit"
-            ? "文言の修正・掲載項目の選択・レイアウト調整のあと、確定して印刷してください"
+            ? "左で編集、右で印刷プレビュー（それぞれ独立してスクロール）"
             : "確定済み — 掲載項目とレイアウトを変えてから印刷・PDF保存できます"
         }
       />
 
-      <div className="no-print page-content space-y-4">
-        <GradingPrintControlsPanel
-          kind="student"
-          prefs={prefs}
-          onSectionsChange={setSections}
-          onLayoutChange={setLayout}
-          onResetLayout={resetLayout}
-          onResetSections={resetSections}
-          templates={templates}
-          onSaveTemplate={saveTemplate}
-          onApplyTemplate={applyTemplate}
-          onDeleteTemplate={deleteTemplate}
-        />
-
-        {mode === "edit" ? (
-          <>
-            <Card className="border-blue-100 bg-blue-50/40 p-4">
-              <p className="font-ja text-sm leading-relaxed text-slate-700">
-                解説・講評・模範解答などの<strong>文言を修正</strong>できます。下のプレビューで掲載項目とレイアウトを確認し、
-                <strong>「確定して印刷プレビュー」</strong>のあと印刷してください。
-              </p>
-            </Card>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="no-print shrink-0 space-y-2 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap gap-2">
+          {mode === "edit" ? (
+            <>
               <Button
-                className="min-h-11 w-full sm:w-auto"
+                className="min-h-11"
                 variant="outline"
                 onClick={handleSaveDraft}
                 disabled={saveState === "saving" || !isDirty}
@@ -233,78 +281,49 @@ export function PrintStudentPage() {
                 下書きを保存
               </Button>
               <Button
-                className="min-h-11 w-full gap-2 sm:w-auto"
+                className="min-h-11 gap-2"
                 onClick={handleFinalize}
                 disabled={saveState === "saving"}
               >
                 <Check className="h-4 w-4" />
-                確定して印刷プレビュー
+                確定
               </Button>
-              <Button className="min-h-11 w-full sm:w-auto" variant="ghost" asChild>
-                <Link to={`/sessions/${sessionId}`}>結果に戻る</Link>
+            </>
+          ) : (
+            <>
+              <Button className="min-h-11 gap-2" onClick={handlePrint}>
+                <Printer className="h-4 w-4" />
+                印刷
               </Button>
-            </div>
-            {saveState === "saving" && <InlineLoading message="保存中..." />}
-            {saveState === "saved" && (
-              <p className="font-ja text-sm text-green-700">下書きを保存しました</p>
-            )}
-            {saveState === "error" && (
-              <p className="font-ja text-sm text-red-600">
-                {saveError || "保存に失敗しました"}
-              </p>
-            )}
-
-            <div className="space-y-4">
-              {sortedDrafts.map((r) => (
-                <GradingPrintQuestionEditor
-                  key={r.id}
-                  result={r}
-                  allResults={sortedDrafts}
-                  kind="student"
-                  included={isQuestionIncluded(prefs.includedQuestions, r.id)}
-                  onIncludedChange={(included) => setQuestionIncluded(r.id, included)}
-                  onChange={(patch) => updateDraft(r.id, patch)}
-                />
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <Button className="min-h-11 gap-2" onClick={handlePrint}>
-              <Printer className="h-4 w-4" />
-              印刷
-            </Button>
-            <Button className="min-h-11" variant="outline" onClick={handlePdf}>
-              PDF保存
-            </Button>
-            <Button className="min-h-11 gap-2" variant="outline" onClick={handleBackToEdit}>
-              <Edit3 className="h-4 w-4" />
-              文言・設定を編集
-            </Button>
-            <Button className="min-h-11" variant="ghost" asChild>
-              <Link to={`/sessions/${sessionId}`}>結果に戻る</Link>
-            </Button>
-          </div>
+              <Button className="min-h-11" variant="outline" onClick={handlePdf}>
+                PDF保存
+              </Button>
+              <Button className="min-h-11 gap-2" variant="outline" onClick={handleBackToEdit}>
+                <Edit3 className="h-4 w-4" />
+                文言を編集
+              </Button>
+            </>
+          )}
+          <Button className="min-h-11" variant="ghost" asChild>
+            <Link to={`/sessions/${sessionId}`}>結果に戻る</Link>
+          </Button>
+        </div>
+        {saveState === "saving" && <InlineLoading message="保存中..." />}
+        {saveState === "saved" && (
+          <p className="font-ja text-sm text-green-700">下書きを保存しました</p>
         )}
-
-        {mode === "edit" && (
-          <p className="font-ja text-sm text-slate-500">
-            下のプレビューが印刷イメージです。掲載項目のチェックを変えるとすぐ反映されます。
-          </p>
+        {saveState === "error" && (
+          <p className="font-ja text-sm text-red-600">{saveError || "保存に失敗しました"}</p>
         )}
       </div>
 
-      <div ref={printRef} className="bg-slate-100 p-8 print:bg-white print:p-0">
-        <StudentPrintLayout
-          results={activeResults}
-          studentName={studentName}
-          sessionNumber={sessionNumber}
-          totalScore100={totalScore100}
-          sections={prefs.sections as StudentPrintSections}
-          layout={prefs.layout}
-          includedQuestions={prefs.includedQuestions}
-        />
-      </div>
+      <ResizableSplit
+        storageKey="print-student"
+        defaultRatio={0.5}
+        className="min-h-0 flex-1"
+        left={editPane}
+        right={previewPane}
+      />
     </div>
   );
 }

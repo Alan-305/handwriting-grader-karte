@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
 import { PageHeader } from "@/components/layout/AppShell";
+import { ResizableSplit } from "@/components/layout/ResizableSplit";
 import { PrintLayoutSettingsPanel } from "@/components/print/PrintLayoutSettingsPanel";
+import { PrintPreviewPane } from "@/components/print/PrintPreviewPane";
 import { TestPaperPrintLayout } from "@/components/print/TestPaperPrintLayout";
 import { Button } from "@/components/ui/button";
 import { usePrintLayoutSettings } from "@/hooks/usePrintLayoutSettings";
@@ -61,40 +63,59 @@ export function PrintTestPaperPage() {
     );
   }
 
+  const settingsPane = (
+    <div className="space-y-4 p-4 pb-8 sm:p-6">
+      <PrintLayoutSettingsPanel
+        documentLabel="問題用紙"
+        settings={settings}
+        onChange={setSettings}
+        onReset={reset}
+      />
+    </div>
+  );
+
+  const previewPane = (
+    <PrintPreviewPane title="印刷プレビュー" printRef={printRef}>
+      <TestPaperPrintLayout
+        testTitle={test.title}
+        totalPoints={test.totalPoints}
+        questions={questions}
+        settings={settings}
+      />
+    </PrintPreviewPane>
+  );
+
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden">
       <PageHeader
         title="問題用紙（印刷用）"
-        description="レイアウトを調整してから印刷してください（解答は別紙）"
+        description="左でレイアウト調整、右で印刷プレビュー（境界をドラッグで幅調整）"
       />
-      <div className="no-print space-y-4 p-8 pb-0">
+
+      <div className="no-print shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => printRef.current && printElement(printRef.current)}>印刷 / PDF</Button>
-          <Button variant="outline" asChild>
+          <Button className="min-h-11" onClick={() => printRef.current && printElement(printRef.current)}>
+            印刷 / PDF
+          </Button>
+          <Button variant="outline" className="min-h-11" asChild>
             <Link to={`/tests/${testId}/print/answer-key`}>解答・解説・全訳</Link>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="min-h-11" asChild>
             <Link to={`/tests/${testId}/print/answer-sheet`}>解答用紙を印刷</Link>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="min-h-11" asChild>
             <Link to={`/tests/${testId}`}>問題エディタに戻る</Link>
           </Button>
         </div>
-        <PrintLayoutSettingsPanel
-          documentLabel="問題用紙"
-          settings={settings}
-          onChange={setSettings}
-          onReset={reset}
-        />
       </div>
-      <div ref={printRef} className="bg-slate-100 p-8 print:bg-white print:p-0">
-        <TestPaperPrintLayout
-          testTitle={test.title}
-          totalPoints={test.totalPoints}
-          questions={questions}
-          settings={settings}
-        />
-      </div>
+
+      <ResizableSplit
+        storageKey="print-test-paper"
+        defaultRatio={0.38}
+        className="min-h-0 flex-1"
+        left={settingsPane}
+        right={previewPane}
+      />
     </div>
   );
 }

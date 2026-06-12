@@ -60,10 +60,11 @@ const SIDEBAR_COLLAPSED_KEY = "app-sidebar-collapsed";
 
 /** 左右分割エディタ（各ペインが独立スクロール） */
 function isSplitEditorRoute(pathname: string): boolean {
-  return (
-    /^\/tests\/[^/]+$/.test(pathname) ||
-    /^\/tests\/[^/]+\/print\/answer-key$/.test(pathname)
-  );
+  if (/^\/sessions\/[^/]+\/print\/(student|teacher)$/.test(pathname)) return true;
+  if (/^\/tests\/[^/]+\/print\/(answer-key|test-paper|answer-sheet)$/.test(pathname)) {
+    return true;
+  }
+  return /^\/tests\/[^/]+$/.test(pathname);
 }
 
 export function AppShell() {
