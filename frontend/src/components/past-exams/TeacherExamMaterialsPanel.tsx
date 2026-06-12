@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { apiClient } from "@/lib/api-client";
+import { confirmDeleteTarget } from "@/lib/confirm-delete";
 import { getStorageInstance } from "@/lib/firebase";
 import type { TeacherExamMaterialAttachment } from "@/types/past-exam";
 
@@ -147,6 +148,7 @@ export function TeacherExamMaterialsPanel({
   const removeAttachment = async (index: number) => {
     if (!user) return;
     const target = attachments[index];
+    if (!confirmDeleteTarget(target.name)) return;
     const next = attachments.filter((_, i) => i !== index);
     setAttachments(next);
     try {

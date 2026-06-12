@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { confirmDeleteTarget } from "@/lib/confirm-delete";
 import { generateAnswerSheetLayout } from "@/lib/answer-sheet-layout";
 import {
   addAnswerPart,
@@ -271,7 +272,7 @@ export function TestEditorPage() {
     if (!testId) return;
     const target = draftQuestions[index];
     if (!target) return;
-    if (!window.confirm(`「第${target.order}問」を削除します。よろしいですか？`)) return;
+    if (!confirmDeleteTarget(`第${target.order}問`)) return;
 
     setSaveState("saving");
     setSaveError("");

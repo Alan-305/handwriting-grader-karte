@@ -12,6 +12,7 @@ import {
   where,
 } from "firebase/firestore";
 import { Archive, Plus } from "lucide-react";
+import { confirmDeleteTarget } from "@/lib/confirm-delete";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -67,7 +68,7 @@ export function TestsPage() {
   };
 
   const deleteTest = async (testId: string, title: string) => {
-    if (!window.confirm(`「${title}」を削除します。よろしいですか？`)) return;
+    if (!confirmDeleteTarget(title)) return;
     setDeletingId(testId);
     setLoadError(null);
     try {

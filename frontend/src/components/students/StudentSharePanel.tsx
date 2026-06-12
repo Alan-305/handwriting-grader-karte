@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
+import { confirmDelete } from "@/lib/confirm-delete";
 import { getDb } from "@/lib/firebase";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -82,6 +83,7 @@ export function StudentSharePanel({ studentId, viewerEmails }: StudentSharePanel
   };
 
   const removeViewer = async (target: string) => {
+    if (!confirmDelete(`${target} の閲覧招待を解除します。よろしいですか？`)) return;
     setBusy(true);
     setError("");
     setNotice("");

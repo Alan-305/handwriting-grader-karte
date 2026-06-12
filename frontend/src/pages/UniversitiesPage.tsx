@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { confirmDeleteTarget } from "@/lib/confirm-delete";
 import {
   countRedundantTemplates,
   mergeDuplicateAnswerSheetTemplates,
@@ -207,7 +208,16 @@ export function UniversitiesPage() {
                 <h3 className="font-ja font-semibold">{u.name} {u.faculty}</h3>
                 <p className="font-ja text-sm text-slate-500">難易度: {u.difficultyLevel}</p>
                 <p className="mt-2 font-ja text-sm text-slate-600">{u.examTrends}</p>
-                <Button variant="ghost" size="sm" className="mt-2" onClick={() => deleteDoc(doc(getDb(), "target_universities", u.id))}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => {
+                    const label = [u.name, u.faculty].filter(Boolean).join(" ");
+                    if (!confirmDeleteTarget(label)) return;
+                    void deleteDoc(doc(getDb(), "target_universities", u.id));
+                  }}
+                >
                   削除
                 </Button>
               </Card>

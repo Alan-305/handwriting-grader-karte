@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { apiClient } from "@/lib/api-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 import { QuestionPromptBlock } from "@/lib/question-text-format";
 import type {
   CoverageLevel,
@@ -87,7 +88,7 @@ export function TestDraftsPage() {
   };
 
   const handleDelete = async (draftId: string) => {
-    if (!window.confirm("このセット下書きを削除しますか？")) return;
+    if (!confirmDelete("このセット下書きを削除しますか？")) return;
     const token = await getIdToken();
     if (!token) return;
     try {

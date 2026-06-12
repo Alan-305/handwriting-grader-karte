@@ -5,6 +5,7 @@ import {
   FORMAT_LABEL,
   resolveFormatOptions,
 } from "@/lib/answer-format";
+import { confirmDelete } from "@/lib/confirm-delete";
 import { NO_MODEL_ANSWER_HINT, resolveGradingMode } from "@/lib/grading-mode";
 import type { AnswerFormatOptions, AnswerPart, AnswerSheetFormat, Question } from "@/types/firestore";
 
@@ -254,7 +255,10 @@ export function AnswerPartCard({
           <button
             type="button"
             className="font-ja text-xs text-red-600 hover:text-red-700"
-            onClick={onRemove}
+            onClick={() => {
+              if (!confirmDelete(`小問 ${part.label} を削除します。よろしいですか？`)) return;
+              onRemove();
+            }}
           >
             削除
           </button>

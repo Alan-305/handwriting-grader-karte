@@ -10,6 +10,7 @@ import {
   mergeAnswerSheetFiles,
 } from "@/lib/answer-sheet-upload";
 import { Button } from "@/components/ui/button";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 export function AnswerSheetDropzone({
   files,
@@ -53,6 +54,7 @@ export function AnswerSheetDropzone({
   );
 
   const removeAt = (index: number) => {
+    if (!confirmDelete(`${index + 1}件目の答案ファイルを削除します。よろしいですか？`)) return;
     setRejectMessage(null);
     onFilesChange(files.filter((_, i) => i !== index));
   };

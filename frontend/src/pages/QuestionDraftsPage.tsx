@@ -9,6 +9,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { apiClient } from "@/lib/api-client";
+import { confirmDelete } from "@/lib/confirm-delete";
 import { getDb } from "@/lib/firebase";
 import type { Test } from "@/types/firestore";
 import { QUESTION_TEXT_HINT, QuestionPromptBlock } from "@/lib/question-text-format";
@@ -86,7 +87,7 @@ export function QuestionDraftsPage() {
   const handleDelete = async (draftId: string) => {
     const token = await getIdToken();
     if (!token) return;
-    if (!window.confirm("この下書きを削除しますか？")) return;
+    if (!confirmDelete("この下書きを削除しますか？")) return;
     try {
       await apiClient.deleteQuestionDraft(token, draftId);
       setDrafts((prev) => prev.filter((d) => d.id !== draftId));

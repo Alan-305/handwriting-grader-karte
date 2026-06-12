@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
+import { confirmDeleteTarget } from "@/lib/confirm-delete";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -231,7 +232,10 @@ export function PastExamAdvicePrintControlsPanel({
                   type="button"
                   className="px-2 font-ja text-xs text-slate-400 hover:text-red-600"
                   aria-label={`${t.name}を削除`}
-                  onClick={() => onDeleteTemplate(t.id)}
+                  onClick={() => {
+                    if (!confirmDeleteTarget(t.name)) return;
+                    onDeleteTemplate(t.id);
+                  }}
                 >
                   ×
                 </button>

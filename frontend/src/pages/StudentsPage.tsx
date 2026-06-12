@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useStudents } from "@/hooks/useStudent";
+import { confirmDelete } from "@/lib/confirm-delete";
 import { StudentHistoryModal } from "@/components/students/StudentHistoryModal";
 import { profileFromStudent } from "@/components/students/StudentProfileFields";
 import type { Student } from "@/types/firestore";
@@ -61,10 +62,14 @@ export function StudentsPage() {
   };
 
   const handleRemoveStudent = async (student: Student) => {
-    const ok = window.confirm(
-      `「${student.name}」を削除しますか？\n\nカルテ・基本情報・面談記録・添削履歴との紐付けが失われます。この操作は取り消せません。`,
-    );
-    if (!ok) return;
+    if (
+      !confirmDelete(
+        `「${student.name}」を削除しますか？`,
+        "カルテ・基本情報・面談記録・添削履歴との紐付けが失われます。この操作は取り消せません。",
+      )
+    ) {
+      return;
+    }
     try {
       await removeStudent(student.id);
     } catch (e) {

@@ -11,6 +11,7 @@ import {
   CONFIRMED_FACT_OPTIONS,
 } from "@/constants/student-interview";
 import { usePastExamUniversities } from "@/hooks/usePastExamUniversities";
+import { confirmDeleteTarget } from "@/lib/confirm-delete";
 import type { StudentInterviewProfile, TargetUniversityRef } from "@/types/firestore";
 
 const selectClass =
@@ -75,6 +76,9 @@ export function StudentProfileFields({ profile, onChange, readOnly = false }: Pr
 
   const removeTargetUniversity = (universityId: string) => {
     if (readOnly) return;
+    const target = profile.targetUniversities.find((u) => u.universityId === universityId);
+    const label = target ? `${target.name} — ${target.faculty}` : "この志望校";
+    if (!confirmDeleteTarget(label)) return;
     onChange({
       ...profile,
       targetUniversities: profile.targetUniversities
