@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -75,17 +75,12 @@ export function GradingPrintControlsPanel({
   };
 
   return (
-    <Card className="no-print border-slate-200">
-      <CardHeader>
-        <CardTitle className="font-ja text-lg">
-          {kind === "student" ? "返却プリント" : "教師用指導資料"}の印刷設定
-        </CardTitle>
-        <CardDescription className="font-ja">
-          掲載する項目を選び、A4レイアウトを調整できます。文字サイズ（%）と行間は下のプレビューにそのまま反映されます。設定はブラウザに保存され、テンプレとして再利用できます。
-        </CardDescription>
-      </CardHeader>
-
-      <div className="space-y-6 px-6 pb-6">
+    <CollapsiblePanel
+      storageKey={`grading-print-controls-${kind}`}
+      title={kind === "student" ? "返却プリントの印刷設定" : "教師用指導資料の印刷設定"}
+      description="掲載項目・A4レイアウトを調整します。折りたたむと右のプレビューと編集欄の高さを揃えやすくなります。"
+    >
+      <div className="space-y-6">
         <section>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <p className="font-ja text-sm font-medium text-slate-800">掲載する項目</p>
@@ -273,7 +268,7 @@ export function GradingPrintControlsPanel({
           </div>
         </section>
       </div>
-    </Card>
+    </CollapsiblePanel>
   );
 }
 

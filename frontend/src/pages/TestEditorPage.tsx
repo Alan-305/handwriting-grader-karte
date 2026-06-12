@@ -22,6 +22,7 @@ import {
   DEFAULT_ANSWER_KEY_PRINT_SECTIONS,
   TeacherAnswerKeyPrintLayout,
 } from "@/components/print/TeacherAnswerKeyPrintLayout";
+import { AnswerSheetPrintLayout } from "@/components/print/AnswerSheetPrintLayout";
 import { TestPaperPrintLayout } from "@/components/print/TestPaperPrintLayout";
 import { CropPreview } from "@/components/upload/CropPreview";
 import { Button } from "@/components/ui/button";
@@ -107,7 +108,7 @@ export function TestEditorPage() {
   const [templates, setTemplates] = useState<AnswerSheetTemplate[]>([]);
   const [selectedQ, setSelectedQ] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewDoc, setPreviewDoc] = useState<"paper" | "answer_key">("paper");
+  const [previewDoc, setPreviewDoc] = useState<"paper" | "answer_sheet" | "answer_key">("paper");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState("");
   const paperPrintSettings = usePrintLayoutSettings(testId);
@@ -456,6 +457,10 @@ export function TestEditorPage() {
     () => draftQuestions.reduce((s, q) => s + q.points, 0),
     [draftQuestions],
   );
+  const answerSheetSlots = useMemo(() => {
+    if (draftQuestions.length === 0) return [];
+    return generateAnswerSheetLayout(draftQuestions).slots;
+  }, [draftQuestions]);
 
   const editorPane = (
     <div className="space-y-6 p-4 pb-44 sm:p-6 lg:pb-40">
@@ -799,6 +804,16 @@ export function TestEditorPage() {
           type="button"
           size="sm"
           className="min-h-11"
+          variant={previewDoc === "answer_sheet" ? "default" : "outline"}
+          onClick={() => setPreviewDoc("answer_sheet")}
+          disabled={answerSheetSlots.length === 0}
+        >
+          解答用紙
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          className="min-h-11"
           variant={previewDoc === "answer_key" ? "default" : "outline"}
           onClick={() => setPreviewDoc("answer_key")}
         >
@@ -812,6 +827,12 @@ export function TestEditorPage() {
               testTitle={draftTitle || "テスト"}
               totalPoints={previewTotalPoints}
               questions={draftQuestions}
+              settings={paperPrintSettings.settings}
+            />
+          ) : previewDoc === "answer_sheet" ? (
+            <AnswerSheetPrintLayout
+              testTitle={draftTitle || "テスト"}
+              slots={answerSheetSlots}
               settings={paperPrintSettings.settings}
             />
           ) : (
