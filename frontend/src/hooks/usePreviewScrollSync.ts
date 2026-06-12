@@ -4,48 +4,57 @@ import { syncPreviewFromEditorTarget } from "@/lib/preview-scroll-sync";
 /** 左ペインのフォーカス・カーソルに合わせて右プレビューをスクロール */
 export function usePreviewScrollSync(
   editorRef: RefObject<HTMLElement | null>,
-  previewScrollRef: RefObject<HTMLElement | null>,
+  previewScrollEl: HTMLElement | null,
   enabled = true,
 ) {
   useEffect(() => {
-    if (!enabled) return;
-    const editor = editorRef.current;
-    const scroll = previewScrollRef.current;
-    if (!editor || !scroll) return;
+    if (!enabled || !previewScrollEl) return;
 
     let raf = 0;
     const schedule = (target: EventTarget | null) => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        syncPreviewFromEditorTarget(scroll, target);
+        requestAnimationFrame(() => {
+          syncPreviewFromEditorTarget(previewScrollEl, target);
+        });
       });
     };
 
-    const onFocusIn = (e: FocusEvent) => schedule(e.target);
-    const onClick = (e: MouseEvent) => schedule(e.target);
+    const onFocusIn = (e: FocusEvent) => {
+      const editor = editorRef.current;
+      if (!editor?.contains(e.target as Node)) return;
+      schedule(e.target);
+    };
+    const onClick = (e: MouseEvent) => {
+      const editor = editorRef.current;
+      if (!editor?.contains(e.target as Node)) return;
+      schedule(e.target);
+    };
     const onKeyUp = (e: KeyboardEvent) => {
       const t = e.target;
-      if (t instanceof HTMLTextAreaElement && t.hasAttribute("data-preview-anchor")) {
-        schedule(t);
-      }
+      if (!(t instanceof HTMLTextAreaElement)) return;
+      const editor = editorRef.current;
+      if (!editor?.contains(t) || !t.hasAttribute("data-preview-anchor")) return;
+      schedule(t);
     };
     const onSelect = (e: Event) => {
       const t = e.target;
-      if (t instanceof HTMLTextAreaElement && t.hasAttribute("data-preview-anchor")) {
-        schedule(t);
-      }
+      if (!(t instanceof HTMLTextAreaElement)) return;
+      const editor = editorRef.current;
+      if (!editor?.contains(t) || !t.hasAttribute("data-preview-anchor")) return;
+      schedule(t);
     };
 
-    editor.addEventListener("focusin", onFocusIn);
-    editor.addEventListener("click", onClick);
-    editor.addEventListener("keyup", onKeyUp);
-    editor.addEventListener("select", onSelect);
+    document.addEventListener("focusin", onFocusIn, true);
+    document.addEventListener("click", onClick, true);
+    document.addEventListener("keyup", onKeyUp, true);
+    document.addEventListener("select", onSelect, true);
     return () => {
       cancelAnimationFrame(raf);
-      editor.removeEventListener("focusin", onFocusIn);
-      editor.removeEventListener("click", onClick);
-      editor.removeEventListener("keyup", onKeyUp);
-      editor.removeEventListener("select", onSelect);
+      document.removeEventListener("focusin", onFocusIn, true);
+      document.removeEventListener("click", onClick, true);
+      document.removeEventListener("keyup", onKeyUp, true);
+      document.removeEventListener("select", onSelect, true);
     };
-  }, [editorRef, previewScrollRef, enabled]);
+  }, [editorRef, previewScrollEl, enabled]);
 }

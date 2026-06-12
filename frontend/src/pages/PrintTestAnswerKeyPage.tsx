@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { PageHeader } from "@/components/layout/AppShell";
 import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
+import { PreviewScrollArea } from "@/components/layout/PreviewScrollRegisterContext";
 import { SyncPreviewSplit } from "@/components/layout/SyncPreviewSplit";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { PrintLayoutSettingsPanel } from "@/components/print/PrintLayoutSettingsPanel";
@@ -419,10 +420,7 @@ export function PrintTestAnswerKeyPage() {
           印刷プレビュー（編集内容が即時反映されます）
         </span>
       </div>
-      <div
-        ref={previewScrollRef}
-        className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-y-contain"
-      >
+      <PreviewScrollArea scrollRef={previewScrollRef}>
         <ScaledPrintPreview className="box-border p-4 pb-8 print:p-0">
           <div ref={printRef}>
             <TeacherAnswerKeyPrintLayout
@@ -435,7 +433,7 @@ export function PrintTestAnswerKeyPage() {
             />
           </div>
         </ScaledPrintPreview>
-      </div>
+      </PreviewScrollArea>
     </div>
   );
 

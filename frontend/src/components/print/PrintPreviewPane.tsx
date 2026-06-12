@@ -1,4 +1,5 @@
 import type { ReactNode, RefObject } from "react";
+import { PreviewScrollArea } from "@/components/layout/PreviewScrollRegisterContext";
 import { ScaledPrintPreview } from "@/components/print/ScaledPrintPreview";
 import { cn } from "@/lib/utils";
 
@@ -27,14 +28,11 @@ export function PrintPreviewPane({
           <p className="mt-0.5 font-ja text-xs text-slate-500">{hint}</p>
         ) : null}
       </div>
-      <div
-        ref={scrollRef}
-        className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-y-contain"
-      >
+      <PreviewScrollArea scrollRef={scrollRef}>
         <ScaledPrintPreview className="box-border p-4 pb-8 print:p-0">
           {printRef ? <div ref={printRef}>{children}</div> : children}
         </ScaledPrintPreview>
-      </div>
+      </PreviewScrollArea>
     </div>
   );
 }

@@ -16,6 +16,7 @@ import {
 import { Check, FileText, Printer, Save } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
+import { PreviewScrollArea } from "@/components/layout/PreviewScrollRegisterContext";
 import { SyncPreviewSplit } from "@/components/layout/SyncPreviewSplit";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { ScaledPrintPreview } from "@/components/print/ScaledPrintPreview";
@@ -843,10 +844,7 @@ export function TestEditorPage() {
           解答・解説・全訳
         </Button>
       </div>
-      <div
-        ref={previewScrollRef}
-        className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-y-contain"
-      >
+      <PreviewScrollArea scrollRef={previewScrollRef}>
         <ScaledPrintPreview className="box-border p-4 pb-8">
           {previewDoc === "paper" ? (
             <TestPaperPrintLayout
@@ -875,7 +873,7 @@ export function TestEditorPage() {
             />
           )}
         </ScaledPrintPreview>
-      </div>
+      </PreviewScrollArea>
     </div>
   );
 
@@ -883,7 +881,7 @@ export function TestEditorPage() {
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden">
       <PageHeader
         title="問題エディタ"
-        description="左で編集、右で印刷プレビュー（それぞれ独立してスクロール・境界をドラッグで幅調整）"
+        description="左で編集すると右のプレビューが連動してスクロールします（境界をドラッグで幅調整）"
       />
       <SyncPreviewSplit
         storageKey="test-editor"

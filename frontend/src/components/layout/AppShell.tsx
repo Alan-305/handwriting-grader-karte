@@ -102,7 +102,12 @@ export function AppShell() {
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-slate-50 lg:flex-row">
+    <div
+      className={cn(
+        "flex min-h-[100dvh] flex-col bg-slate-50 lg:flex-row",
+        splitEditor && "lg:h-[100dvh] lg:max-h-[100dvh] lg:overflow-hidden",
+      )}
+    >
       {/* スマホ・タブレット: 上部バー */}
       <header className="no-print sticky top-0 z-40 flex min-h-14 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 pt-[env(safe-area-inset-top)] lg:hidden">
         <Button

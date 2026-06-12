@@ -1,4 +1,7 @@
-import { useRef, type ReactNode, type RefObject } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  PreviewScrollRegisterProvider,
+} from "@/components/layout/PreviewScrollRegisterContext";
 import { ResizableSplit } from "@/components/layout/ResizableSplit";
 import { usePreviewScrollSync } from "@/hooks/usePreviewScrollSync";
 
@@ -9,7 +12,7 @@ export function SyncPreviewSplit({
   className,
   left,
   right,
-  previewScrollRef,
+  previewScrollRef: _previewScrollRef,
   syncEnabled = true,
 }: {
   storageKey: string;
@@ -17,11 +20,13 @@ export function SyncPreviewSplit({
   className?: string;
   left: ReactNode;
   right: ReactNode;
-  previewScrollRef: RefObject<HTMLElement | null>;
+  /** @deprecated PreviewScrollArea 経由で登録される。互換のため残す */
+  previewScrollRef?: RefObject<HTMLElement | null>;
   syncEnabled?: boolean;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
-  usePreviewScrollSync(editorRef, previewScrollRef, syncEnabled);
+  const [previewScrollEl, setPreviewScrollEl] = useState<HTMLElement | null>(null);
+  usePreviewScrollSync(editorRef, previewScrollEl, syncEnabled);
 
   return (
     <ResizableSplit
@@ -33,7 +38,11 @@ export function SyncPreviewSplit({
           {left}
         </div>
       }
-      right={right}
+      right={
+        <PreviewScrollRegisterProvider onRegister={setPreviewScrollEl}>
+          {right}
+        </PreviewScrollRegisterProvider>
+      }
     />
   );
 }

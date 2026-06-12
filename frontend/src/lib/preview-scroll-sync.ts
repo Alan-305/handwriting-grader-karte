@@ -26,12 +26,16 @@ export function scrollPreviewToAnchor(
 
   const rootRect = scrollRoot.getBoundingClientRect();
   const targetRect = target.getBoundingClientRect();
-  const innerOffset = target.offsetHeight * Math.min(1, Math.max(0, lineRatio)) * 0.9;
-  const top =
-    targetRect.top - rootRect.top + scrollRoot.scrollTop + innerOffset - 56;
+  const innerOffset =
+    (targetRect.height || target.offsetHeight) *
+    Math.min(1, Math.max(0, lineRatio)) *
+    0.85;
+  const delta = targetRect.top - rootRect.top + innerOffset - 48;
 
-  scrollRoot.scrollTo({
-    top: Math.max(0, top),
+  if (Math.abs(delta) < 2) return;
+
+  scrollRoot.scrollBy({
+    top: delta,
     behavior: "smooth",
   });
 }
