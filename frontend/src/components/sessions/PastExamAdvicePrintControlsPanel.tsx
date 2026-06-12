@@ -71,6 +71,7 @@ export function PastExamAdvicePrintControlsPanel({
       storageKey="past-exam-advice-print-controls"
       title="過去問アドバイスの印刷設定"
       description="掲載項目・A4レイアウトを調整します。折りたたむと右のプレビューと編集欄の高さを揃えやすくなります。"
+      defaultOpen={false}
     >
       <div className="space-y-6">
         <section>

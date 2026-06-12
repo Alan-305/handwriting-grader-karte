@@ -79,6 +79,7 @@ export function GradingPrintControlsPanel({
       storageKey={`grading-print-controls-${kind}`}
       title={kind === "student" ? "返却プリントの印刷設定" : "教師用指導資料の印刷設定"}
       description="掲載項目・A4レイアウトを調整します。折りたたむと右のプレビューと編集欄の高さを揃えやすくなります。"
+      defaultOpen={false}
     >
       <div className="space-y-6">
         <section>

@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { Check, FileText, Printer, Save } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
+import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
 import { ResizableSplit } from "@/components/layout/ResizableSplit";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { ScaledPrintPreview } from "@/components/print/ScaledPrintPreview";
@@ -464,7 +465,11 @@ export function TestEditorPage() {
 
   const editorPane = (
     <div className="space-y-6 p-4 pb-44 sm:p-6 lg:pb-40">
-        <Card className="border-blue-100 bg-blue-50/40 p-4">
+        <CollapsiblePanel
+          storageKey="test-editor-guide"
+          title="おすすめの流れ"
+          defaultOpen={false}
+        >
           <p className="font-ja text-sm leading-relaxed text-slate-700">
             <strong>おすすめの流れ：</strong>
             ① 設問・模範解答を入力 → ② 各問の「解答用紙形式」を指定 → ③「保存」
@@ -472,7 +477,7 @@ export function TestEditorPage() {
             <br />
             形式の例：1問の中に (1)(2)(3) や (A)(B)(C) がある場合は「小問を追加」で解答欄を分け、ラベル形式を選べます。
           </p>
-        </Card>
+        </CollapsiblePanel>
         <Card className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
@@ -590,14 +595,17 @@ export function TestEditorPage() {
           </Card>
         )}
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {draftQuestions.map((q, i) => (
-            <Card key={q.id} className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-ja font-semibold">第{q.order}問</h3>
-                <div className="flex items-center gap-2">
+            <CollapsiblePanel
+              key={q.id}
+              storageKey={`test-editor-q-${q.id}`}
+              title={`第${q.order}問`}
+              defaultOpen={i === 0}
+              headerActions={
+                <>
                   <Button variant="ghost" size="sm" onClick={() => setSelectedQ(i)}>
-                    crop 選択
+                    crop
                   </Button>
                   <Button
                     variant="ghost"
@@ -624,10 +632,12 @@ export function TestEditorPage() {
                     className="font-ja text-slate-500 hover:text-red-700"
                     onClick={() => void removeQuestion(i)}
                   >
-                    第{q.order}問を削除
+                    削除
                   </Button>
-                </div>
-              </div>
+                </>
+              }
+            >
+              <div className="space-y-3">
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
                   <label className="font-ja text-sm">添削タイプ</label>
@@ -781,7 +791,8 @@ export function TestEditorPage() {
                   />
                 </div>
               )}
-            </Card>
+              </div>
+            </CollapsiblePanel>
           ))}
         </div>
     </div>

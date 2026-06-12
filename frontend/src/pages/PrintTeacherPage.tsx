@@ -150,7 +150,7 @@ export function PrintTeacherPage() {
             </p>
           </Card>
           <div className="space-y-4">
-            {sortedDrafts.map((r) => (
+            {sortedDrafts.map((r, index) => (
               <GradingPrintQuestionEditor
                 key={r.id}
                 result={r}
@@ -159,6 +159,7 @@ export function PrintTeacherPage() {
                 included={isQuestionIncluded(prefs.includedQuestions, r.id)}
                 onIncludedChange={(included) => setQuestionIncluded(r.id, included)}
                 onChange={(patch) => updateDraft(r.id, patch)}
+                defaultOpen={index === 0}
               />
             ))}
           </div>

@@ -12,6 +12,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { PageHeader } from "@/components/layout/AppShell";
+import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
 import { ResizableSplit } from "@/components/layout/ResizableSplit";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { PrintLayoutSettingsPanel } from "@/components/print/PrintLayoutSettingsPanel";
@@ -59,11 +60,12 @@ function AnswerKeySectionsPanel({
   ];
 
   return (
-    <Card className="space-y-3 p-4">
-      <p className="font-ja text-sm font-semibold text-slate-800">印刷に含める項目</p>
-      <p className="font-ja text-xs leading-relaxed text-slate-500">
-        英語の長文がある設問の「本文の全訳」は AI が自動生成します。印刷の有無はここで選べます。
-      </p>
+    <CollapsiblePanel
+      storageKey="answer-key-sections"
+      title="印刷に含める項目"
+      description="英語の長文がある設問の「本文の全訳」は AI が自動生成します。"
+      defaultOpen={false}
+    >
       <div className="flex flex-wrap gap-x-5 gap-y-2">
         {items.map(({ key, label }) => (
           <label key={key} className="inline-flex min-h-11 cursor-pointer items-center gap-2 font-ja text-sm">
@@ -77,7 +79,7 @@ function AnswerKeySectionsPanel({
           </label>
         ))}
       </div>
-    </Card>
+    </CollapsiblePanel>
   );
 }
 
@@ -305,12 +307,16 @@ export function PrintTestAnswerKeyPage() {
 
   const editPane = (
     <div className="space-y-4 p-4 pb-12 sm:p-6">
-      <Card className="border-blue-100 bg-blue-50/80 p-4 font-ja text-sm leading-relaxed text-slate-700">
-        <p>
+      <CollapsiblePanel
+        storageKey="answer-key-guide"
+        title="全訳の自動生成について"
+        defaultOpen={false}
+      >
+        <p className="font-ja text-sm leading-relaxed text-slate-700">
           英語の長文が出題される設問（第1問・第3問など）の<strong>本文の全訳</strong>は AI が自動生成します。
           全訳は常に各問の<strong>いちばん最後</strong>の別枠に印刷されます。長文は段落ごとに ¶1、¶2… を付けます。
         </p>
-      </Card>
+      </CollapsiblePanel>
 
       <AnswerKeySectionsPanel sections={sections} onChange={setSections} />
 
@@ -321,17 +327,19 @@ export function PrintTestAnswerKeyPage() {
         onReset={reset}
       />
 
-      {questions.map((q) => {
+      {questions.map((q, qi) => {
         const qUnits = draftUnits.filter((u) => u.questionId === q.id);
         const passage = draft.passageByQuestion[q.id] ?? "";
         const showPassage = questionShowsPassageTranslationField(q, passage);
 
         return (
-          <Card key={q.id} className="space-y-5 p-5">
-            <h2 className="font-ja text-lg font-semibold text-slate-900">
-              第{q.order}問
-            </h2>
-
+          <CollapsiblePanel
+            key={q.id}
+            storageKey={`answer-key-q-${q.id}`}
+            title={`第${q.order}問`}
+            defaultOpen={qi === 0}
+          >
+            <div className="space-y-5">
             {qUnits.map((unit) => (
               <div key={unit.key} className="space-y-2">
                 {qUnits.length > 1 ? (
@@ -389,7 +397,8 @@ export function PrintTestAnswerKeyPage() {
                 />
               </Card>
             ) : null}
-          </Card>
+            </div>
+          </CollapsiblePanel>
         );
       })}
     </div>

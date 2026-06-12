@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
 import { Input } from "@/components/ui/input";
 import {
   clampQuestionGapMm,
@@ -30,13 +30,12 @@ export function PrintLayoutSettingsPanel({
   };
 
   return (
-    <Card className="no-print">
-      <CardHeader>
-        <CardTitle className="text-lg">{documentLabel}レイアウト設定</CardTitle>
-        <CardDescription>
-          プレビューに即反映されます。問題用紙・解答用紙で設定は共通（テストごとに保存）です。
-        </CardDescription>
-      </CardHeader>
+    <CollapsiblePanel
+      storageKey={`print-layout-${documentLabel}`}
+      title={`${documentLabel}レイアウト設定`}
+      description="プレビューに即反映されます。問題用紙・解答用紙で設定は共通（テストごとに保存）です。"
+      defaultOpen={false}
+    >
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="大問の区切り">
           <select
@@ -98,7 +97,7 @@ export function PrintLayoutSettingsPanel({
           初期値に戻す（第1問独立・余白 {DEFAULT_PRINT_LAYOUT_SETTINGS.questionGapMm}mm）
         </button>
       </div>
-    </Card>
+    </CollapsiblePanel>
   );
 }
 
