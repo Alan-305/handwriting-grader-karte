@@ -64,15 +64,25 @@ Firebase で Google を有効にすると、Google Cloud に Web クライアン
 
 ---
 
-## ⑤ API キーの制限（任意）
+## ⑤ API キーの HTTP リファラー制限（本番ログインで重要）
 
 [Google Cloud → 認証情報 → API キー](https://console.cloud.google.com/apis/credentials?project=handwriting-grader-karte)
 
-Browser key（Firebase 用）に **HTTP リファラー制限** がある場合、次を追加:
+**Browser key (auto created by Firebase)** に **HTTP リファラー制限** がある場合、次を含めてください:
 
 ```
+https://handwriting-grader-karte.web.app/*
+https://handwriting-grader-karte.firebaseapp.com/*
 http://localhost:5173/*
 http://localhost/*
+```
+
+本番で `auth/requests-from-referer-https://handwriting-grader-karte.web.app-are-blocked.` が出る場合、**リファラーに `.web.app` が入っていない**ことがほとんどです（承認済みドメインとは別設定）。
+
+一括更新:
+
+```bash
+bash scripts/setup-firebase-api-key-referrers.sh
 ```
 
 制限が原因か切り分けるには、一時的に **制限なし** にしてログインを試してください。
@@ -110,6 +120,7 @@ cd frontend && npm run dev
 | エラー | 対処 |
 |--------|------|
 | `auth/unauthorized-domain` | `localhost:5173` で開く（127.0.0.1 不可） |
+| `auth/requests-from-referer-...-are-blocked` | ⑤ API キーの HTTP リファラーに `.web.app` / `.firebaseapp.com` を追加 |
 | `auth/operation-not-allowed` | ② Google ログインを有効化 |
 | `auth/popup-blocked` | ポップアップ許可、または Chrome/Safari を使用 |
 | ログイン後真っ白 / データが出ない | ⑥ ルールをデプロイ |
