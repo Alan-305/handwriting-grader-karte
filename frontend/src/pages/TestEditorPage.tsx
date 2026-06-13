@@ -799,7 +799,7 @@ export function TestEditorPage() {
                     onChange={(e) => updateDraftTranslation(q.id, e.target.value)}
                     className="mt-2 font-ja"
                     rows={5}
-                    placeholder="（任意）「解答・解説・全訳」画面で AI に自動生成させることもできます"
+                    placeholder="問題生成時に作成された全訳がここに表示されます（手入力も可）"
                     data-preview-anchor={questionPassageAnchor(q.id)}
                   />
                 </div>

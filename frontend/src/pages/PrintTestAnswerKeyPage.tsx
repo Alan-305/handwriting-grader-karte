@@ -41,7 +41,6 @@ import {
   applyAnswerKeyUnitsToQuestions,
   buildAnswerKeyUnitsFromDraft,
   initAnswerKeyDraftState,
-  questionNeedsAiPassageTranslation,
   questionShowsPassageTranslationField,
   type AnswerKeyDraftState,
 } from "@/lib/test-answer-key";
@@ -69,7 +68,7 @@ function AnswerKeySectionsPanel({
     <CollapsiblePanel
       storageKey="answer-key-sections"
       title="印刷に含める項目"
-      description="英語の長文がある設問の「本文の全訳」は AI が自動生成します。"
+      description="英語の長文がある設問では、問題生成時に作成した「本文の全訳」を表示します。"
       defaultOpen={false}
     >
       <div className="flex flex-wrap gap-x-5 gap-y-2">
@@ -111,7 +110,6 @@ export function PrintTestAnswerKeyPage() {
   const [generateState, setGenerateState] = useState<GenerateState>("idle");
   const [generateError, setGenerateError] = useState("");
   const [generatingQuestionIds, setGeneratingQuestionIds] = useState<string[]>([]);
-  const autoGenerateStarted = useRef(false);
 
   const layoutKey = testId ? `${testId}-answer-key` : "answer-key";
   const { settings, setSettings, reset } = usePrintLayoutSettings(layoutKey);
@@ -179,7 +177,6 @@ export function PrintTestAnswerKeyPage() {
 
   useEffect(() => {
     if (!testId) return;
-    autoGenerateStarted.current = false;
     (async () => {
       const testSnap = await getDoc(doc(getDb(), "tests", testId));
       if (!testSnap.exists()) {
@@ -197,41 +194,8 @@ export function PrintTestAnswerKeyPage() {
       setDraft(initial);
       setSavedDraft(initial);
       setLoading(false);
-
-      const missingIds = loaded
-        .filter((q) =>
-          questionNeedsAiPassageTranslation(q, initial.passageByQuestion[q.id] ?? ""),
-        )
-        .map((q) => q.id);
-
-      if (missingIds.length > 0 && !autoGenerateStarted.current) {
-        autoGenerateStarted.current = true;
-        const token = await getIdToken();
-        if (!token) return;
-
-        setGenerateState("generating");
-        setGeneratingQuestionIds(missingIds);
-        try {
-          const result = await apiClient.generatePassageTranslations(token, testId, {
-            questionIds: missingIds,
-          });
-          applyGeneratedTranslations(result.translations);
-          const errorMessages = Object.values(result.errors);
-          if (errorMessages.length > 0) {
-            setGenerateError(errorMessages.join(" / "));
-            setGenerateState("error");
-          } else {
-            setGenerateState("idle");
-          }
-        } catch (e) {
-          setGenerateState("error");
-          setGenerateError(e instanceof Error ? e.message : "全訳の生成に失敗しました");
-        } finally {
-          setGeneratingQuestionIds([]);
-        }
-      }
     })();
-  }, [applyGeneratedTranslations, getIdToken, testId]);
+  }, [testId]);
 
   const isDirty = useMemo(
     () => JSON.stringify(draft) !== JSON.stringify(savedDraft),
@@ -316,12 +280,13 @@ export function PrintTestAnswerKeyPage() {
     <div className="space-y-4 p-4 pb-12 sm:p-6">
       <CollapsiblePanel
         storageKey="answer-key-guide"
-        title="全訳の自動生成について"
+        title="本文の全訳について"
         defaultOpen={false}
       >
         <p className="font-ja text-sm leading-relaxed text-slate-700">
-          英語の長文が出題される設問（第1問・第3問など）の<strong>本文の全訳</strong>は AI が自動生成します。
-          全訳は常に各問の<strong>いちばん最後</strong>の別枠に印刷されます。長文は段落ごとに ¶1、¶2… を付けます。
+          英語の長文が出題される設問（第1問・第3問など）の<strong>本文の全訳</strong>は、
+          問題生成時に模範解答へ含めて作成されます。この画面ではその内容を表示・編集できます。
+          全訳は常に各問の<strong>いちばん最後</strong>の別枠に印刷されます。不足している場合のみ「AIで生成」ボタンを使ってください。
         </p>
       </CollapsiblePanel>
 
@@ -373,10 +338,10 @@ export function PrintTestAnswerKeyPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <label className="font-ja text-sm font-semibold text-slate-800">
-                      本文の全訳（AI生成）
+                      本文の全訳
                     </label>
                     <p className="mt-1 font-ja text-xs text-slate-500">
-                      第{q.order}問のいちばん最後に印刷される別枠です。長文は ¶1、¶2… 付き。
+                      問題生成時に作成した全訳です。第{q.order}問のいちばん最後に印刷される別枠です。
                     </p>
                   </div>
                   <Button
@@ -388,7 +353,7 @@ export function PrintTestAnswerKeyPage() {
                     onClick={() => void runPassageTranslation([q.id], true)}
                   >
                     <Sparkles className="h-4 w-4" />
-                    {generatingQuestionIds.includes(q.id) ? "生成中…" : "再生成"}
+                    {generatingQuestionIds.includes(q.id) ? "生成中…" : "AIで生成"}
                   </Button>
                 </div>
                 <Textarea
@@ -399,7 +364,7 @@ export function PrintTestAnswerKeyPage() {
                   placeholder={
                     generatingQuestionIds.includes(q.id)
                       ? "AIが本文の全訳を生成しています…"
-                      : "未生成の場合は自動で生成されます"
+                      : "問題生成時に作成された全訳がここに表示されます"
                   }
                   readOnly={generatingQuestionIds.includes(q.id)}
                   data-preview-anchor={questionPassageAnchor(q.id)}

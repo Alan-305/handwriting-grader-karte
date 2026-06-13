@@ -16,22 +16,35 @@ import type { Student, TargetUniversityRef } from "@/types/firestore";
 import { useAuth } from "./useAuth";
 
 export function useStudents() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (authLoading) return;
+    if (!user) {
+      setStudents([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     const q = query(
       collection(getDb(), "students"),
       where("teacherId", "==", user.uid),
       orderBy("name"),
     );
-    return onSnapshot(q, (snap) => {
-      setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Student));
-      setLoading(false);
-    });
-  }, [user]);
+    return onSnapshot(
+      q,
+      (snap) => {
+        setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Student));
+        setLoading(false);
+      },
+      (error) => {
+        console.error("生徒一覧の読み込みに失敗しました:", error);
+        setLoading(false);
+      },
+    );
+  }, [user, authLoading]);
 
   const createStudent = useCallback(
     async (data: { name: string; course: string; targetUniversities: TargetUniversityRef[]; memo?: string }) => {

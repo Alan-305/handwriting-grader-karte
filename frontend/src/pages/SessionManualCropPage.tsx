@@ -23,7 +23,7 @@ import type { CropRegion } from "@/types/firestore";
 export function SessionManualCropPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const { getIdToken } = useAuth();
+  const { getIdToken, loading: authLoading } = useAuth();
 
   const [data, setData] = useState<CropTargetsResponse | null>(null);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -42,7 +42,10 @@ export function SessionManualCropPage() {
     setError("");
     try {
       const token = await getIdToken();
-      if (!token) return;
+      if (!token) {
+        setError("ログインが必要です");
+        return;
+      }
       const res = await apiClient.getCropTargets(token, sessionId);
       setData(res);
       const urls = await Promise.all(
@@ -63,9 +66,9 @@ export function SessionManualCropPage() {
   }, [sessionId, getIdToken]);
 
   useEffect(() => {
+    if (authLoading) return;
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [authLoading, load]);
 
   const targets: CropTargetItem[] = useMemo(
     () => (data?.targets ?? []) as CropTargetItem[],

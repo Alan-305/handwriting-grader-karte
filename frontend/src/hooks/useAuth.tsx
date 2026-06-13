@@ -224,9 +224,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getIdToken = useCallback(async () => {
-    if (!user) return null;
-    return user.getIdToken();
-  }, [user]);
+    if (!isFirebaseConfigured) return null;
+    const auth = getAuthInstance();
+    try {
+      await auth.authStateReady();
+    } catch (error) {
+      console.error("認証状態の取得に失敗しました:", error);
+      return null;
+    }
+    if (!auth.currentUser) return null;
+    return auth.currentUser.getIdToken();
+  }, []);
 
   const value = useMemo(
     () => ({

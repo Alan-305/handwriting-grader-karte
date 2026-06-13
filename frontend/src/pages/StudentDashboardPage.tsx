@@ -22,43 +22,63 @@ import type { AggregatedStats, KarteSnapshot, Student } from "@/types/firestore"
 
 export function StudentDashboardPage() {
   const { studentId } = useParams<{ studentId: string }>();
-  const { getIdToken } = useAuth();
+  const { getIdToken, loading: authLoading, user } = useAuth();
   const [student, setStudent] = useState<Student | null>(null);
   const [stats, setStats] = useState<AggregatedStats | null>(null);
   const [snapshot, setSnapshot] = useState<KarteSnapshot | null>(null);
+  const [studentLoading, setStudentLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [snapshotLoadError, setSnapshotLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!studentId) return;
-    return onSnapshot(doc(getDb(), "students", studentId), (snap) => {
-      if (snap.exists()) setStudent({ id: snap.id, ...snap.data() } as Student);
-    });
-  }, [studentId]);
+    if (!studentId || authLoading || !user) return;
+    setStudentLoading(true);
+    return onSnapshot(
+      doc(getDb(), "students", studentId),
+      (snap) => {
+        if (snap.exists()) setStudent({ id: snap.id, ...snap.data() } as Student);
+        setStudentLoading(false);
+      },
+      (err) => {
+        console.error("student listener error:", err);
+        setStudentLoading(false);
+      },
+    );
+  }, [studentId, authLoading, user]);
 
   useEffect(() => {
-    if (!studentId) return;
-    return onSnapshot(doc(getDb(), "students", studentId, "stats", "aggregated"), (snap) => {
-      if (snap.exists()) setStats(snap.data() as AggregatedStats);
-    });
-  }, [studentId]);
+    if (!studentId || authLoading || !user) return;
+    setStatsLoading(true);
+    return onSnapshot(
+      doc(getDb(), "students", studentId, "stats", "aggregated"),
+      (snap) => {
+        if (snap.exists()) setStats(snap.data() as AggregatedStats);
+        setStatsLoading(false);
+      },
+      (err) => {
+        console.error("stats listener error:", err);
+        setStatsLoading(false);
+      },
+    );
+  }, [studentId, authLoading, user]);
 
   useEffect(() => {
-    if (!studentId) return;
+    if (!studentId || authLoading || !user) return;
     void (async () => {
       const token = await getIdToken();
       if (!token) return;
       try {
         await apiClient.refreshStats(token, studentId);
-      } catch {
-        /* 集計更新失敗時はキャッシュ表示 */
+      } catch (error) {
+        console.error("stats refresh failed:", error);
       }
     })();
-  }, [studentId, getIdToken]);
+  }, [studentId, authLoading, user, getIdToken]);
 
   useEffect(() => {
-    if (!studentId) return;
+    if (!studentId || authLoading || !user) return;
     const q = query(
       collection(getDb(), "students", studentId, "karte_snapshots"),
       orderBy("generatedAt", "desc"),
@@ -80,7 +100,9 @@ export function StudentDashboardPage() {
         console.error("karte_snapshots listener error:", err);
       },
     );
-  }, [studentId]);
+  }, [studentId, authLoading, user]);
+
+  const pageLoading = authLoading || studentLoading;
 
   const runAnalysis = async () => {
     if (!studentId) return;
@@ -105,9 +127,9 @@ export function StudentDashboardPage() {
 
   return (
     <div>
-      <LoadingOverlay visible={analyzing} message="考えてます" />
+      <LoadingOverlay visible={analyzing || pageLoading} message={analyzing ? "考えてます" : "読み込み中..."} />
       <PageHeader
-        title={`${student?.name ?? ""} のカルテ`}
+        title={`${student?.name ?? (pageLoading ? "読み込み中…" : "")} のカルテ`}
         description="成績推移・弱点分析・志望校対策アドバイス"
       />
       <div className="page-content space-y-6">
@@ -162,7 +184,7 @@ export function StudentDashboardPage() {
                 テストごと1点（同一テストの再添削は上書き）。正答率の推移です。
               </CardDescription>
             </CardHeader>
-            <ScoreTrendChart stats={stats} />
+            <ScoreTrendChart stats={statsLoading ? null : stats} />
           </Card>
           <Card>
             <CardHeader>
@@ -171,7 +193,7 @@ export function StudentDashboardPage() {
                 第1回の棒グラフの下に第2回、さらに第3回…と、テストごとに一般カテゴリのミス傾向が積み上がります。同一テストの再添削は上書きです。
               </CardDescription>
             </CardHeader>
-            <ErrorFrequencyChart stats={stats} />
+            <ErrorFrequencyChart stats={statsLoading ? null : stats} />
           </Card>
         </div>
 
