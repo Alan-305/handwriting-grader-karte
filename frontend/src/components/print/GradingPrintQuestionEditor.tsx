@@ -2,6 +2,7 @@ import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  isCompositionResult,
   modelAnswerForPrint,
   studentAnswerForPrint,
 } from "@/lib/question-results";
@@ -33,9 +34,7 @@ export function GradingPrintQuestionEditor({
 }) {
   const studentText = studentAnswerForPrint(result, allResults);
   const modelText = modelAnswerForPrint(result, allResults);
-  const isComposition = Boolean(
-    result.contentEvaluation || result.grammarEvaluation || result.polishedAnswer,
-  );
+  const isComposition = isCompositionResult(result);
   const anchor = resultAnchor(result.id);
 
   return (
@@ -102,10 +101,10 @@ export function GradingPrintQuestionEditor({
         </div>
 
         <div>
-          <label className="font-ja text-sm">講評</label>
+          <label className="font-ja text-sm">{isComposition ? "総評" : "講評"}</label>
           <Textarea
             className="mt-1 font-ja"
-            rows={2}
+            rows={isComposition ? 3 : 2}
             value={result.feedback ?? ""}
             onChange={(e) => onChange({ feedback: e.target.value })}
             data-preview-anchor={anchor}
@@ -146,30 +145,30 @@ export function GradingPrintQuestionEditor({
         {isComposition ? (
           <>
             <div>
-              <label className="font-ja text-sm">内容の評価・解説</label>
+              <label className="font-ja text-sm">内容について</label>
               <Textarea
                 className="mt-1 font-ja"
-                rows={3}
+                rows={4}
                 value={result.contentEvaluation ?? ""}
                 onChange={(e) => onChange({ contentEvaluation: e.target.value })}
                 data-preview-anchor={anchor}
               />
             </div>
             <div>
-              <label className="font-ja text-sm">文法・語法の評価・解説</label>
+              <label className="font-ja text-sm">文法・語法・表現について</label>
               <Textarea
                 className="mt-1 font-ja"
-                rows={3}
+                rows={4}
                 value={result.grammarEvaluation ?? ""}
                 onChange={(e) => onChange({ grammarEvaluation: e.target.value })}
                 data-preview-anchor={anchor}
               />
             </div>
             <div>
-              <label className="font-ja text-sm">完成版英文</label>
+              <label className="font-ja text-sm">完成版</label>
               <Textarea
                 className="font-en mt-1"
-                rows={3}
+                rows={4}
                 value={result.polishedAnswer ?? ""}
                 onChange={(e) => onChange({ polishedAnswer: e.target.value })}
                 data-preview-anchor={anchor}

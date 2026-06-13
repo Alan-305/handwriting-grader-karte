@@ -127,6 +127,41 @@ export function studentAnswerForPrint(
   return textForPart(text, r.partLabel, labels) || text;
 }
 
+/** 自由英作文（内容・文法・完成版のいずれかがある） */
+export function isCompositionResult(
+  r: Pick<QuestionResult, "contentEvaluation" | "grammarEvaluation" | "polishedAnswer">,
+): boolean {
+  return Boolean(r.contentEvaluation || r.grammarEvaluation || r.polishedAnswer);
+}
+
+/** 長文総合読解の小問（複数 answerParts または composite 大問） */
+export function isComprehensiveReadingResult(
+  r: Pick<
+    QuestionResult,
+    "contentEvaluation" | "grammarEvaluation" | "polishedAnswer" | "partCount" | "questionAnswerFormat" | "questionId" | "order"
+  >,
+  siblings: QuestionResult[] = [],
+): boolean {
+  if (isCompositionResult(r)) return false;
+  if ((r.partCount ?? 0) > 1) return true;
+  if (r.questionAnswerFormat === "composite") return true;
+  const parts = siblings.filter((s) => s.questionId === r.questionId && s.order === r.order);
+  return parts.length > 1;
+}
+
+/** 記号・正誤問題は解説内で正答も完結させるため、模範解答パネルは出さない */
+export function shouldShowModelAnswerPanel(
+  r: Pick<QuestionResult, "type" | "polishedAnswer" | "answerFormat" | "transcriptionProfile" | "partCount" | "questionAnswerFormat" | "questionId" | "order">,
+  siblings: QuestionResult[] = [],
+): boolean {
+  if (r.polishedAnswer) return false;
+  if (isComprehensiveReadingResult(r, siblings)) return true;
+  if (r.type === "symbol") return false;
+  if (r.answerFormat === "short") return false;
+  if (r.transcriptionProfile === "symbol") return false;
+  return true;
+}
+
 export function modelAnswerForPrint(
   r: QuestionResult,
   siblings: QuestionResult[],

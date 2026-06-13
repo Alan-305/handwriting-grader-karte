@@ -4,12 +4,19 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { FeedbackBlock } from "@/components/typography/Typography";
 import { GradeBadge } from "@/components/grading/GradeBadge";
 import { CompositionFeedbackSections } from "@/components/grading/CompositionFeedbackSections";
+import { ComprehensiveReadingFeedbackSections } from "@/components/grading/ComprehensiveReadingFeedbackSections";
 import { ModelAnswerPanel } from "@/components/grading/ModelAnswerPanel";
 import { PastExamAdvicePanel } from "@/components/sessions/PastExamAdvicePanel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useSession } from "@/hooks/useSession";
-import { modelAnswerForPrint, studentAnswerForPrint } from "@/lib/question-results";
+import {
+  isCompositionResult,
+  isComprehensiveReadingResult,
+  modelAnswerForPrint,
+  shouldShowModelAnswerPanel,
+  studentAnswerForPrint,
+} from "@/lib/question-results";
 import {
   formatQuestionScore,
   formatTotalScoreLabel,
@@ -103,21 +110,38 @@ export function SessionResultPage() {
                 {studentAnswerForPrint(r, results) || "—"}
               </p>
             </div>
-            {r.feedback ? <FeedbackBlock title="講評">{r.feedback}</FeedbackBlock> : null}
-            {r.contentEvaluation || r.grammarEvaluation || r.polishedAnswer ? (
+            {isCompositionResult(r) ? (
               <CompositionFeedbackSections
+                summary={r.feedback}
                 contentEvaluation={r.contentEvaluation}
                 grammarEvaluation={r.grammarEvaluation}
                 polishedAnswer={r.polishedAnswer}
               />
-            ) : r.explanation ? (
-              <div className="rounded-xl bg-slate-50 p-4">
-                <FeedbackBlock title="解説">{r.explanation}</FeedbackBlock>
-              </div>
-            ) : null}
-            {!r.polishedAnswer ? (
-              <ModelAnswerPanel modelAnswer={modelAnswerForPrint(r, results)} />
-            ) : null}
+            ) : isComprehensiveReadingResult(r, results) ? (
+              <ComprehensiveReadingFeedbackSections
+                summary={r.feedback}
+                explanation={r.explanation}
+                modelAnswer={
+                  shouldShowModelAnswerPanel(r, results)
+                    ? modelAnswerForPrint(r, results)
+                    : undefined
+                }
+              />
+            ) : (
+              <>
+                {r.feedback ? <FeedbackBlock title="講評">{r.feedback}</FeedbackBlock> : null}
+                {r.explanation ? (
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <FeedbackBlock title="解説">
+                      <p className="whitespace-pre-line">{r.explanation}</p>
+                    </FeedbackBlock>
+                  </div>
+                ) : null}
+                {shouldShowModelAnswerPanel(r, results) ? (
+                  <ModelAnswerPanel modelAnswer={modelAnswerForPrint(r, results)} />
+                ) : null}
+              </>
+            )}
             <p className="font-ja text-sm font-medium text-slate-700">
               {formatQuestionScore(r)}
               {(r.errorTags?.length ?? 0) > 0 && (

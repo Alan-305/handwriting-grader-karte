@@ -1,8 +1,8 @@
 import { JaText } from "@/components/typography/Typography";
 import { GradeBadge } from "@/components/grading/GradeBadge";
-import { TtsButton } from "@/components/grading/ModelAnswerPanel";
 import type { GradeLevel, QuestionResult } from "@/types/firestore";
 import { CompositionFeedbackSections } from "@/components/grading/CompositionFeedbackSections";
+import { ComprehensiveReadingFeedbackSections } from "@/components/grading/ComprehensiveReadingFeedbackSections";
 import { PreviewAnchor } from "@/components/print/PreviewAnchor";
 import { PrintFlowDocument } from "@/components/print/PrintA4Page";
 import { resultAnchor } from "@/lib/preview-anchor";
@@ -16,7 +16,10 @@ import {
   type TeacherPrintSections,
 } from "@/lib/grading-print-config";
 import {
+  isCompositionResult,
+  isComprehensiveReadingResult,
   modelAnswerForPrint,
+  shouldShowModelAnswerPanel,
   sortQuestionResults,
   studentAnswerForPrint,
 } from "@/lib/question-results";
@@ -99,6 +102,8 @@ export function StudentPrintLayout({
           showTranslation || !modelParts.translation
             ? modelText
             : modelParts.body || modelText;
+        const composition = isCompositionResult(r);
+        const comprehensive = isComprehensiveReadingResult(r, sorted);
         const breakBefore = shouldBreakBeforeQuestion(index, layout.sectionMode);
         const gapClass =
           shouldApplyQuestionGap(index, layout.sectionMode) ? "print-question-gap" : "";
@@ -128,7 +133,7 @@ export function StudentPrintLayout({
                 </div>
               )}
 
-              {studentSectionOn(sections, "feedback") && r.feedback ? (
+              {studentSectionOn(sections, "feedback") && r.feedback && !composition && !comprehensive ? (
                 <p className="grading-print-block font-ja text-sm text-slate-700">
                   {personalize(r.feedback)}
                 </p>
@@ -136,9 +141,13 @@ export function StudentPrintLayout({
 
               {(studentSectionOn(sections, "contentEvaluation") ||
                 studentSectionOn(sections, "grammarEvaluation") ||
-                studentSectionOn(sections, "polishedAnswer")) &&
-              (r.contentEvaluation || r.grammarEvaluation || r.polishedAnswer) ? (
+                studentSectionOn(sections, "polishedAnswer") ||
+                (studentSectionOn(sections, "feedback") && composition)) &&
+              composition ? (
                 <CompositionFeedbackSections
+                  summary={
+                    studentSectionOn(sections, "feedback") ? personalize(r.feedback) : undefined
+                  }
                   contentEvaluation={
                     studentSectionOn(sections, "contentEvaluation")
                       ? personalize(r.contentEvaluation)
@@ -152,28 +161,39 @@ export function StudentPrintLayout({
                   polishedAnswer={
                     studentSectionOn(sections, "polishedAnswer") ? r.polishedAnswer : undefined
                   }
-                  hideTtsOnPrint
+                />
+              ) : comprehensive ? (
+                <ComprehensiveReadingFeedbackSections
+                  summary={
+                    studentSectionOn(sections, "feedback") ? personalize(r.feedback) : undefined
+                  }
+                  explanation={
+                    studentSectionOn(sections, "explanation")
+                      ? personalize(r.explanation)
+                      : undefined
+                  }
+                  modelAnswer={
+                    studentSectionOn(sections, "modelAnswer") && modelTextForPrint
+                      ? modelTextForPrint
+                      : undefined
+                  }
                 />
               ) : studentSectionOn(sections, "explanation") && r.explanation ? (
                 <div className="grading-print-block rounded-xl bg-slate-50 p-4 print:bg-transparent print:p-0">
                   <p className="font-ja text-sm font-semibold text-slate-600">解説</p>
-                  <p className="text-explanation mt-2 font-ja text-slate-800">
+                  <p className="text-explanation mt-2 whitespace-pre-line font-ja text-slate-800">
                     {personalize(r.explanation)}
                   </p>
                 </div>
               ) : null}
 
               {studentSectionOn(sections, "modelAnswer") &&
-              !r.polishedAnswer &&
+              shouldShowModelAnswerPanel(r, sorted) &&
+              !comprehensive &&
               modelTextForPrint ? (
-                <div className="grading-print-block flex items-start gap-3">
-                  <div className="flex-1">
-                    <p className="font-ja text-sm font-semibold text-slate-600">模範解答</p>
-                    <p className="text-explanation mt-1 font-en text-slate-900">{modelTextForPrint}</p>
-                  </div>
-                  <span className="no-print">
-                    <TtsButton text={modelTextForPrint} lang="en" />
-                  </span>
+                <div className="grading-print-block">
+                  <p className="font-ja text-sm font-semibold text-slate-600">模範解答</p>
+                  <p className="text-explanation mt-1 font-en text-slate-900">{modelTextForPrint}</p>
                 </div>
               ) : null}
 
@@ -219,6 +239,8 @@ export function TeacherPrintLayout({
       {sorted.map((r, index) => {
         const studentText = studentAnswerForPrint(r, sorted);
         const modelText = modelAnswerForPrint(r, sorted);
+        const composition = isCompositionResult(r);
+        const comprehensive = isComprehensiveReadingResult(r, sorted);
         const breakBefore = shouldBreakBeforeQuestion(index, layout.sectionMode);
         const gapClass =
           shouldApplyQuestionGap(index, layout.sectionMode) ? "print-question-gap" : "";
@@ -242,7 +264,7 @@ export function TeacherPrintLayout({
                 )}
               </div>
 
-              {teacherSectionOn(sections, "feedback") && (
+              {teacherSectionOn(sections, "feedback") && !composition && !comprehensive && (
                 <p className="grading-print-block font-ja text-sm">
                   <JaText className="font-semibold">講評: </JaText>
                   {r.feedback || "—"}
@@ -264,9 +286,11 @@ export function TeacherPrintLayout({
 
               {(teacherSectionOn(sections, "contentEvaluation") ||
                 teacherSectionOn(sections, "grammarEvaluation") ||
-                teacherSectionOn(sections, "polishedAnswer")) &&
-              (r.contentEvaluation || r.grammarEvaluation || r.polishedAnswer) ? (
+                teacherSectionOn(sections, "polishedAnswer") ||
+                (teacherSectionOn(sections, "feedback") && composition)) &&
+              composition ? (
                 <CompositionFeedbackSections
+                  summary={teacherSectionOn(sections, "feedback") ? r.feedback : undefined}
                   contentEvaluation={
                     teacherSectionOn(sections, "contentEvaluation")
                       ? r.contentEvaluation
@@ -280,16 +304,28 @@ export function TeacherPrintLayout({
                   polishedAnswer={
                     teacherSectionOn(sections, "polishedAnswer") ? r.polishedAnswer : undefined
                   }
-                  hideTtsOnPrint
+                />
+              ) : comprehensive ? (
+                <ComprehensiveReadingFeedbackSections
+                  summary={teacherSectionOn(sections, "feedback") ? r.feedback : undefined}
+                  explanation={
+                    teacherSectionOn(sections, "explanation") ? r.explanation : undefined
+                  }
+                  modelAnswer={
+                    teacherSectionOn(sections, "modelAnswer") && modelText ? modelText : undefined
+                  }
                 />
               ) : teacherSectionOn(sections, "explanation") && r.explanation ? (
                 <div className="grading-print-block">
                   <p className="font-ja text-sm font-semibold text-slate-600">解説</p>
-                  <p className="text-explanation mt-2 font-ja text-slate-800">{r.explanation}</p>
+                  <p className="text-explanation mt-2 whitespace-pre-line font-ja text-slate-800">{r.explanation}</p>
                 </div>
               ) : null}
 
-              {teacherSectionOn(sections, "modelAnswer") && modelText ? (
+              {teacherSectionOn(sections, "modelAnswer") &&
+              shouldShowModelAnswerPanel(r, sorted) &&
+              !comprehensive &&
+              modelText ? (
                 <div className="grading-print-block">
                   <p className="font-ja text-sm font-semibold text-slate-600">模範解答</p>
                   <p className="text-model-answer mt-1 font-en text-slate-900">{modelText}</p>

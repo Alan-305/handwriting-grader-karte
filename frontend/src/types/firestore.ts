@@ -6,7 +6,8 @@ export type AnswerSheetFormat =
   | "japanese_grid"
   | "underline"
   | "english_composition"
-  | "short";
+  | "short"
+  | "composite";
 
 /** 添削プロンプトの種別（模範解答なしのとき no_model 用プロンプトを使用） */
 export type GradingMode = "standard" | "no_model";
@@ -245,6 +246,12 @@ export interface QuestionResult {
   partIndex?: number;
   partLabel?: string;
   type: QuestionType;
+  /** 小問の解答形式（短答・記号など）。表示制御に使用 */
+  answerFormat?: AnswerSheetFormat;
+  /** 同一設問内の小問数（長文総合読解の判定用） */
+  partCount?: number;
+  /** 大問の answerFormat（composite 等） */
+  questionAnswerFormat?: AnswerSheetFormat;
   croppedImagePath: string;
   /** 転記確認前は未採点のことがある */
   grade?: GradeLevel;

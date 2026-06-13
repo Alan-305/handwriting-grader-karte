@@ -5,6 +5,7 @@ export const FORMAT_LABEL: Record<AnswerSheetFormat, string> = {
   underline: "下線部（和訳・和文英訳など）",
   english_composition: "自由英作文（下線＋語数）",
   short: "短答・記号（枠のみ）",
+  composite: "総合問題（小問混在）",
 };
 
 export const DEFAULT_FORMAT: Record<QuestionType, AnswerSheetFormat> = {
@@ -18,6 +19,7 @@ export const DEFAULT_OPTIONS: Record<AnswerSheetFormat, AnswerFormatOptions> = {
   underline: { underlineLines: 3, underlineWidth: "long" },
   english_composition: { targetWords: 80, compositionLines: 10, compositionWidth: "long" },
   short: { symbolTableCount: 5, symbolTableHeader: "exam" },
+  composite: {},
 };
 
 export interface ResolvedFormatOptions {

@@ -346,8 +346,8 @@ class AnthropicVisionClient:
             "teacherNotes": "時制の確認を重点的に。",
         }
         if schema is EnglishCompositionGradeResult:
-            mock["contentEvaluation"] = "① 課題への応答はおおむねできています。"
-            mock["grammarEvaluation"] = "① 時制に注意するとさらに良くなります。"
+            mock["contentEvaluation"] = "・良い点: 課題への応答はおおむねできています。\n・改善点: 具体例と主張のつながりをもう一段深めると説得力が増します。"
+            mock["grammarEvaluation"] = "・I go yesterday → I went yesterday — 過去の出来事なので過去形が正しい。"
             mock["polishedAnswer"] = "This is a sample polished answer for development mode."
             mock["explanation"] = ""
         return schema.model_validate(mock)

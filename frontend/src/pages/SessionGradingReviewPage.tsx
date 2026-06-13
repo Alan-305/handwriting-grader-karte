@@ -21,7 +21,10 @@ import {
 import { apiClient } from "@/lib/api-client";
 import { getDb } from "@/lib/firebase";
 import {
+  isCompositionResult,
+  isComprehensiveReadingResult,
   modelAnswerForPrint,
+  shouldShowModelAnswerPanel,
   sortQuestionResults,
   studentAnswerForPrint,
 } from "@/lib/question-results";
@@ -198,7 +201,7 @@ export function SessionGradingReviewPage() {
         <Card className="border-amber-100 bg-amber-50/80 p-4 font-ja text-sm leading-relaxed text-slate-800">
           <p>
             この画面で<strong>確定するまで</strong>、生徒への返却・カルテ集計は完了しません。
-            自由英作文は「内容」「文法」「完成版英文」の3部構成で表示されます。
+            自由英作文は「総評」「内容について」「文法・語法・表現について」「完成版」の4部構成で表示されます。
           </p>
           <p className="mt-2">
             「あなたの解答」を修正した場合は、<strong>修正内容で再採点</strong>を押してから確定してください。
@@ -245,9 +248,9 @@ export function SessionGradingReviewPage() {
           {sortedDrafts.map((r) => {
             const studentText = studentAnswerForPrint(r, sortedDrafts);
             const modelText = modelAnswerForPrint(r, sortedDrafts);
-            const isComposition = Boolean(
-              r.contentEvaluation || r.grammarEvaluation || r.polishedAnswer,
-            );
+            const isComposition = isCompositionResult(r);
+            const isComprehensive = isComprehensiveReadingResult(r, sortedDrafts);
+            const useSummaryLabel = isComposition || isComprehensive;
             return (
               <Card key={r.id} className="space-y-4 p-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -300,10 +303,10 @@ export function SessionGradingReviewPage() {
                 </div>
 
                 <div>
-                  <label className="font-ja text-sm">講評</label>
+                  <label className="font-ja text-sm">{useSummaryLabel ? "総評" : "講評"}</label>
                   <Textarea
                     className="mt-1 font-ja"
-                    rows={2}
+                    rows={useSummaryLabel ? 3 : 2}
                     value={r.feedback ?? ""}
                     onChange={(e) => updateDraft(r.id, { feedback: e.target.value })}
                   />
@@ -312,10 +315,11 @@ export function SessionGradingReviewPage() {
                 {isComposition ? (
                   <>
                     <div>
-                      <label className="font-ja text-sm">内容の評価・解説</label>
+                      <label className="font-ja text-sm">内容について</label>
                       <Textarea
                         className="mt-1 font-ja"
-                        rows={4}
+                        rows={5}
+                        placeholder="・良い点: …（改行）・改善点: …"
                         value={r.contentEvaluation ?? ""}
                         onChange={(e) =>
                           updateDraft(r.id, { contentEvaluation: e.target.value })
@@ -323,10 +327,11 @@ export function SessionGradingReviewPage() {
                       />
                     </div>
                     <div>
-                      <label className="font-ja text-sm">文法・語法の評価・解説</label>
+                      <label className="font-ja text-sm">文法・語法・表現について</label>
                       <Textarea
                         className="mt-1 font-ja"
-                        rows={4}
+                        rows={5}
+                        placeholder="・誤り → 正しい表現 — 理由"
                         value={r.grammarEvaluation ?? ""}
                         onChange={(e) =>
                           updateDraft(r.id, { grammarEvaluation: e.target.value })
@@ -334,14 +339,36 @@ export function SessionGradingReviewPage() {
                       />
                     </div>
                     <div>
-                      <label className="font-ja text-sm">完成版英文</label>
+                      <label className="font-ja text-sm">完成版</label>
                       <Textarea
                         className="font-en mt-1"
-                        rows={4}
+                        rows={5}
                         value={r.polishedAnswer ?? ""}
                         onChange={(e) =>
                           updateDraft(r.id, { polishedAnswer: e.target.value })
                         }
+                      />
+                    </div>
+                  </>
+                ) : isComprehensive ? (
+                  <>
+                    <div>
+                      <label className="font-ja text-sm">解説</label>
+                      <Textarea
+                        className="mt-1 font-ja"
+                        rows={6}
+                        placeholder="・正答の根拠…（改行）・誤選肢の理由…"
+                        value={r.explanation ?? ""}
+                        onChange={(e) => updateDraft(r.id, { explanation: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="font-ja text-sm">模範解答（参考）</label>
+                      <Textarea
+                        className="font-en mt-1"
+                        rows={3}
+                        value={modelText}
+                        onChange={(e) => updateDraft(r.id, { modelAnswer: e.target.value })}
                       />
                     </div>
                   </>
@@ -350,22 +377,25 @@ export function SessionGradingReviewPage() {
                     <label className="font-ja text-sm">解説</label>
                     <Textarea
                       className="mt-1 font-ja"
-                      rows={4}
+                      rows={6}
+                      placeholder="(1) 正解：…（改行）(2) 不正解：…"
                       value={r.explanation ?? ""}
                       onChange={(e) => updateDraft(r.id, { explanation: e.target.value })}
                     />
                   </div>
                 )}
 
-                <div>
-                  <label className="font-ja text-sm">模範解答（参考）</label>
-                  <Textarea
-                    className="font-en mt-1"
-                    rows={2}
-                    value={modelText}
-                    onChange={(e) => updateDraft(r.id, { modelAnswer: e.target.value })}
-                  />
-                </div>
+                {shouldShowModelAnswerPanel(r, sortedDrafts) && !isComprehensive ? (
+                  <div>
+                    <label className="font-ja text-sm">模範解答（参考）</label>
+                    <Textarea
+                      className="font-en mt-1"
+                      rows={2}
+                      value={modelText}
+                      onChange={(e) => updateDraft(r.id, { modelAnswer: e.target.value })}
+                    />
+                  </div>
+                ) : null}
               </Card>
             );
           })}
