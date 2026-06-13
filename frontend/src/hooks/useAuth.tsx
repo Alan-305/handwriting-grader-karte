@@ -21,6 +21,8 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getAuthInstance, getDb, isFirebaseConfigured } from "@/lib/firebase";
+import { clearLastActivityAt } from "@/lib/session-inactivity";
+import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
 /** 教師＝編集者、viewer＝招待された閲覧専用ユーザー */
 export type UserRole = "teacher" | "viewer";
@@ -220,8 +222,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    clearLastActivityAt();
     await signOut(getAuthInstance());
   }, []);
+
+  useInactivityLogout(logout, Boolean(user) && isFirebaseConfigured);
 
   const getIdToken = useCallback(async () => {
     if (!isFirebaseConfigured) return null;

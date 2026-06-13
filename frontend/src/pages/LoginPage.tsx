@@ -6,6 +6,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { useAuth } from "@/hooks/useAuth";
 import { isFirebaseConfigured } from "@/lib/firebase";
+import { consumeLogoutReasonMessage } from "@/lib/session-inactivity";
 
 function formatAuthError(error: unknown): string {
   const code = (error as AuthError | undefined)?.code;
@@ -49,10 +50,13 @@ function GoogleIcon() {
 export function LoginPage() {
   const { user, role, loginWithGoogle, loginWithGoogleRedirect, loading } = useAuth();
   const [error, setError] = useState("");
+  const [infoMessage, setInfoMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [hostWarning, setHostWarning] = useState("");
 
   useEffect(() => {
+    const message = consumeLogoutReasonMessage();
+    if (message) setInfoMessage(message);
     const host = window.location.hostname;
     if (host === "127.0.0.1") {
       setHostWarning(
@@ -121,6 +125,11 @@ export function LoginPage() {
                 ポップアップが開かない場合はこちら（リダイレクト）
               </Button>
             </>
+          )}
+          {infoMessage && (
+            <p className="rounded-md bg-slate-100 px-3 py-2 text-center font-ja text-sm text-slate-700">
+              {infoMessage}
+            </p>
           )}
           {hostWarning && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-center font-ja text-xs text-amber-800">
