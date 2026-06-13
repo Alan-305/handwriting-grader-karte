@@ -10,7 +10,6 @@ export const GENERALIZED_ERROR_CATEGORIES = [
   "誤訳・脱訳",
   "語彙ミス",
   "選択の誤り",
-  "指示未達",
   "スペルミス",
   "その他",
 ] as const;
@@ -30,6 +29,7 @@ const LEGACY_CATEGORY_MAP: Record<string, (typeof GENERALIZED_ERROR_CATEGORIES)[
   "語順・表現": "文構造の誤り",
   構文の取り違え: "文構造の誤り",
   "表記・記号": "選択の誤り",
+  指示未達: "その他",
 };
 
 const RULES: { keywords: string[]; category: (typeof GENERALIZED_ERROR_CATEGORIES)[number] }[] = [
@@ -49,7 +49,7 @@ const RULES: { keywords: string[]; category: (typeof GENERALIZED_ERROR_CATEGORIE
   { keywords: ["誤訳", "脱訳", "訳し漏れ", "訳抜け", "訳漏", "漏訳"], category: "誤訳・脱訳" },
   { keywords: ["スペル", "綴り"], category: "スペルミス" },
   { keywords: ["語彙", "単語"], category: "語彙ミス" },
-  { keywords: ["指示未達", "語数", "字数", "要約"], category: "指示未達" },
+  { keywords: ["語数", "字数", "要約"], category: "内容説明不足" },
   { keywords: ["選択", "記号", "空所", "表記"], category: "選択の誤り" },
 ];
 

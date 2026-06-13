@@ -19,6 +19,7 @@ def test_categorize_legacy_tags():
     assert categorize_error_tag("時制ミス") == "時制・仮定法・助動詞"
     assert categorize_error_tag("具体性不足") == "内容説明不足"
     assert categorize_error_tag("構造把握の弱さ") == "句・節の把握ミス"
+    assert categorize_error_tag("指示未達") == "その他"
 
 
 def test_categorize_new_skill_tags():
