@@ -86,7 +86,7 @@ export function TeacherAnswerKeyPrintLayout({
     >
       <header className="print-doc-header border-b-2 border-slate-800 pb-5 text-center print:border-black">
         <h1 className="font-ja text-2xl font-semibold">{testTitle}</h1>
-        <p className="mt-2 font-ja text-base text-slate-700">解答・解説・全訳（教師用）</p>
+        <p className="mt-2 font-ja text-base text-slate-700">解答・解説・全訳</p>
       </header>
 
       {orderedQuestions.map((question, questionIndex) => {

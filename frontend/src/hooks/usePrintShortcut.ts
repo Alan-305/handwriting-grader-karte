@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 import type { RefObject } from "react";
+import { printElement } from "@/lib/pdf-export";
 import { printDocument } from "@/lib/print-layout-settings";
 
-export function usePrintShortcut(_targetRef?: RefObject<HTMLElement | null>) {
+export function usePrintShortcut(targetRef?: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const isPrintShortcut =
@@ -10,10 +11,14 @@ export function usePrintShortcut(_targetRef?: RefObject<HTMLElement | null>) {
         event.key.toLowerCase() === "p";
       if (!isPrintShortcut) return;
       event.preventDefault();
-      printDocument();
+      if (targetRef?.current) {
+        printElement(targetRef.current);
+      } else {
+        printDocument();
+      }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [targetRef]);
 }

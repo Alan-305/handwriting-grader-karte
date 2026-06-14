@@ -43,8 +43,7 @@ import {
   questionShowsPassageTranslationField,
   type AnswerKeyDraftState,
 } from "@/lib/test-answer-key";
-import { exportElementToPdf } from "@/lib/pdf-export";
-import { printDocument } from "@/lib/print-layout-settings";
+import { exportElementToPdf, printElement } from "@/lib/pdf-export";
 import type { Question, Test } from "@/types/firestore";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -400,7 +399,7 @@ export function PrintTestAnswerKeyPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden">
       <PageHeader
-        title="解答・解説・全訳（教師用）"
+        title="解答・解説・全訳"
         description={`${test.title} — 左で編集、右で印刷プレビュー（境界をドラッグで幅を調整）`}
       />
 
@@ -419,7 +418,7 @@ export function PrintTestAnswerKeyPage() {
             type="button"
             variant="outline"
             className="min-h-11 gap-2"
-            onClick={() => printDocument()}
+            onClick={() => printRef.current && printElement(printRef.current)}
           >
             <Printer className="h-4 w-4" />
             印刷 / PDF
