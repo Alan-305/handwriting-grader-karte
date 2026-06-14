@@ -182,14 +182,60 @@ body {
     padding: 0;
   }
 
-  /* 問題用紙：流し込み（表紙＋複数大問を1枚に詰める） */
+  /* 問題用紙：流し込み（@page 余白のみ。追加 padding で右端が欠けないようにする） */
   .print-flow-document {
-    width: 100%;
-    max-width: none;
-    padding: 0 2mm;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
     margin: 0 !important;
     box-sizing: border-box;
     box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  html,
+  body {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: visible !important;
+  }
+
+  .print-flow-document *,
+  .print-flow-document *::before,
+  .print-flow-document *::after {
+    box-sizing: border-box;
+  }
+
+  .print-flow-document table {
+    max-width: 100%;
+  }
+
+  /* 印刷時は装飾枠・背景を外し、文字領域を確保（解答用紙のマス目・記号表は除外） */
+  .print-flow-document--answer-key .border,
+  .print-flow-document--answer-key .border-2,
+  .print-flow-document--answer-key .border-b,
+  .print-flow-document--answer-key .border-t {
+    border-color: transparent !important;
+  }
+
+  .print-flow-document--answer-key .print-doc-header {
+    border-bottom-color: #000 !important;
+  }
+
+  .print-flow-document--answer-key .rounded-lg,
+  .print-flow-document--answer-key .bg-slate-50,
+  .print-flow-document--answer-key .bg-slate-50\/80 {
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .answer-sheet-field:not(.answer-sheet-japanese-grid),
+  .answer-sheet-japanese-grid-wrap {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
   }
 
   .print-doc-header {
@@ -255,7 +301,7 @@ body {
   .print-flow-document.print-layout-document[data-page-margin="wide"],
   .print-flow-document.print-flow-document--answer-sheet.print-layout-document[data-page-margin="wide"],
   .grading-print-document.print-layout-document[data-page-margin="wide"] {
-    padding: 6mm 10mm !important;
+    padding: 0 !important;
     box-sizing: border-box;
   }
 
@@ -293,6 +339,19 @@ body {
   .print-flow-document--answer-sheet .print-question-block {
     break-inside: auto;
     page-break-inside: auto;
+  }
+
+  .answer-sheet-japanese-grid,
+  .answer-sheet-symbol-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .print-flow-document--answer-key .text-explanation,
+  .print-flow-document--answer-key .whitespace-pre-wrap {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .answer-sheet-japanese-grid,

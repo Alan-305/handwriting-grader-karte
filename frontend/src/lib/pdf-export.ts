@@ -43,15 +43,36 @@ export async function exportElementToPdf(element: HTMLElement, filename: string)
 }
 
 const PRINT_STYLES = `
-  body { margin: 0; background: white; }
+  html, body { width: 100%; margin: 0; padding: 0; background: white; overflow: visible; box-sizing: border-box; }
+  *, *::before, *::after { box-sizing: border-box; }
   @page { size: A4 portrait; margin: 20mm 24mm; }
   .print-flow-document {
-    width: 100%;
-    max-width: none;
-    padding: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
     margin: 0;
     box-shadow: none !important;
+    overflow: visible !important;
   }
+  .print-flow-document table { max-width: 100%; }
+  .print-flow-document--answer-key .border,
+  .print-flow-document--answer-key .border-2,
+  .print-flow-document--answer-key .border-b {
+    border-color: transparent !important;
+  }
+  .print-flow-document--answer-key .print-doc-header {
+    border-bottom-color: #000 !important;
+  }
+  .print-flow-document--answer-key .rounded-lg,
+  .print-flow-document--answer-key .bg-slate-50,
+  .print-flow-document--answer-key .bg-slate-50\\/80 {
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .answer-sheet-field:not(.answer-sheet-japanese-grid),
+  .answer-sheet-japanese-grid-wrap { padding-left: 0 !important; padding-right: 0 !important; }
   .print-doc-header {
     break-inside: avoid;
     page-break-inside: avoid;

@@ -129,11 +129,11 @@ export function TeacherAnswerKeyPrintLayout({
               .filter(Boolean)
               .join(" ")}
           >
-            <section className="space-y-5 border-b border-slate-200 pb-6 print:border-black/20">
+            <section className="space-y-5 border-b border-slate-200 pb-6 print:border-0 print:pb-4">
               <h2 className="font-ja text-lg font-semibold">第{question.order}問</h2>
 
               {sections.prompt && question.prompt ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 print:border-black/20 print:bg-transparent">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 print:border-0 print:bg-transparent print:p-0">
                   <p className="mb-2 font-ja text-sm font-semibold text-slate-600">問題文</p>
                   <QuestionPromptBlock prompt={question.prompt} />
                 </div>
@@ -175,7 +175,7 @@ export function TeacherAnswerKeyPrintLayout({
               {showPassageTranslation ? (
                 <PreviewAnchor
                   anchor={questionPassageAnchor(question.id)}
-                  className="mt-2 rounded-lg border-2 border-slate-300 bg-slate-50/80 p-5 print:border-black/30 print:bg-transparent"
+                  className="mt-2 rounded-lg border-2 border-slate-300 bg-slate-50/80 p-5 print:mt-0 print:border-0 print:bg-transparent print:p-0"
                 >
                   <SectionBlock title={translationTitle}>
                     <p className="whitespace-pre-wrap font-ja">{storedTranslation}</p>

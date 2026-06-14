@@ -34,7 +34,7 @@ function SymbolTableField({ formatOptions }: { formatOptions?: AnswerFormatOptio
     formatOptions?.symbolTableHeader ?? "exam",
   );
   return (
-    <div className="bg-white px-1 py-1">
+    <div className="bg-white px-1 py-1 print:px-0">
       <table
         className="answer-sheet-symbol-table w-full border-collapse"
         style={{ tableLayout: "fixed", borderCollapse: "collapse" }}

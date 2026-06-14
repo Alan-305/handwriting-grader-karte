@@ -14,7 +14,7 @@ function JapaneseGridField({
   charLimit?: number;
 }) {
   return (
-    <div className="answer-sheet-japanese-grid-wrap space-y-1">
+    <div className="answer-sheet-japanese-grid-wrap space-y-1 print:px-0">
       {charLimit != null && charLimit > 0 && (
         <p className="font-ja text-[10px] text-slate-500">
           {charLimit}字以内（1行{gridCols}字）
@@ -55,7 +55,7 @@ function JapaneseGridField({
 function UnderlineField({ lines, widthRatio }: { lines: number; widthRatio: number }) {
   return (
     <div
-      className="answer-sheet-field space-y-0 rounded border bg-white px-2 py-3"
+      className="answer-sheet-field space-y-0 rounded border bg-white px-2 py-3 print:px-0"
       style={{
         width: `${Math.round(widthRatio * 100)}%`,
         borderColor: ANSWER_SHEET_LINE,
@@ -88,7 +88,7 @@ function EnglishCompositionField({
 }) {
   return (
     <div
-      className="answer-sheet-field rounded border bg-white px-2 py-3"
+      className="answer-sheet-field rounded border bg-white px-2 py-3 print:px-0"
       style={{
         width: `${Math.round(widthRatio * 100)}%`,
         borderColor: ANSWER_SHEET_LINE,
