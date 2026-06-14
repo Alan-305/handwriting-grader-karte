@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "@/components/layout/AppShell";
 import { FeedbackBlock } from "@/components/typography/Typography";
@@ -21,6 +21,7 @@ import {
 import {
   formatQuestionScore,
   formatTotalScoreLabel,
+  sumResultScores,
 } from "@/lib/scoring";
 import type { GradeLevel } from "@/types/firestore";
 
@@ -28,6 +29,11 @@ export function SessionResultPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const { session, results, loading } = useSession(sessionId);
+
+  const scoreBreakdown = useMemo(
+    () => sumResultScores(results),
+    [results],
+  );
 
   useEffect(() => {
     if (!session || loading) return;
@@ -64,7 +70,11 @@ export function SessionResultPage() {
               {formatTotalScoreLabel(session)}
             </p>
             <p className="mt-1 font-ja text-sm text-slate-500">
-              内訳 {session.totalScore} / {session.maxScore}点
+              内訳{" "}
+              {formatQuestionScore({
+                score: scoreBreakdown.totalScore,
+                maxPoints: scoreBreakdown.maxScore,
+              })}
             </p>
           </Card>
         )}
@@ -81,7 +91,9 @@ export function SessionResultPage() {
         )}
         <div className="flex flex-wrap gap-2 no-print">
           <Button asChild variant="outline">
-            <Link to={`/sessions/${sessionId}/grading-review`}>添削内容を編集</Link>
+            <Link to={`/sessions/${sessionId}/grading-review`}>
+              {session?.gradingConfirmedAt ? "添削内容を編集" : "添削内容の確認へ"}
+            </Link>
           </Button>
           <Button asChild variant="outline" disabled={!session?.gradingConfirmedAt}>
             <Link to={`/sessions/${sessionId}/print/student`}>返却プリントを編集・印刷</Link>

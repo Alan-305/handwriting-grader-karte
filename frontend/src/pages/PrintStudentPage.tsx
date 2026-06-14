@@ -22,7 +22,7 @@ import { useGradingPrintPreferences } from "@/hooks/useGradingPrintPreferences";
 import { exportElementToPdf, printElement } from "@/lib/pdf-export";
 import { getDb } from "@/lib/firebase";
 import { isQuestionIncluded } from "@/lib/grading-print-config";
-import { sortQuestionResults } from "@/lib/question-results";
+import { sortQuestionResults, updateQuestionPassageTranslation } from "@/lib/question-results";
 import { dedupeSessionsByTest } from "@/lib/session-list";
 import { sumResultScores, toScoreOutOf100 } from "@/lib/scoring";
 import type { StudentPrintSections } from "@/lib/grading-print-config";
@@ -111,6 +111,11 @@ export function PrintStudentPage() {
 
   const updateDraft = (id: string, patch: Partial<QuestionResult>) => {
     setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+    setSaveState("idle");
+  };
+
+  const updatePassageTranslation = (id: string, translation: string) => {
+    setDrafts((prev) => updateQuestionPassageTranslation(prev, id, translation));
     setSaveState("idle");
   };
 
@@ -226,6 +231,9 @@ export function PrintStudentPage() {
                 included={isQuestionIncluded(prefs.includedQuestions, r.id)}
                 onIncludedChange={(included) => setQuestionIncluded(r.id, included)}
                 onChange={(patch) => updateDraft(r.id, patch)}
+                onPassageTranslationChange={(translation) =>
+                  updatePassageTranslation(r.id, translation)
+                }
                 defaultOpen={index === 0}
               />
             ))}

@@ -23,10 +23,13 @@ import { getDb } from "@/lib/firebase";
 import {
   isCompositionResult,
   isComprehensiveReadingResult,
+  isLastQuestionPart,
   modelAnswerForPrint,
+  passageTranslationForPrint,
   shouldShowModelAnswerPanel,
   sortQuestionResults,
   studentAnswerForPrint,
+  updateQuestionPassageTranslation,
 } from "@/lib/question-results";
 import { formatGradingProgressMessage } from "@/lib/session-progress-message";
 import type { GradeLevel, QuestionResult } from "@/types/firestore";
@@ -72,14 +75,8 @@ export function SessionGradingReviewPage() {
     }
   }, [session?.pastExamAdvice]);
 
-  useEffect(() => {
-    if (!session || loading) return;
-    if (session.gradingConfirmedAt) {
-      navigate(`/sessions/${sessionId}`, { replace: true });
-    }
-  }, [session, loading, navigate, sessionId]);
-
   const sortedDrafts = useMemo(() => sortQuestionResults(drafts), [drafts]);
+  const isConfirmed = Boolean(session?.gradingConfirmedAt);
 
   const progressMessage = useMemo(() => {
     const fromSession = formatGradingProgressMessage(session?.gradingProgress);
@@ -158,6 +155,22 @@ export function SessionGradingReviewPage() {
     }
   };
 
+  const handleSaveAfterConfirm = async () => {
+    setSaving(true);
+    setError("");
+    setDraftSaved(false);
+    try {
+      await saveResults(sortedDrafts);
+      await syncSessionScores(sortedDrafts);
+      if (advice) await persistAdvice(advice);
+      navigate(`/sessions/${sessionId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleConfirm = async () => {
     if (!advice) {
       setError("過去問視点のアドバイスが未生成です。生成してから確定してください。");
@@ -193,25 +206,49 @@ export function SessionGradingReviewPage() {
         }
       />
       <PageHeader
-        title="添削内容の確認"
-        description="添削結果と過去問視点のアドバイスを確認・修正してから確定してください"
+        title={isConfirmed ? "添削内容の編集" : "添削内容の確認"}
+        description={
+          isConfirmed
+            ? "講評・解説・全訳などを修正して保存できます。返却プリントは結果画面から出力してください。"
+            : "添削結果と過去問視点のアドバイスを確認・修正してから確定してください"
+        }
       />
 
       <div className="page-content mx-auto max-w-3xl space-y-6">
-        <Card className="border-amber-100 bg-amber-50/80 p-4 font-ja text-sm leading-relaxed text-slate-800">
-          <p>
-            この画面で<strong>確定するまで</strong>、生徒への返却・カルテ集計は完了しません。
-            自由英作文は「総評」「内容について」「文法・語法・表現について」「完成版」の4部構成で表示されます。
-          </p>
-          <p className="mt-2">
-            「あなたの解答」を修正した場合は、<strong>修正内容で再採点</strong>を押してから確定してください。
-            採点・講評・過去問アドバイスが解答内容に合わせて更新されます。
-          </p>
-          <p className="mt-2 text-slate-600">
-            <strong>下書き保存</strong>したあと再開するには、
-            <strong>生徒</strong> → 該当生徒の<strong>「過去の添削・面談」</strong>
-            → <strong>「添削確認を続ける（下書き）」</strong>から開けます（サイドバーの「下書き」は問題生成用です）。
-          </p>
+        <Card
+          className={
+            isConfirmed
+              ? "border-blue-100 bg-blue-50/80 p-4 font-ja text-sm leading-relaxed text-slate-800"
+              : "border-amber-100 bg-amber-50/80 p-4 font-ja text-sm leading-relaxed text-slate-800"
+          }
+        >
+          {isConfirmed ? (
+            <>
+              <p>
+                このセッションは<strong>確定済み</strong>です。ここでの修正は保存後、結果画面・返却プリントに反映されます。
+                長文読解の<strong>全訳</strong>は、最後の小問の欄で編集できます。
+              </p>
+              <p className="mt-2">
+                「あなたの解答」を変えた場合は、<strong>修正内容で再採点</strong>を押してください。
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                この画面で<strong>確定するまで</strong>、生徒への返却・カルテ集計は完了しません。
+                自由英作文は「総評」「内容について」「文法・語法・表現について」「完成版」の4部構成で表示されます。
+              </p>
+              <p className="mt-2">
+                「あなたの解答」を修正した場合は、<strong>修正内容で再採点</strong>を押してから確定してください。
+                採点・講評・過去問アドバイスが解答内容に合わせて更新されます。
+              </p>
+              <p className="mt-2 text-slate-600">
+                <strong>下書き保存</strong>したあと再開するには、
+                <strong>生徒</strong> → 該当生徒の<strong>「過去の添削・面談」</strong>
+                → <strong>「添削確認を続ける（下書き）」</strong>から開けます（サイドバーの「下書き」は問題生成用です）。
+              </p>
+            </>
+          )}
         </Card>
 
         {draftSaved && (
@@ -223,22 +260,49 @@ export function SessionGradingReviewPage() {
         )}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Button className="min-h-11 w-full sm:w-auto" variant="outline" onClick={handleSaveDraft} disabled={saving || confirming || generatingAdvice || regrading}>
-            下書き保存
-          </Button>
-          <Button
-            className="min-h-11 w-full gap-2 sm:w-auto"
-            variant="outline"
-            onClick={handleRegrade}
-            disabled={saving || confirming || generatingAdvice || regrading}
-          >
-            <RefreshCw className={`h-4 w-4 ${regrading ? "animate-spin" : ""}`} />
-            修正内容で再採点
-          </Button>
-          <Button className="min-h-11 w-full gap-2 sm:w-auto" onClick={handleConfirm} disabled={saving || confirming || generatingAdvice || regrading || !advice}>
-            <Check className="h-4 w-4" />
-            内容を確定する
-          </Button>
+          {isConfirmed ? (
+            <>
+              <Button
+                className="min-h-11 w-full gap-2 sm:w-auto"
+                onClick={handleSaveAfterConfirm}
+                disabled={saving || confirming || generatingAdvice || regrading}
+              >
+                <Check className="h-4 w-4" />
+                変更を保存
+              </Button>
+              <Button
+                className="min-h-11 w-full gap-2 sm:w-auto"
+                variant="outline"
+                onClick={handleRegrade}
+                disabled={saving || confirming || generatingAdvice || regrading}
+              >
+                <RefreshCw className={`h-4 w-4 ${regrading ? "animate-spin" : ""}`} />
+                修正内容で再採点
+              </Button>
+              <Button className="min-h-11 w-full sm:w-auto" variant="outline" asChild>
+                <Link to={`/sessions/${sessionId}`}>結果画面に戻る</Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button className="min-h-11 w-full sm:w-auto" variant="outline" onClick={handleSaveDraft} disabled={saving || confirming || generatingAdvice || regrading}>
+                下書き保存
+              </Button>
+              <Button
+                className="min-h-11 w-full gap-2 sm:w-auto"
+                variant="outline"
+                onClick={handleRegrade}
+                disabled={saving || confirming || generatingAdvice || regrading}
+              >
+                <RefreshCw className={`h-4 w-4 ${regrading ? "animate-spin" : ""}`} />
+                修正内容で再採点
+              </Button>
+              <Button className="min-h-11 w-full gap-2 sm:w-auto" onClick={handleConfirm} disabled={saving || confirming || generatingAdvice || regrading || !advice}>
+                <Check className="h-4 w-4" />
+                内容を確定する
+              </Button>
+            </>
+          )}
           {saving && <InlineLoading message="保存中..." />}
         </div>
 
@@ -251,6 +315,9 @@ export function SessionGradingReviewPage() {
             const isComposition = isCompositionResult(r);
             const isComprehensive = isComprehensiveReadingResult(r, sortedDrafts);
             const useSummaryLabel = isComposition || isComprehensive;
+            const passageTranslation = passageTranslationForPrint(r, sortedDrafts);
+            const showPassageTranslation =
+              isComprehensive && isLastQuestionPart(r, sortedDrafts);
             return (
               <Card key={r.id} className="space-y-4 p-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -371,6 +438,26 @@ export function SessionGradingReviewPage() {
                         onChange={(e) => updateDraft(r.id, { modelAnswer: e.target.value })}
                       />
                     </div>
+                    {showPassageTranslation ? (
+                      <div className="rounded-lg border-2 border-slate-200 bg-slate-50/70 p-4">
+                        <label className="font-ja text-sm font-semibold text-slate-800">
+                          全訳（第{r.order}問のいちばん最後に掲載）
+                        </label>
+                        <p className="mt-1 font-ja text-xs text-slate-500">
+                          返却プリントでは最後の小問の末尾に表示されます。
+                        </p>
+                        <Textarea
+                          className="mt-2 font-ja"
+                          rows={6}
+                          value={passageTranslation}
+                          onChange={(e) =>
+                            setDrafts((prev) =>
+                              updateQuestionPassageTranslation(prev, r.id, e.target.value),
+                            )
+                          }
+                        />
+                      </div>
+                    ) : null}
                   </>
                 ) : (
                   <div>
@@ -447,12 +534,21 @@ export function SessionGradingReviewPage() {
           )}
         </section>
 
-        <Button className="min-h-11 w-full gap-2" onClick={handleConfirm} disabled={confirming || generatingAdvice || regrading || !advice}>
-          <Check className="h-4 w-4" />
-          内容を確定する
-        </Button>
+        {isConfirmed ? (
+          <Button className="min-h-11 w-full gap-2" onClick={handleSaveAfterConfirm} disabled={saving || confirming || generatingAdvice || regrading}>
+            <Check className="h-4 w-4" />
+            変更を保存
+          </Button>
+        ) : (
+          <Button className="min-h-11 w-full gap-2" onClick={handleConfirm} disabled={confirming || generatingAdvice || regrading || !advice}>
+            <Check className="h-4 w-4" />
+            内容を確定する
+          </Button>
+        )}
         <Button variant="ghost" asChild className="w-full">
-          <Link to={`/sessions/${sessionId}`}>結果画面を見る（未確定のまま）</Link>
+          <Link to={`/sessions/${sessionId}`}>
+            {isConfirmed ? "結果画面に戻る" : "結果画面を見る（未確定のまま）"}
+          </Link>
         </Button>
       </div>
     </div>

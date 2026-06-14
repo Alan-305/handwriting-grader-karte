@@ -3,7 +3,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   isCompositionResult,
+  isComprehensiveReadingResult,
+  isLastQuestionPart,
   modelAnswerForPrint,
+  passageTranslationForPrint,
   studentAnswerForPrint,
 } from "@/lib/question-results";
 import { resultAnchor } from "@/lib/preview-anchor";
@@ -22,6 +25,7 @@ export function GradingPrintQuestionEditor({
   included,
   onIncludedChange,
   onChange,
+  onPassageTranslationChange,
   defaultOpen = false,
 }: {
   result: QuestionResult;
@@ -30,11 +34,15 @@ export function GradingPrintQuestionEditor({
   included: boolean;
   onIncludedChange: (included: boolean) => void;
   onChange: (patch: Partial<QuestionResult>) => void;
+  onPassageTranslationChange?: (translation: string) => void;
   defaultOpen?: boolean;
 }) {
   const studentText = studentAnswerForPrint(result, allResults);
   const modelText = modelAnswerForPrint(result, allResults);
   const isComposition = isCompositionResult(result);
+  const isComprehensive = isComprehensiveReadingResult(result, allResults);
+  const passageTranslation = passageTranslationForPrint(result, allResults);
+  const showPassageTranslation = isComprehensive && isLastQuestionPart(result, allResults);
   const anchor = resultAnchor(result.id);
 
   return (
@@ -198,6 +206,21 @@ export function GradingPrintQuestionEditor({
             data-preview-anchor={anchor}
           />
         </div>
+
+        {showPassageTranslation ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+            <label className="font-ja text-sm font-semibold text-slate-800">
+              全訳（第{result.order}問のいちばん最後に掲載）
+            </label>
+            <Textarea
+              className="mt-2 font-ja"
+              rows={6}
+              value={passageTranslation}
+              onChange={(e) => onPassageTranslationChange?.(e.target.value)}
+              data-preview-anchor={anchor}
+            />
+          </div>
+        ) : null}
       </div>
     </CollapsiblePanel>
   );

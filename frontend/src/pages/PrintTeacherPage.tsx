@@ -17,7 +17,7 @@ import { useSavePrintArtifact, useSession, useUpdateQuestionResults } from "@/ho
 import { apiClient } from "@/lib/api-client";
 import { isQuestionIncluded } from "@/lib/grading-print-config";
 import { exportElementToPdf, printElement } from "@/lib/pdf-export";
-import { sortQuestionResults } from "@/lib/question-results";
+import { sortQuestionResults, updateQuestionPassageTranslation } from "@/lib/question-results";
 import type { TeacherPrintSections } from "@/lib/grading-print-config";
 import type { QuestionResult } from "@/types/firestore";
 
@@ -67,6 +67,11 @@ export function PrintTeacherPage() {
 
   const updateDraft = (id: string, patch: Partial<QuestionResult>) => {
     setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+    setSaveState("idle");
+  };
+
+  const updatePassageTranslation = (id: string, translation: string) => {
+    setDrafts((prev) => updateQuestionPassageTranslation(prev, id, translation));
     setSaveState("idle");
   };
 
@@ -160,6 +165,9 @@ export function PrintTeacherPage() {
                 included={isQuestionIncluded(prefs.includedQuestions, r.id)}
                 onIncludedChange={(included) => setQuestionIncluded(r.id, included)}
                 onChange={(patch) => updateDraft(r.id, patch)}
+                onPassageTranslationChange={(translation) =>
+                  updatePassageTranslation(r.id, translation)
+                }
                 defaultOpen={index === 0}
               />
             ))}

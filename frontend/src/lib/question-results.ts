@@ -1,5 +1,10 @@
 import type { AnswerPart, Question, QuestionResult } from "@/types/firestore";
-import { answerBodyWithoutPassageTranslation, splitModelAnswerSections, translationBody } from "@/lib/model-answer-sections";
+import {
+  answerBodyWithoutPassageTranslation,
+  mergeModelAnswerSections,
+  splitModelAnswerSections,
+  translationBody,
+} from "@/lib/model-answer-sections";
 
 function resultRank(r: QuestionResult): number {
   const graded = r.graded ? 1 : 0;
@@ -174,6 +179,46 @@ export function isLastQuestionPart(
   if (group.length <= 1) return true;
   const sorted = [...group].sort((a, b) => (a.partIndex ?? 0) - (b.partIndex ?? 0));
   return sorted[sorted.length - 1]?.id === r.id;
+}
+
+/** modelAnswer に本文全訳を結合（既存の【全訳】は置き換え） */
+export function modelAnswerWithPassageTranslation(
+  modelAnswer: string,
+  translation: string,
+): string {
+  return mergeModelAnswerSections(answerBodyWithoutPassageTranslation(modelAnswer), translation);
+}
+
+/** 同一設問の全小問 modelAnswer を揃えつつ、全訳だけ更新する */
+export function updateQuestionPassageTranslation(
+  drafts: QuestionResult[],
+  targetId: string,
+  translation: string,
+): QuestionResult[] {
+  const target = drafts.find((d) => d.id === targetId);
+  if (!target) return drafts;
+
+  const group = drafts.filter((s) => s.questionId === target.questionId && s.order === target.order);
+  if (group.length === 0) return drafts;
+
+  const labels = group.map((p) => p.partLabel).filter((x): x is string => Boolean(x));
+  const sorted = [...group].sort((a, b) => (a.partIndex ?? 0) - (b.partIndex ?? 0));
+
+  let fullBody = "";
+  if (sorted.length > 1 && labels.length > 1) {
+    fullBody = sorted
+      .map((p) => {
+        const slice = modelAnswerForPrint(p, drafts);
+        return p.partLabel ? `${p.partLabel} ${slice}` : slice;
+      })
+      .join("\n");
+  } else {
+    fullBody = answerBodyWithoutPassageTranslation(sorted[0]?.modelAnswer ?? "");
+  }
+
+  const merged = mergeModelAnswerSections(fullBody, translation);
+  const groupIds = new Set(group.map((g) => g.id));
+  return drafts.map((d) => (groupIds.has(d.id) ? { ...d, modelAnswer: merged } : d));
 }
 
 /** 本文全訳（最後の小問でのみ表示） */
