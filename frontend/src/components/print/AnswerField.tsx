@@ -26,6 +26,8 @@ function JapaneseGridField({
           borderCollapse: "collapse",
           tableLayout: "fixed",
           width: "100%",
+          maxWidth: "100%",
+          boxSizing: "border-box",
           border: `1px solid ${ANSWER_SHEET_LINE}`,
         }}
       >
@@ -58,6 +60,8 @@ function UnderlineField({ lines, widthRatio }: { lines: number; widthRatio: numb
       className="answer-sheet-field space-y-0 rounded border bg-white px-2 py-3 print:px-0"
       style={{
         width: `${Math.round(widthRatio * 100)}%`,
+        maxWidth: "100%",
+        boxSizing: "border-box",
         borderColor: ANSWER_SHEET_LINE,
         borderWidth: "1px",
       }}
@@ -91,6 +95,8 @@ function EnglishCompositionField({
       className="answer-sheet-field rounded border bg-white px-2 py-3 print:px-0"
       style={{
         width: `${Math.round(widthRatio * 100)}%`,
+        maxWidth: "100%",
+        boxSizing: "border-box",
         borderColor: ANSWER_SHEET_LINE,
         borderWidth: "1px",
       }}
@@ -130,6 +136,9 @@ function ShortField() {
       className="answer-sheet-field rounded bg-white"
       style={{
         minHeight: "24mm",
+        width: "100%",
+        maxWidth: "100%",
+        boxSizing: "border-box",
         border: `2px solid ${ANSWER_SHEET_LINE}`,
       }}
     />

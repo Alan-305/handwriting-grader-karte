@@ -37,7 +37,7 @@ function SymbolTableField({ formatOptions }: { formatOptions?: AnswerFormatOptio
     <div className="bg-white px-1 py-1 print:px-0">
       <table
         className="answer-sheet-symbol-table w-full border-collapse"
-        style={{ tableLayout: "fixed", borderCollapse: "collapse" }}
+        style={{ tableLayout: "fixed", borderCollapse: "collapse", width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
       >
         <thead>
           <tr className="bg-slate-50">

@@ -207,8 +207,20 @@ body {
     box-sizing: border-box;
   }
 
-  .print-flow-document table {
-    max-width: 100%;
+  .print-flow-document table,
+  .answer-sheet-japanese-grid-wrap,
+  .answer-sheet-field,
+  .answer-sheet-symbol-table {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .answer-sheet-japanese-grid,
+  .answer-sheet-symbol-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    table-layout: fixed !important;
   }
 
   /* 印刷時は装飾枠・背景を外し、文字領域を確保（解答用紙のマス目・記号表は除外） */
@@ -346,6 +358,7 @@ body {
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
+    table-layout: fixed !important;
   }
 
   .print-flow-document--answer-key .text-explanation,
