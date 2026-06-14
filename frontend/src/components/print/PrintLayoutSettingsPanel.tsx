@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
 import { Input } from "@/components/ui/input";
 import {
+  clampFontScale,
+  clampLineHeight,
   clampQuestionGapMm,
   DEFAULT_PRINT_LAYOUT_SETTINGS,
   PAGE_MARGIN_LABEL,
@@ -40,7 +42,7 @@ export function PrintLayoutSettingsPanel({
       storageKey={`print-layout-${documentLabel}`}
       title={`${documentLabel}レイアウト設定`}
       description="プレビューに即反映されます。問題用紙・解答用紙で設定は共通（テストごとに保存）です。"
-      defaultOpen={documentLabel === "解答用紙"}
+      defaultOpen={documentLabel === "解答用紙" || documentLabel === "解答・解説・全訳"}
     >
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="大問の区切り">
@@ -95,6 +97,39 @@ export function PrintLayoutSettingsPanel({
         </Field>
       </div>
 
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Field label="文字サイズ（%）">
+          <Input
+            type="number"
+            min={85}
+            max={120}
+            step={1}
+            inputMode="numeric"
+            className="h-11 font-en"
+            value={settings.fontScalePercent}
+            onChange={(e) =>
+              update("fontScalePercent", clampFontScale(Number(e.target.value)))
+            }
+          />
+          <p className="font-ja text-xs text-slate-500">
+            見出し・解説・全訳など、印刷全体の文字が連動して変わります（85〜120%）。
+          </p>
+        </Field>
+
+        <Field label="行間">
+          <Input
+            type="number"
+            min={1.25}
+            max={1.9}
+            step={0.05}
+            className="h-11 font-en"
+            value={settings.lineHeight}
+            onChange={(e) => update("lineHeight", clampLineHeight(Number(e.target.value)))}
+          />
+          <p className="font-ja text-xs text-slate-500">解説・全訳など本文の行の開き（1.25〜1.9）。</p>
+        </Field>
+      </div>
+
       {settings.sectionMode === "custom" && sortedOrders.length > 1 ? (
         <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
           <p className="font-ja text-sm font-semibold text-slate-800">改ページ位置</p>
@@ -139,7 +174,8 @@ export function PrintLayoutSettingsPanel({
           className="font-ja text-sm text-slate-500 underline hover:text-slate-700"
           onClick={onReset}
         >
-          初期値に戻す（第1問独立・余白 {DEFAULT_PRINT_LAYOUT_SETTINGS.questionGapMm}mm）
+          初期値に戻す（第1問独立・余白 {DEFAULT_PRINT_LAYOUT_SETTINGS.questionGapMm}mm・文字{" "}
+          {DEFAULT_PRINT_LAYOUT_SETTINGS.fontScalePercent}%）
         </button>
       </div>
     </CollapsiblePanel>

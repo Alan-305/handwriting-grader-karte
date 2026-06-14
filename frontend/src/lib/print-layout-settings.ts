@@ -11,6 +11,10 @@ export interface PrintLayoutSettings {
   pageMargin: PrintPageMargin;
   /** custom モード: この order の大問の直前で改ページ（第1問は不可） */
   breakBeforeOrders?: number[];
+  /** 印刷全体の文字サイズ（85〜120%） */
+  fontScalePercent: number;
+  /** 本文の行間（1.25〜1.9） */
+  lineHeight: number;
 }
 
 export const DEFAULT_PRINT_LAYOUT_SETTINGS: PrintLayoutSettings = {
@@ -18,6 +22,8 @@ export const DEFAULT_PRINT_LAYOUT_SETTINGS: PrintLayoutSettings = {
   questionGapMm: 12,
   pageMargin: "standard",
   breakBeforeOrders: [],
+  fontScalePercent: 100,
+  lineHeight: 1.55,
 };
 
 export const SECTION_MODE_LABEL: Record<PrintSectionMode, string> = {
@@ -40,9 +46,21 @@ export function clampQuestionGapMm(value: number): number {
   return Math.min(50, Math.max(0, Math.round(value)));
 }
 
+export function clampFontScale(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_PRINT_LAYOUT_SETTINGS.fontScalePercent;
+  return Math.min(120, Math.max(85, Math.round(value)));
+}
+
+export function clampLineHeight(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_PRINT_LAYOUT_SETTINGS.lineHeight;
+  return Math.min(1.9, Math.max(1.25, Math.round(value * 100) / 100));
+}
+
 export function printLayoutDocumentStyle(settings: PrintLayoutSettings): CSSProperties {
   return {
     "--print-question-gap": `${clampQuestionGapMm(settings.questionGapMm)}mm`,
+    "--print-font-scale": `${clampFontScale(settings.fontScalePercent)}%`,
+    "--print-line-height": String(clampLineHeight(settings.lineHeight)),
   } as CSSProperties;
 }
 
@@ -58,6 +76,12 @@ function migrateLegacy(raw: Record<string, unknown>): PrintLayoutSettings {
   }
 
   settings.questionGapMm = clampQuestionGapMm(settings.questionGapMm);
+  settings.fontScalePercent = clampFontScale(
+    settings.fontScalePercent ?? DEFAULT_PRINT_LAYOUT_SETTINGS.fontScalePercent,
+  );
+  settings.lineHeight = clampLineHeight(
+    settings.lineHeight ?? DEFAULT_PRINT_LAYOUT_SETTINGS.lineHeight,
+  );
   if (!Array.isArray(settings.breakBeforeOrders)) {
     settings.breakBeforeOrders = [];
   } else {
@@ -87,6 +111,8 @@ export function savePrintLayoutSettings(testId: string, settings: PrintLayoutSet
     JSON.stringify({
       ...settings,
       questionGapMm: clampQuestionGapMm(settings.questionGapMm),
+      fontScalePercent: clampFontScale(settings.fontScalePercent),
+      lineHeight: clampLineHeight(settings.lineHeight),
       breakBeforeOrders: (settings.breakBeforeOrders ?? [])
         .filter((n) => Number.isFinite(n) && n > 1)
         .sort((a, b) => a - b),

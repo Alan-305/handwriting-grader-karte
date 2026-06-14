@@ -119,6 +119,47 @@ body {
   line-height: var(--grading-print-line-height, 1.55);
 }
 
+/*
+ * 問題用紙・解答用紙・解答・解説・全訳：文字サイズ（%）・行間をプレビューと印刷の両方に反映。
+ */
+.print-layout-document {
+  font-size: calc(1rem * var(--print-font-scale, 100%) / 100);
+  line-height: var(--print-line-height, 1.55);
+}
+
+.print-layout-document :where(.text-xs) {
+  font-size: 0.75em;
+}
+
+.print-layout-document :where(.text-sm) {
+  font-size: 0.875em;
+}
+
+.print-layout-document :where(.text-base) {
+  font-size: 1em;
+}
+
+.print-layout-document :where(.text-lg) {
+  font-size: 1.125em;
+}
+
+.print-layout-document :where(.text-xl) {
+  font-size: 1.25em;
+}
+
+.print-layout-document :where(.text-2xl) {
+  font-size: 1.5em;
+}
+
+.print-layout-document :where(.text-explanation) {
+  font-size: 1em;
+  line-height: var(--print-line-height, 1.55);
+}
+
+.print-layout-document :where(.leading-relaxed) {
+  line-height: var(--print-line-height, 1.55);
+}
+
 @media print {
   body {
     background: white;

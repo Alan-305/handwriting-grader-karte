@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampFontScale,
+  clampLineHeight,
   DEFAULT_PRINT_LAYOUT_SETTINGS,
   shouldApplyQuestionGap,
   shouldBreakBeforeQuestion,
@@ -50,5 +52,21 @@ describe("shouldApplyQuestionGap", () => {
     expect(shouldApplyQuestionGap(2, { sectionMode: "split_first", breakBeforeOrders: [] })).toBe(
       true,
     );
+  });
+});
+
+describe("clampFontScale", () => {
+  it("clamps to 85–120", () => {
+    expect(clampFontScale(80)).toBe(85);
+    expect(clampFontScale(125)).toBe(120);
+    expect(clampFontScale(100)).toBe(100);
+  });
+});
+
+describe("clampLineHeight", () => {
+  it("clamps to 1.25–1.9", () => {
+    expect(clampLineHeight(1)).toBe(1.25);
+    expect(clampLineHeight(2)).toBe(1.9);
+    expect(clampLineHeight(1.55)).toBe(1.55);
   });
 });

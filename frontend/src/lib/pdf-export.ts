@@ -80,6 +80,13 @@ const PRINT_STYLES = `
     break-inside: auto !important;
     page-break-inside: auto !important;
   }
+  .print-layout-document {
+    font-size: calc(1rem * var(--print-font-scale, 100%) / 100);
+    line-height: var(--print-line-height, 1.55);
+  }
+  .print-layout-document :where(.text-explanation, .leading-relaxed) {
+    line-height: var(--print-line-height, 1.55);
+  }
   .print-question-block {
     margin-top: 1.25rem;
     break-inside: avoid;
