@@ -14,6 +14,7 @@ import {
   isCompositionResult,
   isComprehensiveReadingResult,
   modelAnswerForPrint,
+  passageTranslationForPrint,
   shouldShowModelAnswerPanel,
   studentAnswerForPrint,
 } from "@/lib/question-results";
@@ -126,6 +127,7 @@ export function SessionResultPage() {
                     ? modelAnswerForPrint(r, results)
                     : undefined
                 }
+                passageTranslation={passageTranslationForPrint(r, results)}
               />
             ) : (
               <>

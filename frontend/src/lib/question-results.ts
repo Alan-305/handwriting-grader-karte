@@ -1,4 +1,5 @@
 import type { AnswerPart, Question, QuestionResult } from "@/types/firestore";
+import { answerBodyWithoutPassageTranslation, splitModelAnswerSections, translationBody } from "@/lib/model-answer-sections";
 
 function resultRank(r: QuestionResult): number {
   const graded = r.graded ? 1 : 0;
@@ -95,8 +96,10 @@ export function textForPart(
   const text = (fullText ?? "").trim();
   if (!text || !partLabel) return text;
 
+  const bodyText = answerBodyWithoutPassageTranslation(text);
+
   const labels = siblingLabels.filter(Boolean);
-  if (labels.length <= 1) return text;
+  if (labels.length <= 1) return bodyText;
 
   const escaped = partLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const labelPattern = "\\([0-9０-９]+\\)|（[0-9０-９]+）";
@@ -104,12 +107,12 @@ export function textForPart(
     `${escaped}\\s*([\\s\\S]*?)(?=\\s*${labelPattern}|$)`,
     "i",
   );
-  const match = text.match(re);
+  const match = bodyText.match(re);
   if (match?.[1]?.trim()) {
     return match[1].trim();
   }
 
-  return text;
+  return bodyText;
 }
 
 export function studentAnswerForPrint(
@@ -162,20 +165,48 @@ export function shouldShowModelAnswerPanel(
   return true;
 }
 
+/** 同一設問内の最後の小問か */
+export function isLastQuestionPart(
+  r: Pick<QuestionResult, "id" | "questionId" | "order" | "partIndex">,
+  siblings: QuestionResult[] = [],
+): boolean {
+  const group = siblings.filter((s) => s.questionId === r.questionId && s.order === r.order);
+  if (group.length <= 1) return true;
+  const sorted = [...group].sort((a, b) => (a.partIndex ?? 0) - (b.partIndex ?? 0));
+  return sorted[sorted.length - 1]?.id === r.id;
+}
+
+/** 本文全訳（最後の小問でのみ表示） */
+export function passageTranslationForPrint(
+  r: Pick<QuestionResult, "id" | "questionId" | "order" | "partIndex" | "modelAnswer">,
+  siblings: QuestionResult[] = [],
+): string {
+  if (!isLastQuestionPart(r, siblings)) return "";
+
+  const group = siblings.filter((s) => s.questionId === r.questionId && s.order === r.order);
+  const sources = group.length > 0 ? group.map((p) => p.modelAnswer ?? "") : [r.modelAnswer ?? ""];
+  for (const raw of sources) {
+    const { translation } = splitModelAnswerSections(raw);
+    if (translation.trim()) return translationBody(translation);
+  }
+  return "";
+}
+
 export function modelAnswerForPrint(
   r: QuestionResult,
   siblings: QuestionResult[],
 ): string {
   const text = r.modelAnswer ?? "";
+  const bodyOnly = answerBodyWithoutPassageTranslation(text);
   const parts = siblings.filter((s) => s.questionId === r.questionId && s.order === r.order);
-  if (parts.length <= 1) return text;
+  if (parts.length <= 1) return bodyOnly;
 
   const same = parts.every((p) => (p.modelAnswer ?? "") === text);
-  if (!same) return text;
+  if (!same) return answerBodyWithoutPassageTranslation(text);
 
   const labels = parts.map((p) => p.partLabel).filter((x): x is string => Boolean(x));
   const extracted = textForPart(text, r.partLabel, labels);
-  return extracted || text;
+  return extracted || bodyOnly;
 }
 
 export function pickQuestionResultPatch(

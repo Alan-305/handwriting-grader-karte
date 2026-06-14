@@ -19,6 +19,7 @@ import {
   isCompositionResult,
   isComprehensiveReadingResult,
   modelAnswerForPrint,
+  passageTranslationForPrint,
   shouldShowModelAnswerPanel,
   sortQuestionResults,
   studentAnswerForPrint,
@@ -32,17 +33,6 @@ import { depersonalizeForStudentPrint, compactStudentNameForPrintHeader } from "
 
 function questionHeading(r: QuestionResult): string {
   return `第${r.order}問${r.partLabel ? ` ${r.partLabel}` : ""}`;
-}
-
-function splitModelAnswerTranslation(text: string): { body: string; translation: string } {
-  if (!text) return { body: "", translation: "" };
-  const marker = /(【全訳】|【全文和訳】)/;
-  const hit = marker.exec(text);
-  if (!hit || hit.index < 0) return { body: text, translation: "" };
-  return {
-    body: text.slice(0, hit.index).trim(),
-    translation: text.slice(hit.index).trim(),
-  };
 }
 
 export function StudentPrintLayout({
@@ -96,12 +86,7 @@ export function StudentPrintLayout({
       {sorted.map((r, index) => {
         const studentText = studentAnswerForPrint(r, sorted);
         const modelText = modelAnswerForPrint(r, sorted);
-        const modelParts = splitModelAnswerTranslation(modelText);
-        const showTranslation = studentSectionOn(sections, "modelAnswerTranslation");
-        const modelTextForPrint =
-          showTranslation || !modelParts.translation
-            ? modelText
-            : modelParts.body || modelText;
+        const passageTranslation = passageTranslationForPrint(r, sorted);
         const composition = isCompositionResult(r);
         const comprehensive = isComprehensiveReadingResult(r, sorted);
         const breakBefore = shouldBreakBeforeQuestion(index, layout.sectionMode);
@@ -173,8 +158,11 @@ export function StudentPrintLayout({
                       : undefined
                   }
                   modelAnswer={
-                    studentSectionOn(sections, "modelAnswer") && modelTextForPrint
-                      ? modelTextForPrint
+                    studentSectionOn(sections, "modelAnswer") && modelText ? modelText : undefined
+                  }
+                  passageTranslation={
+                    studentSectionOn(sections, "modelAnswerTranslation")
+                      ? passageTranslation
                       : undefined
                   }
                 />
@@ -190,10 +178,21 @@ export function StudentPrintLayout({
               {studentSectionOn(sections, "modelAnswer") &&
               shouldShowModelAnswerPanel(r, sorted) &&
               !comprehensive &&
-              modelTextForPrint ? (
+              modelText ? (
                 <div className="grading-print-block">
                   <p className="font-ja text-sm font-semibold text-slate-600">模範解答</p>
-                  <p className="text-explanation mt-1 font-en text-slate-900">{modelTextForPrint}</p>
+                  <p className="text-explanation mt-1 font-en text-slate-900">{modelText}</p>
+                </div>
+              ) : null}
+
+              {studentSectionOn(sections, "modelAnswerTranslation") &&
+              !comprehensive &&
+              passageTranslation ? (
+                <div className="grading-print-block">
+                  <p className="font-ja text-sm font-semibold text-slate-600">全訳</p>
+                  <p className="text-explanation mt-2 whitespace-pre-line font-ja text-slate-800">
+                    {personalize(passageTranslation)}
+                  </p>
                 </div>
               ) : null}
 
@@ -239,6 +238,7 @@ export function TeacherPrintLayout({
       {sorted.map((r, index) => {
         const studentText = studentAnswerForPrint(r, sorted);
         const modelText = modelAnswerForPrint(r, sorted);
+        const passageTranslation = passageTranslationForPrint(r, sorted);
         const composition = isCompositionResult(r);
         const comprehensive = isComprehensiveReadingResult(r, sorted);
         const breakBefore = shouldBreakBeforeQuestion(index, layout.sectionMode);
@@ -313,6 +313,9 @@ export function TeacherPrintLayout({
                   }
                   modelAnswer={
                     teacherSectionOn(sections, "modelAnswer") && modelText ? modelText : undefined
+                  }
+                  passageTranslation={
+                    teacherSectionOn(sections, "modelAnswer") ? passageTranslation : undefined
                   }
                 />
               ) : teacherSectionOn(sections, "explanation") && r.explanation ? (
