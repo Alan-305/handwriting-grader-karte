@@ -157,6 +157,23 @@ body {
     margin-bottom: 1.25rem;
   }
 
+  /* 添削返却プリント：大問ブロックは途中改ページ可（タイトル直後から解説を流す） */
+  .grading-print-document .print-doc-header {
+    break-after: avoid;
+    page-break-after: avoid;
+    margin-bottom: 0.75rem;
+  }
+
+  .grading-print-document .print-question-block {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .grading-print-document .grading-print-question > .flex:first-child {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
   .print-question-block {
     break-inside: avoid;
     page-break-inside: avoid;

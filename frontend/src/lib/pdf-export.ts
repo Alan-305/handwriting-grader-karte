@@ -57,10 +57,20 @@ const PRINT_STYLES = `
     page-break-inside: avoid;
     margin-bottom: 1.25rem;
   }
+  .grading-print-document .print-doc-header {
+    break-after: avoid;
+    page-break-after: avoid;
+    margin-bottom: 0.75rem;
+  }
   .print-question-block {
     margin-top: 1.25rem;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+  .grading-print-document .print-question-block,
+  .print-question-block.print-question-block--split-ok {
+    break-inside: auto;
+    page-break-inside: auto;
   }
   .print-question-block:first-of-type { margin-top: 0; }
   .print-page {

@@ -31,5 +31,7 @@ export function formatTotalScoreLabel(
 }
 
 export function formatQuestionScore(r: Pick<QuestionResult, "score" | "maxPoints">): string {
-  return `${r.score ?? 0} / ${r.maxPoints}点`;
+  const score = Math.round(r.score ?? 0);
+  const maxPoints = Math.round(r.maxPoints ?? 0);
+  return `${score} / ${maxPoints}点`;
 }
