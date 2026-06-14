@@ -76,7 +76,7 @@ export function PrintAnswerSheetPage() {
   }
 
   const settingsPane = (
-    <div className="space-y-4 p-4 pb-8 sm:p-6">
+    <div className="no-print space-y-4 p-4 pb-8 sm:p-6">
       <PrintLayoutSettingsPanel
         documentLabel="解答用紙"
         settings={settings}

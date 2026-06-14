@@ -48,9 +48,9 @@ export function ScaledPrintPreview({
   }, [children]);
 
   return (
-    <div ref={outerRef} className={cn("min-w-0", className)}>
+    <div ref={outerRef} className={cn("scaled-print-preview min-w-0", className)}>
       <div
-        className="print:h-auto"
+        className="scaled-print-preview__frame"
         style={
           scaledSize
             ? { width: scaledSize.width, height: scaledSize.height }
@@ -59,7 +59,7 @@ export function ScaledPrintPreview({
       >
         <div
           ref={innerRef}
-          className="w-fit print:w-full print:max-w-none print:transform-none"
+          className="scaled-print-preview__content w-fit"
           style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}
         >
           {children}

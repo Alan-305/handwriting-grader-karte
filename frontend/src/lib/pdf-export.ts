@@ -1,5 +1,11 @@
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import {
+  A4_WIDTH_MM,
+  PRINT_CONTENT_WIDTH_MM,
+  PRINT_PAGE_MARGIN_CSS,
+  PRINT_SCREEN_PADDING_CSS,
+} from "@/lib/print-page";
 
 const PRINT_PAGE_SELECTOR = ".print-page";
 
@@ -42,22 +48,22 @@ export async function exportElementToPdf(element: HTMLElement, filename: string)
   pdf.save(filename);
 }
 
-const PRINT_STYLES = `
+function buildPrintStyles(): string {
+  return `
   *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: white; }
 
-  /* 印刷用ウィンドウ：A4 幅に固定（100% だとブラウザ幅まで広がり右端が欠ける） */
   @media screen {
     html, body {
-      width: 210mm;
-      max-width: 210mm;
+      width: ${A4_WIDTH_MM}mm;
+      max-width: ${A4_WIDTH_MM}mm;
       margin: 0 auto;
       overflow-x: hidden;
     }
     .print-flow-document {
-      width: 210mm !important;
-      max-width: 210mm !important;
-      padding: 20mm 24mm !important;
+      width: ${A4_WIDTH_MM}mm !important;
+      max-width: ${A4_WIDTH_MM}mm !important;
+      padding: ${PRINT_SCREEN_PADDING_CSS} !important;
       margin: 0 !important;
       box-sizing: border-box !important;
       box-shadow: none !important;
@@ -71,19 +77,19 @@ const PRINT_STYLES = `
   }
 
   @media print {
-    @page { size: A4 portrait; margin: 20mm 24mm; }
+    @page { size: A4 portrait; margin: ${PRINT_PAGE_MARGIN_CSS}; }
     html, body {
       width: auto !important;
       max-width: none !important;
       overflow: visible !important;
     }
     .print-flow-document {
-      width: 100% !important;
-      max-width: 100% !important;
+      width: ${PRINT_CONTENT_WIDTH_MM}mm !important;
+      max-width: ${PRINT_CONTENT_WIDTH_MM}mm !important;
       padding: 0 !important;
-      margin: 0 !important;
+      margin: 0 auto !important;
       box-shadow: none !important;
-      overflow: visible !important;
+      overflow: hidden !important;
     }
     .print-flow-document *,
     .print-flow-document *::before,
@@ -97,6 +103,7 @@ const PRINT_STYLES = `
     .answer-sheet-field {
       width: 100% !important;
       max-width: 100% !important;
+      table-layout: fixed !important;
     }
     .print-flow-document--answer-key .border,
     .print-flow-document--answer-key .border-2,
@@ -210,39 +217,69 @@ const PRINT_STYLES = `
     .print-corner-br { bottom: 0; right: 0; }
   }
 `;
+}
 
+function getAppStylesheetHref(): string {
+  const link = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).find((el) =>
+    (el as HTMLLinkElement).href.includes("/assets/index-"),
+  );
+  return link ? (link as HTMLLinkElement).href : "";
+}
+
+/** 印刷対象だけを iframe に載せて印刷（Mac Safari / Chrome 向けに CSS を隔離） */
 export function printElement(element: HTMLElement) {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) return;
-  const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-    .map((el) => el.outerHTML)
-    .join("\n");
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html lang="ja">
-    <head>
-      <meta charset="utf-8" />
-      <title>Print</title>
-      ${styles}
-      <style>${PRINT_STYLES}</style>
-    </head>
-    <body>${element.innerHTML}</body>
-    </html>
-  `);
-  printWindow.document.close();
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+  document.body.appendChild(iframe);
 
-  const runPrint = () => {
-    printWindow.focus();
-    printWindow.print();
+  const win = iframe.contentWindow;
+  const doc = iframe.contentDocument;
+  if (!win || !doc) {
+    iframe.remove();
+    return;
+  }
+
+  const cssHref = getAppStylesheetHref();
+  const stylesheetLink = cssHref
+    ? `<link rel="stylesheet" href="${cssHref}" crossorigin="anonymous" />`
+    : "";
+
+  doc.open();
+  doc.write(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=${A4_WIDTH_MM}mm" />
+  <title></title>
+  ${stylesheetLink}
+  <style>${buildPrintStyles()}</style>
+</head>
+<body>${element.innerHTML}</body>
+</html>`);
+  doc.close();
+
+  const cleanup = () => {
+    window.setTimeout(() => iframe.remove(), 1500);
   };
 
-  const links = Array.from(printWindow.document.querySelectorAll('link[rel="stylesheet"]'));
-  if (links.length === 0) {
+  const runPrint = () => {
+    win.focus();
+    win.print();
+    cleanup();
+  };
+
+  if (!cssHref) {
     runPrint();
     return;
   }
 
-  let pending = links.length;
+  const link = doc.querySelector('link[rel="stylesheet"]');
+  if (!link) {
+    runPrint();
+    return;
+  }
+
   let printed = false;
   const runPrintOnce = () => {
     if (printed) return;
@@ -250,20 +287,7 @@ export function printElement(element: HTMLElement) {
     runPrint();
   };
 
-  const onReady = () => {
-    pending -= 1;
-    if (pending <= 0) runPrintOnce();
-  };
-
-  links.forEach((link) => {
-    const el = link as HTMLLinkElement;
-    if (el.sheet) onReady();
-    else {
-      el.addEventListener("load", onReady);
-      el.addEventListener("error", onReady);
-    }
-  });
-
-  // Stylesheet が読み込まれない場合の保険
-  printWindow.setTimeout(runPrintOnce, 2000);
+  link.addEventListener("load", runPrintOnce, { once: true });
+  link.addEventListener("error", runPrintOnce, { once: true });
+  window.setTimeout(runPrintOnce, 2500);
 }

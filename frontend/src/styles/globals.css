@@ -17,6 +17,14 @@
 /* PC サイドバーの幅（AppShell の折りたたみ状態と同期。固定フッター等の左端合わせに使う） */
 :root {
   --app-sidebar-width: 0px;
+  --print-page-width: 210mm;
+  --print-margin-top: 20mm;
+  --print-margin-bottom: 20mm;
+  --print-margin-left: 22mm;
+  --print-margin-right: 26mm;
+  --print-content-width: calc(
+    var(--print-page-width) - var(--print-margin-left) - var(--print-margin-right)
+  );
 }
 
 @media (min-width: 1024px) {
@@ -171,10 +179,11 @@ body {
     display: none !important;
   }
 
-  /* A4 印刷：@page で余白、本文は自然改ページ */
+  /* A4 印刷：@page で余白、本文幅は mm 指定（Mac Safari の 100% 計算ずれ対策） */
   @page {
     size: A4 portrait;
-    margin: 20mm 24mm;
+    margin: var(--print-margin-top) var(--print-margin-right) var(--print-margin-bottom)
+      var(--print-margin-left);
   }
 
   .print-document {
@@ -182,15 +191,16 @@ body {
     padding: 0;
   }
 
-  /* 問題用紙：流し込み（@page 余白のみ。追加 padding で右端が欠けないようにする） */
+  /* 流し込み印刷：可視幅を mm で固定 */
   .print-flow-document {
-    width: 100% !important;
-    max-width: 100% !important;
+    width: var(--print-content-width) !important;
+    max-width: var(--print-content-width) !important;
     padding: 0 !important;
-    margin: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
     box-sizing: border-box;
     box-shadow: none !important;
-    overflow: visible !important;
+    overflow: hidden !important;
   }
 
   html,
@@ -393,6 +403,18 @@ body {
   }
 
   /* 解答用紙：印刷時各ページ四隅にトンボ */
+  .scaled-print-preview__frame {
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+  }
+
+  .scaled-print-preview__content {
+    transform: none !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
   .print-corner-mark {
     position: fixed;
     z-index: 9999;
@@ -425,9 +447,10 @@ body {
 /* 画面プレビュー */
 @media screen {
   .print-flow-document {
-    width: 210mm;
+    width: var(--print-page-width);
     min-height: 297mm;
-    padding: 20mm 24mm;
+    padding: var(--print-margin-top) var(--print-margin-right) var(--print-margin-bottom)
+      var(--print-margin-left);
     margin: 0 auto 12px;
     box-sizing: border-box;
   }
