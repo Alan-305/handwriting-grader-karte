@@ -60,11 +60,16 @@ export function ViewerSessionResultPage() {
 
         {results.map((r) => (
           <Card key={r.id} className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               <h3 className="font-ja text-lg font-semibold">
                 第{r.order}問{r.partLabel ? ` ${r.partLabel}` : ""}
               </h3>
-              {r.grade ? <GradeBadge grade={r.grade as GradeLevel} /> : null}
+              <div className="flex shrink-0 flex-wrap items-center gap-3">
+                <p className="font-ja text-sm font-medium text-slate-700">
+                  得点 {formatQuestionScore(r)}
+                </p>
+                {r.grade ? <GradeBadge grade={r.grade as GradeLevel} /> : null}
+              </div>
             </div>
             <div>
               <p className="font-ja text-sm font-semibold text-slate-600">あなたの解答</p>
@@ -106,12 +111,9 @@ export function ViewerSessionResultPage() {
                 ) : null}
               </>
             )}
-            <p className="font-ja text-sm font-medium text-slate-700">
-              {formatQuestionScore(r)}
-              {(r.errorTags?.length ?? 0) > 0 && (
-                <span className="font-normal text-slate-500"> · {r.errorTags?.join("、")}</span>
-              )}
-            </p>
+            {(r.errorTags?.length ?? 0) > 0 ? (
+              <p className="font-ja text-sm text-slate-500">傾向: {r.errorTags?.join("、")}</p>
+            ) : null}
           </Card>
         ))}
 

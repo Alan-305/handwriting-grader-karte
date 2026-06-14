@@ -100,14 +100,21 @@ export function StudentPrintLayout({
             className={`print-question-wrap print-question-block print-question-block--split-ok ${gapClass} ${breakBefore ? "print-break-before-page" : ""}`}
           >
             <section className="grading-print-question space-y-4 border-b border-slate-100 pb-8 print:border-black/20">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <h2 className="font-ja text-sm font-semibold text-slate-800">{questionHeading(r)}</h2>
-                {studentSectionOn(sections, "grade") && (
-                  <GradeBadge
-                    grade={r.grade as GradeLevel}
-                    className="min-h-9 min-w-9 px-3 text-sm"
-                  />
-                )}
+                <div className="flex shrink-0 flex-wrap items-center gap-3">
+                  {studentSectionOn(sections, "score") && (
+                    <p className="font-ja text-sm text-slate-600">
+                      得点 {formatQuestionScore(r)}
+                    </p>
+                  )}
+                  {studentSectionOn(sections, "grade") && (
+                    <GradeBadge
+                      grade={r.grade as GradeLevel}
+                      className="min-h-9 min-w-9 px-3 text-sm"
+                    />
+                  )}
+                </div>
               </div>
 
               {studentSectionOn(sections, "studentAnswer") && (
@@ -196,11 +203,6 @@ export function StudentPrintLayout({
                 </div>
               ) : null}
 
-              {studentSectionOn(sections, "score") && (
-                <p className="grading-print-block font-ja text-sm text-slate-600">
-                  得点: {formatQuestionScore(r)}
-                </p>
-              )}
             </section>
           </PreviewAnchor>
         );
