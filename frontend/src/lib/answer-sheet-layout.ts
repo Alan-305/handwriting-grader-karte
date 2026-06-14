@@ -3,7 +3,7 @@ import { expandAnswerUnits, type AnswerUnit } from "@/lib/answer-parts";
 import {
   DEFAULT_PRINT_LAYOUT_SETTINGS,
   shouldBreakBeforeQuestion,
-  type PrintSectionMode,
+  type PrintLayoutSettings,
 } from "@/lib/print-layout-settings";
 import type {
   AnswerFormatOptions,
@@ -113,7 +113,7 @@ function toLayoutSlot(
 
 export function generateAnswerSheetLayout(
   questions: Question[],
-  sectionMode: PrintSectionMode = DEFAULT_PRINT_LAYOUT_SETTINGS.sectionMode,
+  settings: Pick<PrintLayoutSettings, "sectionMode" | "breakBeforeOrders"> = DEFAULT_PRINT_LAYOUT_SETTINGS,
 ): AnswerSheetLayout {
   let pageIndex = 0;
   let localY = MARGIN + HEADER_HEIGHT;
@@ -122,7 +122,7 @@ export function generateAnswerSheetLayout(
 
   for (let qIndex = 0; qIndex < questions.length; qIndex += 1) {
     const q = questions[qIndex];
-    if (shouldBreakBeforeQuestion(qIndex, sectionMode)) {
+    if (shouldBreakBeforeQuestion(qIndex, q.order, settings)) {
       pageIndex += 1;
       localY = MARGIN;
     }

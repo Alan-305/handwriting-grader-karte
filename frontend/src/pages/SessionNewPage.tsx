@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useStudents } from "@/hooks/useStudent";
 import { apiClient } from "@/lib/api-client";
 import { generateAnswerSheetLayout, layoutPageCount } from "@/lib/answer-sheet-layout";
+import { loadPrintLayoutSettings } from "@/lib/print-layout-settings";
 import { getDb } from "@/lib/firebase";
 import { primaryPastExamSlug } from "@/lib/resolve-university";
 import type { Question, Test } from "@/types/firestore";
@@ -69,10 +70,11 @@ export function SessionNewPage() {
   const selectedQuestions = testId ? questionsByTest[testId] ?? [] : [];
 
   const expectedPages = useMemo(() => {
-    if (selectedQuestions.length === 0) return 1;
-    const layout = generateAnswerSheetLayout(selectedQuestions);
+    if (!testId || selectedQuestions.length === 0) return 1;
+    const settings = loadPrintLayoutSettings(testId);
+    const layout = generateAnswerSheetLayout(selectedQuestions, settings);
     return layoutPageCount(layout.slots);
-  }, [selectedQuestions]);
+  }, [testId, selectedQuestions]);
 
   const uploadHint = useMemo(() => {
     if (expectedPages <= 1) {

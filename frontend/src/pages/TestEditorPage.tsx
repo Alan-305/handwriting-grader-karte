@@ -398,7 +398,7 @@ export function TestEditorPage() {
     setSaveState("saving");
     setSaveError("");
     try {
-      const layout = generateAnswerSheetLayout(draftQuestions);
+      const layout = generateAnswerSheetLayout(draftQuestions, paperPrintSettings.settings);
 
       const tplRef = await addDoc(collection(getDb(), "answer_sheet_templates"), {
         teacherId: user.uid,
@@ -469,8 +469,8 @@ export function TestEditorPage() {
   );
   const answerSheetSlots = useMemo(() => {
     if (draftQuestions.length === 0) return [];
-    return generateAnswerSheetLayout(draftQuestions).slots;
-  }, [draftQuestions]);
+    return generateAnswerSheetLayout(draftQuestions, paperPrintSettings.settings).slots;
+  }, [draftQuestions, paperPrintSettings.settings]);
 
   const editorPane = (
     <div className="space-y-6 p-4 pb-44 sm:p-6 lg:pb-40">

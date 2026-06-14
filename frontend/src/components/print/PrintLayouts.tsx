@@ -89,9 +89,9 @@ export function StudentPrintLayout({
         const passageTranslation = passageTranslationForPrint(r, sorted);
         const composition = isCompositionResult(r);
         const comprehensive = isComprehensiveReadingResult(r, sorted);
-        const breakBefore = shouldBreakBeforeQuestion(index, layout.sectionMode);
+        const breakBefore = shouldBreakBeforeQuestion(index, r.order, layout);
         const gapClass =
-          shouldApplyQuestionGap(index, layout.sectionMode) ? "print-question-gap" : "";
+          shouldApplyQuestionGap(index, layout) ? "print-question-gap" : "";
 
         return (
           <PreviewAnchor
@@ -243,9 +243,9 @@ export function TeacherPrintLayout({
         const passageTranslation = passageTranslationForPrint(r, sorted);
         const composition = isCompositionResult(r);
         const comprehensive = isComprehensiveReadingResult(r, sorted);
-        const breakBefore = shouldBreakBeforeQuestion(index, layout.sectionMode);
+        const breakBefore = shouldBreakBeforeQuestion(index, r.order, layout);
         const gapClass =
-          shouldApplyQuestionGap(index, layout.sectionMode) ? "print-question-gap" : "";
+          shouldApplyQuestionGap(index, layout) ? "print-question-gap" : "";
 
         return (
           <PreviewAnchor

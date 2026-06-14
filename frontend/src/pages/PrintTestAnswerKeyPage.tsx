@@ -13,11 +13,10 @@ import {
 } from "firebase/firestore";
 import { PageHeader } from "@/components/layout/AppShell";
 import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
-import { PreviewScrollArea } from "@/components/layout/PreviewScrollRegisterContext";
 import { SyncPreviewSplit } from "@/components/layout/SyncPreviewSplit";
 import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { PrintLayoutSettingsPanel } from "@/components/print/PrintLayoutSettingsPanel";
-import { ScaledPrintPreview } from "@/components/print/ScaledPrintPreview";
+import { PrintPreviewPane } from "@/components/print/PrintPreviewPane";
 import {
   DEFAULT_ANSWER_KEY_PRINT_SECTIONS,
   TeacherAnswerKeyPrintLayout,
@@ -44,7 +43,8 @@ import {
   questionShowsPassageTranslationField,
   type AnswerKeyDraftState,
 } from "@/lib/test-answer-key";
-import { exportElementToPdf, printElement } from "@/lib/pdf-export";
+import { exportElementToPdf } from "@/lib/pdf-export";
+import { printDocument } from "@/lib/print-layout-settings";
 import type { Question, Test } from "@/types/firestore";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -277,7 +277,7 @@ export function PrintTestAnswerKeyPage() {
   }
 
   const editPane = (
-    <div className="space-y-4 p-4 pb-12 sm:p-6">
+    <div className="no-print space-y-4 p-4 pb-12 sm:p-6">
       <CollapsiblePanel
         storageKey="answer-key-guide"
         title="本文の全訳について"
@@ -297,6 +297,7 @@ export function PrintTestAnswerKeyPage() {
         settings={settings}
         onChange={setSettings}
         onReset={reset}
+        questionOrders={questions.map((q) => q.order)}
       />
 
       {questions.map((q, qi) => {
@@ -379,27 +380,21 @@ export function PrintTestAnswerKeyPage() {
   );
 
   const previewPane = (
-    <div className="flex h-full min-h-0 flex-col bg-slate-100">
-      <div className="no-print shrink-0 border-b border-slate-200 bg-white px-4 py-2">
-        <span className="font-ja text-sm font-medium text-slate-600">
-          印刷プレビュー（編集内容が即時反映されます）
-        </span>
-      </div>
-      <PreviewScrollArea scrollRef={previewScrollRef}>
-        <ScaledPrintPreview className="box-border p-4 pb-8 print:p-0">
-          <div ref={printRef}>
-            <TeacherAnswerKeyPrintLayout
-              testTitle={test.title}
-              questions={previewQuestions}
-              units={draftUnits}
-              settings={settings}
-              sections={sections}
-              passageTranslations={draft.passageByQuestion}
-            />
-          </div>
-        </ScaledPrintPreview>
-      </PreviewScrollArea>
-    </div>
+    <PrintPreviewPane
+      title="印刷プレビュー"
+      hint="編集内容が即時反映されます"
+      printRef={printRef}
+      scrollRef={previewScrollRef}
+    >
+      <TeacherAnswerKeyPrintLayout
+        testTitle={test.title}
+        questions={previewQuestions}
+        units={draftUnits}
+        settings={settings}
+        sections={sections}
+        passageTranslations={draft.passageByQuestion}
+      />
+    </PrintPreviewPane>
   );
 
   return (
@@ -424,7 +419,7 @@ export function PrintTestAnswerKeyPage() {
             type="button"
             variant="outline"
             className="min-h-11 gap-2"
-            onClick={() => printRef.current && printElement(printRef.current)}
+            onClick={() => printDocument()}
           >
             <Printer className="h-4 w-4" />
             印刷 / PDF

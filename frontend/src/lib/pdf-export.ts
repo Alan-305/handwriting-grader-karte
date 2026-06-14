@@ -69,6 +69,17 @@ const PRINT_STYLES = `
     break-inside: auto !important;
     page-break-inside: auto !important;
   }
+  .print-flow-document--answer-key .print-doc-header {
+    break-after: page !important;
+    page-break-after: always !important;
+    margin-bottom: 0 !important;
+  }
+  .print-flow-document--answer-key .print-question-wrap,
+  .print-flow-document--answer-key .print-question-block,
+  .print-flow-document--answer-key .print-question-block--split-ok {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
   .print-question-block {
     margin-top: 1.25rem;
     break-inside: avoid;

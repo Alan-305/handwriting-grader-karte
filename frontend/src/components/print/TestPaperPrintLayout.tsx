@@ -57,8 +57,8 @@ export function TestPaperPrintLayout({
       </header>
 
       {questions.map((q, index) => {
-        const breakBefore = shouldBreakBeforeQuestion(index, settings.sectionMode);
-        const applyGap = shouldApplyQuestionGap(index, settings.sectionMode);
+        const breakBefore = shouldBreakBeforeQuestion(index, q.order, settings);
+        const applyGap = shouldApplyQuestionGap(index, settings);
 
         return (
           <div

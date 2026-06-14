@@ -71,6 +71,7 @@ export function PrintTestPaperPage() {
         settings={settings}
         onChange={setSettings}
         onReset={reset}
+        questionOrders={questions.map((q) => q.order)}
       />
     </div>
   );

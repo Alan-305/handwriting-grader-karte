@@ -164,6 +164,20 @@ body {
     margin-bottom: 0.75rem;
   }
 
+  /* 解答・解説・全訳：1ページ目は表紙（タイトルのみ）、2ページ目から本文 */
+  .print-flow-document--answer-key .print-doc-header {
+    break-after: page;
+    page-break-after: always;
+    margin-bottom: 0;
+  }
+
+  .print-flow-document--answer-key .print-question-wrap,
+  .print-flow-document--answer-key .print-question-block,
+  .print-flow-document--answer-key .print-question-block--split-ok {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
   .grading-print-document .print-question-wrap,
   .grading-print-document .print-question-block,
   .grading-print-document .grading-print-question,

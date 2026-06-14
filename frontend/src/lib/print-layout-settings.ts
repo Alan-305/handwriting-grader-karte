@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-export type PrintSectionMode = "split_first" | "flow_all" | "one_per_question";
+export type PrintSectionMode = "split_first" | "flow_all" | "one_per_question" | "custom";
 
 export type PrintPageMargin = "standard" | "wide";
 
@@ -9,18 +9,22 @@ export interface PrintLayoutSettings {
   /** 大問と大問の間隔（mm） */
   questionGapMm: number;
   pageMargin: PrintPageMargin;
+  /** custom モード: この order の大問の直前で改ページ（第1問は不可） */
+  breakBeforeOrders?: number[];
 }
 
 export const DEFAULT_PRINT_LAYOUT_SETTINGS: PrintLayoutSettings = {
   sectionMode: "split_first",
   questionGapMm: 12,
   pageMargin: "standard",
+  breakBeforeOrders: [],
 };
 
 export const SECTION_MODE_LABEL: Record<PrintSectionMode, string> = {
   split_first: "第1問を独立（第2問以降は別ページから）",
   flow_all: "すべて流し込み（スペースが足りれば同じページ）",
   one_per_question: "大問ごとに改ページ",
+  custom: "大問ごとに指定（チェックで改ページ位置を選ぶ）",
 };
 
 export const PAGE_MARGIN_LABEL: Record<PrintPageMargin, string> = {
@@ -54,6 +58,13 @@ function migrateLegacy(raw: Record<string, unknown>): PrintLayoutSettings {
   }
 
   settings.questionGapMm = clampQuestionGapMm(settings.questionGapMm);
+  if (!Array.isArray(settings.breakBeforeOrders)) {
+    settings.breakBeforeOrders = [];
+  } else {
+    settings.breakBeforeOrders = [...new Set(settings.breakBeforeOrders.map(Number))]
+      .filter((n) => Number.isFinite(n) && n > 1)
+      .sort((a, b) => a - b);
+  }
   return settings;
 }
 
@@ -76,23 +87,50 @@ export function savePrintLayoutSettings(testId: string, settings: PrintLayoutSet
     JSON.stringify({
       ...settings,
       questionGapMm: clampQuestionGapMm(settings.questionGapMm),
+      breakBeforeOrders: (settings.breakBeforeOrders ?? [])
+        .filter((n) => Number.isFinite(n) && n > 1)
+        .sort((a, b) => a - b),
     }),
   );
 }
 
-/** 各大問の前に改ページを入れるか */
-export function shouldBreakBeforeQuestion(index: number, mode: PrintSectionMode): boolean {
-  if (index === 0) return false;
-  if (mode === "flow_all") return false;
-  if (mode === "one_per_question") return true;
-  return index === 1;
+type LayoutBreakSettings = Pick<PrintLayoutSettings, "sectionMode" | "breakBeforeOrders">;
+
+/** 各大問の前に改ページを入れるか（groupIndex=0 は常に false） */
+export function shouldBreakBeforeQuestion(
+  groupIndex: number,
+  questionOrder: number,
+  settings: LayoutBreakSettings,
+): boolean {
+  if (groupIndex === 0) return false;
+  const { sectionMode, breakBeforeOrders = [] } = settings;
+  if (sectionMode === "flow_all") return false;
+  if (sectionMode === "one_per_question") return true;
+  if (sectionMode === "custom") return breakBeforeOrders.includes(questionOrder);
+  return groupIndex === 1;
 }
 
-/** 大問間余白（mm）を適用するか — split_first では第2問以降の間のみ */
-export function shouldApplyQuestionGap(index: number, mode: PrintSectionMode): boolean {
-  if (index === 0) return false;
-  if (mode === "split_first") return index >= 2;
+/** 大問間余白（mm）を適用するか */
+export function shouldApplyQuestionGap(
+  groupIndex: number,
+  settings: LayoutBreakSettings,
+): boolean {
+  if (groupIndex === 0) return false;
+  if (settings.sectionMode === "split_first") return groupIndex >= 2;
   return true;
+}
+
+export function toggleBreakBeforeOrder(
+  settings: PrintLayoutSettings,
+  questionOrder: number,
+  enabled: boolean,
+): PrintLayoutSettings {
+  if (questionOrder <= 1) return settings;
+  const current = settings.breakBeforeOrders ?? [];
+  const breakBeforeOrders = enabled
+    ? [...new Set([...current, questionOrder])].sort((a, b) => a - b)
+    : current.filter((o) => o !== questionOrder);
+  return { ...settings, breakBeforeOrders };
 }
 
 /** 印刷時にブラウザ PDF ヘッダーへタイトルを出さない */

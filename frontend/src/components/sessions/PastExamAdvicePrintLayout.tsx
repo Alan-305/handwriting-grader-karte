@@ -82,9 +82,9 @@ export function PastExamAdvicePrintLayout({
 
       {insights.length > 0
         ? insights.map((item, index) => {
-        const breakBefore = shouldBreakBeforeQuestion(index, layout.sectionMode);
+        const breakBefore = shouldBreakBeforeQuestion(index, item.questionOrder, layout);
         const gapClass =
-          shouldApplyQuestionGap(index, layout.sectionMode) ? "print-question-gap" : "";
+          shouldApplyQuestionGap(index, layout) ? "print-question-gap" : "";
 
         return (
           <PreviewAnchor

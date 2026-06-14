@@ -156,8 +156,8 @@ export function AnswerSheetPrintLayout({
       </header>
 
       {groups.map(({ order, parts }, index) => {
-        const breakBefore = shouldBreakBeforeQuestion(index, settings.sectionMode);
-        const applyGap = shouldApplyQuestionGap(index, settings.sectionMode);
+        const breakBefore = shouldBreakBeforeQuestion(index, order, settings);
+        const applyGap = shouldApplyQuestionGap(index, settings);
         const isLast = index === groups.length - 1;
 
         const syncAnchor = questionIdByOrder?.[order]

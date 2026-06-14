@@ -50,11 +50,15 @@ export function PrintAnswerSheetPage() {
       );
       const loaded = qSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Question);
       setQuestions(loaded);
-      const layout = generateAnswerSheetLayout(loaded);
-      setSlots(layout.slots);
       setLoading(false);
     })();
   }, [testId]);
+
+  useEffect(() => {
+    if (questions.length === 0) return;
+    const layout = generateAnswerSheetLayout(questions, settings);
+    setSlots(layout.slots);
+  }, [questions, settings]);
 
   if (loading) {
     return <div className="page-content font-ja text-slate-500">読み込み中...</div>;
@@ -78,6 +82,7 @@ export function PrintAnswerSheetPage() {
         settings={settings}
         onChange={setSettings}
         onReset={reset}
+        questionOrders={questions.map((q) => q.order)}
       />
     </div>
   );

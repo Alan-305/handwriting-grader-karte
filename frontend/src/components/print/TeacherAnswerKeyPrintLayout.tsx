@@ -45,7 +45,7 @@ function SectionBlock({
 }) {
   if (!children) return null;
   return (
-    <div className="print-break-avoid space-y-2">
+    <div className="space-y-2">
       <h3 className="font-ja text-sm font-semibold text-slate-700">{title}</h3>
       <div className="text-explanation leading-relaxed text-slate-900">{children}</div>
     </div>
@@ -79,7 +79,7 @@ export function TeacherAnswerKeyPrintLayout({
 
   return (
     <PrintFlowDocument
-      className="print-layout-document"
+      className="print-layout-document print-flow-document--answer-key"
       data-section-mode={settings.sectionMode}
       data-page-margin={settings.pageMargin}
       style={printLayoutDocumentStyle(settings)}
@@ -114,22 +114,22 @@ export function TeacherAnswerKeyPrintLayout({
 
         if (!hasContent) return null;
 
-        const breakBefore = shouldBreakBeforeQuestion(questionIndex, settings.sectionMode);
-        const applyGap = shouldApplyQuestionGap(questionIndex, settings.sectionMode);
+        const breakBefore = shouldBreakBeforeQuestion(questionIndex, question.order, settings);
+        const applyGap = shouldApplyQuestionGap(questionIndex, settings);
 
         return (
           <PreviewAnchor
             key={question.id}
             anchor={questionAnchor(question.id)}
             className={[
-              "print-question-wrap print-question-block",
+              "print-question-wrap print-question-block--split-ok",
               breakBefore ? "print-break-before-page" : "",
               applyGap ? "print-question-gap" : "",
             ]
               .filter(Boolean)
               .join(" ")}
           >
-            <section className="print-break-avoid space-y-5 border-b border-slate-200 pb-6 print:border-black/20">
+            <section className="space-y-5 border-b border-slate-200 pb-6 print:border-black/20">
               <h2 className="font-ja text-lg font-semibold">第{question.order}問</h2>
 
               {sections.prompt && question.prompt ? (
@@ -175,7 +175,7 @@ export function TeacherAnswerKeyPrintLayout({
               {showPassageTranslation ? (
                 <PreviewAnchor
                   anchor={questionPassageAnchor(question.id)}
-                  className="print-break-avoid mt-2 rounded-lg border-2 border-slate-300 bg-slate-50/80 p-5 print:border-black/30 print:bg-transparent"
+                  className="mt-2 rounded-lg border-2 border-slate-300 bg-slate-50/80 p-5 print:border-black/30 print:bg-transparent"
                 >
                   <SectionBlock title={translationTitle}>
                     <p className="whitespace-pre-wrap font-ja">{storedTranslation}</p>
