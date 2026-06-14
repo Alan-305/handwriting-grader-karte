@@ -157,21 +157,24 @@ body {
     margin-bottom: 1.25rem;
   }
 
-  /* 添削返却プリント：大問ブロックは途中改ページ可（タイトル直後から解説を流す） */
+  /* 添削返却プリント：タイトル直後から本文を流す（途中改ページ可） */
   .grading-print-document .print-doc-header {
-    break-after: avoid;
-    page-break-after: avoid;
+    break-after: auto;
+    page-break-after: auto;
     margin-bottom: 0.75rem;
   }
 
-  .grading-print-document .print-question-block {
-    break-inside: auto;
-    page-break-inside: auto;
+  .grading-print-document .print-question-wrap,
+  .grading-print-document .print-question-block,
+  .grading-print-document .grading-print-question,
+  .grading-print-document .grading-print-block {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
   }
 
   .grading-print-document .grading-print-question > .flex:first-child {
-    break-after: avoid;
-    page-break-after: avoid;
+    break-after: auto;
+    page-break-after: auto;
   }
 
   .print-question-block {

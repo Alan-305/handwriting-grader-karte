@@ -59,7 +59,7 @@ export function ScaledPrintPreview({
       >
         <div
           ref={innerRef}
-          className="w-fit print:w-auto print:transform-none"
+          className="w-fit print:w-full print:max-w-none print:transform-none"
           style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}
         >
           {children}

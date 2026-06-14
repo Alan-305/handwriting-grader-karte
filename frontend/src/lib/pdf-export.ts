@@ -58,9 +58,16 @@ const PRINT_STYLES = `
     margin-bottom: 1.25rem;
   }
   .grading-print-document .print-doc-header {
-    break-after: avoid;
-    page-break-after: avoid;
+    break-after: auto !important;
+    page-break-after: auto !important;
     margin-bottom: 0.75rem;
+  }
+  .grading-print-document .print-question-wrap,
+  .grading-print-document .print-question-block,
+  .grading-print-document .grading-print-question,
+  .grading-print-document .grading-print-block {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
   }
   .print-question-block {
     margin-top: 1.25rem;
@@ -68,9 +75,10 @@ const PRINT_STYLES = `
     page-break-inside: avoid;
   }
   .grading-print-document .print-question-block,
+  .grading-print-document .print-question-wrap,
   .print-question-block.print-question-block--split-ok {
-    break-inside: auto;
-    page-break-inside: auto;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
   }
   .print-question-block:first-of-type { margin-top: 0; }
   .print-page {

@@ -21,7 +21,7 @@ export function PrintPreviewPane({
   className?: string;
 }) {
   return (
-    <div className={cn("flex h-full min-h-0 flex-col bg-slate-100", className)}>
+    <div className={cn("flex h-full min-h-0 flex-col bg-slate-100 print:bg-white", className)}>
       <div className="no-print shrink-0 border-b border-slate-200 bg-white px-4 py-2">
         <span className="font-ja text-sm font-medium text-slate-600">{title}</span>
         {hint ? (

@@ -90,7 +90,7 @@ export function PastExamAdvicePrintLayout({
           <PreviewAnchor
             key={item.questionOrder}
             anchor={adviceQuestionAnchor(item.questionOrder)}
-            className={`print-question-wrap print-question-block ${gapClass} ${breakBefore ? "print-break-before-page" : ""}`}
+            className={`print-question-wrap print-question-block--split-ok ${gapClass} ${breakBefore ? "print-break-before-page" : ""}`}
           >
             <section className="grading-print-question space-y-3 border-b border-slate-100 pb-6 print:border-black/20">
               <div className="flex flex-wrap items-center gap-2">

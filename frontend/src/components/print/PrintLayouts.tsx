@@ -97,7 +97,7 @@ export function StudentPrintLayout({
           <PreviewAnchor
             key={r.id}
             anchor={resultAnchor(r.id)}
-            className={`print-question-wrap print-question-block print-question-block--split-ok ${gapClass} ${breakBefore ? "print-break-before-page" : ""}`}
+            className={`print-question-wrap print-question-block--split-ok ${gapClass} ${breakBefore ? "print-break-before-page" : ""}`}
           >
             <section className="grading-print-question space-y-4 border-b border-slate-100 pb-8 print:border-black/20">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -251,7 +251,7 @@ export function TeacherPrintLayout({
           <PreviewAnchor
             key={r.id}
             anchor={resultAnchor(r.id)}
-            className={`print-question-wrap print-question-block print-question-block--split-ok ${gapClass} ${breakBefore ? "print-break-before-page" : ""}`}
+            className={`print-question-wrap print-question-block--split-ok ${gapClass} ${breakBefore ? "print-break-before-page" : ""}`}
           >
             <section className="grading-print-question space-y-3 border-b border-slate-100 pb-6 print:border-black/20">
               <div className="flex flex-wrap items-center gap-3">

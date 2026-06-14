@@ -19,7 +19,8 @@ import {
 } from "@/hooks/useSession";
 import { usePrintShortcut } from "@/hooks/usePrintShortcut";
 import { useGradingPrintPreferences } from "@/hooks/useGradingPrintPreferences";
-import { exportElementToPdf, printElement } from "@/lib/pdf-export";
+import { exportElementToPdf } from "@/lib/pdf-export";
+import { printDocument } from "@/lib/print-layout-settings";
 import { getDb } from "@/lib/firebase";
 import { isQuestionIncluded } from "@/lib/grading-print-config";
 import { sortQuestionResults, updateQuestionPassageTranslation } from "@/lib/question-results";
@@ -171,7 +172,7 @@ export function PrintStudentPage() {
   };
 
   const handlePrint = () => {
-    if (printRef.current) printElement(printRef.current);
+    printDocument();
   };
 
   const handlePdf = async () => {
@@ -199,7 +200,7 @@ export function PrintStudentPage() {
   if (loading) return <div className="page-content font-ja">読み込み中...</div>;
 
   const editPane = (
-    <div className="space-y-4 p-4 pb-8 sm:p-6">
+    <div className="no-print space-y-4 p-4 pb-8 sm:p-6">
       <GradingPrintControlsPanel
         kind="student"
         prefs={prefs}
