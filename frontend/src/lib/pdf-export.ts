@@ -70,9 +70,9 @@ const PRINT_STYLES = `
     page-break-inside: auto !important;
   }
   .print-flow-document--answer-key .print-doc-header {
-    break-after: page !important;
-    page-break-after: always !important;
-    margin-bottom: 0 !important;
+    break-after: auto !important;
+    page-break-after: auto !important;
+    margin-bottom: 0.75rem !important;
   }
   .print-flow-document--answer-key .print-question-wrap,
   .print-flow-document--answer-key .print-question-block,
