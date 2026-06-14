@@ -12,6 +12,8 @@ import { AnswerField } from "@/components/print/AnswerField";
 import { PrintFixedCornerMarks, PrintFlowDocument } from "@/components/print/PrintA4Page";
 import type { AnswerFormatOptions } from "@/types/firestore";
 
+const ANSWER_SHEET_LINE = "#334155";
+
 function buildSymbolHeaderLabels(
   count: number,
   style: "numeric" | "alpha" | "exam",
@@ -33,13 +35,17 @@ function SymbolTableField({ formatOptions }: { formatOptions?: AnswerFormatOptio
   );
   return (
     <div className="bg-white px-1 py-1">
-      <table className="w-full border-collapse table-fixed">
+      <table
+        className="answer-sheet-symbol-table w-full border-collapse"
+        style={{ tableLayout: "fixed", borderCollapse: "collapse" }}
+      >
         <thead>
           <tr className="bg-slate-50">
             {rows.map((label) => (
               <th
                 key={label}
-                className="border border-slate-400 py-1 text-center font-en text-[11px] font-medium text-slate-700"
+                className="py-1 text-center font-en text-[11px] font-medium text-slate-700"
+                style={{ border: `1px solid ${ANSWER_SHEET_LINE}` }}
               >
                 {label}
               </th>
@@ -51,8 +57,11 @@ function SymbolTableField({ formatOptions }: { formatOptions?: AnswerFormatOptio
             {rows.map((label) => (
               <td
                 key={label}
-                className="border border-slate-400 align-middle"
-                style={{ height: "16mm" }}
+                className="align-middle"
+                style={{
+                  border: `1px solid ${ANSWER_SHEET_LINE}`,
+                  height: "16mm",
+                }}
               >
                 <div className="h-full w-full" />
               </td>
@@ -88,11 +97,14 @@ function AnswerQuestionSection({
   showEndMarker: boolean;
 }) {
   return (
-    <section className="print-question-block print-break-avoid">
+    <section className="print-question-block print-question-block--split-ok">
       <p className="mb-3 font-ja text-base font-semibold">第{order}問</p>
       <div className={parts.length > 1 ? "space-y-4" : undefined}>
         {parts.map((slot) => (
-          <div key={slot.slotKey} className="print-break-avoid">
+          <div
+            key={slot.slotKey}
+            className={shouldUseSymbolTable(slot, order) ? "print-break-avoid" : undefined}
+          >
             {slot.partLabel && (
               <p className="mb-1 font-ja text-xs font-medium text-slate-700">{slot.partLabel}</p>
             )}

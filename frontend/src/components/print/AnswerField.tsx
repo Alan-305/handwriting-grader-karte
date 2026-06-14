@@ -1,6 +1,9 @@
 import { resolveFormatOptions } from "@/lib/answer-format";
 import type { AnswerFormatOptions, AnswerSheetFormat } from "@/types/firestore";
 
+const ANSWER_SHEET_LINE = "#334155";
+const ANSWER_SHEET_CELL_HEIGHT = "7.5mm";
+
 function JapaneseGridField({
   gridRows,
   gridCols,
@@ -11,24 +14,40 @@ function JapaneseGridField({
   charLimit?: number;
 }) {
   return (
-    <div className="space-y-1">
+    <div className="answer-sheet-japanese-grid-wrap space-y-1">
       {charLimit != null && charLimit > 0 && (
         <p className="font-ja text-[10px] text-slate-500">
           {charLimit}字以内（1行{gridCols}字）
         </p>
       )}
-      <div
-        className="grid border border-slate-400"
-        style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}
+      <table
+        className="answer-sheet-japanese-grid w-full"
+        style={{
+          borderCollapse: "collapse",
+          tableLayout: "fixed",
+          width: "100%",
+          border: `1px solid ${ANSWER_SHEET_LINE}`,
+        }}
       >
-        {Array.from({ length: gridRows * gridCols }, (_, i) => (
-          <div
-            key={i}
-            className="aspect-square border border-slate-300 bg-white"
-            style={{ minHeight: "7.5mm" }}
-          />
-        ))}
-      </div>
+        <tbody>
+          {Array.from({ length: gridRows }, (_, row) => (
+            <tr key={row}>
+              {Array.from({ length: gridCols }, (_, col) => (
+                <td
+                  key={col}
+                  aria-hidden
+                  style={{
+                    border: `1px solid ${ANSWER_SHEET_LINE}`,
+                    height: ANSWER_SHEET_CELL_HEIGHT,
+                    padding: 0,
+                    background: "#fff",
+                  }}
+                />
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -36,14 +55,22 @@ function JapaneseGridField({
 function UnderlineField({ lines, widthRatio }: { lines: number; widthRatio: number }) {
   return (
     <div
-      className="space-y-0 rounded border border-slate-400 bg-white px-2 py-3"
-      style={{ width: `${Math.round(widthRatio * 100)}%` }}
+      className="answer-sheet-field space-y-0 rounded border bg-white px-2 py-3"
+      style={{
+        width: `${Math.round(widthRatio * 100)}%`,
+        borderColor: ANSWER_SHEET_LINE,
+        borderWidth: "1px",
+      }}
     >
       {Array.from({ length: lines }, (_, i) => (
         <div
           key={i}
-          className="border-b border-slate-400"
-          style={{ minHeight: "9mm", marginBottom: i < lines - 1 ? "2mm" : 0 }}
+          className="border-b"
+          style={{
+            borderColor: ANSWER_SHEET_LINE,
+            minHeight: "9mm",
+            marginBottom: i < lines - 1 ? "2mm" : 0,
+          }}
         />
       ))}
     </div>
@@ -61,22 +88,31 @@ function EnglishCompositionField({
 }) {
   return (
     <div
-      className="rounded border border-slate-400 bg-white px-2 py-3"
-      style={{ width: `${Math.round(widthRatio * 100)}%` }}
+      className="answer-sheet-field rounded border bg-white px-2 py-3"
+      style={{
+        width: `${Math.round(widthRatio * 100)}%`,
+        borderColor: ANSWER_SHEET_LINE,
+        borderWidth: "1px",
+      }}
     >
       <div className="space-y-0">
         {Array.from({ length: lines }, (_, i) => (
           <div
             key={i}
-            className="border-b border-slate-400"
-            style={{ minHeight: "9mm", marginBottom: i < lines - 1 ? "2mm" : 0 }}
+            className="border-b"
+            style={{
+              borderColor: ANSWER_SHEET_LINE,
+              minHeight: "9mm",
+              marginBottom: i < lines - 1 ? "2mm" : 0,
+            }}
           />
         ))}
       </div>
       <div className="mt-3 flex items-center justify-end gap-1 font-ja text-xs text-slate-600">
         <span className="font-en">（</span>
         <span
-          className="inline-block min-w-[12mm] border-b border-slate-500"
+          className="inline-block min-w-[12mm] border-b"
+          style={{ borderColor: ANSWER_SHEET_LINE }}
           aria-hidden
         />
         <span className="font-en">語）</span>
@@ -91,8 +127,11 @@ function EnglishCompositionField({
 function ShortField() {
   return (
     <div
-      className="rounded border-2 border-slate-400 bg-white"
-      style={{ minHeight: "24mm" }}
+      className="answer-sheet-field rounded bg-white"
+      style={{
+        minHeight: "24mm",
+        border: `2px solid ${ANSWER_SHEET_LINE}`,
+      }}
     />
   );
 }

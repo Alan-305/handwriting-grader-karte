@@ -87,6 +87,30 @@ const PRINT_STYLES = `
   }
   .print-page:last-child { page-break-after: auto; break-after: auto; }
   .print-break-avoid { break-inside: avoid; page-break-inside: avoid; }
+  .print-flow-document--answer-sheet .print-question-block {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  .answer-sheet-japanese-grid,
+  .answer-sheet-japanese-grid td,
+  .answer-sheet-field,
+  .answer-sheet-symbol-table th,
+  .answer-sheet-symbol-table td {
+    border-color: #111 !important;
+  }
+  .answer-sheet-japanese-grid {
+    border-width: 0.75pt !important;
+  }
+  .answer-sheet-japanese-grid td {
+    border-width: 0.5pt !important;
+  }
+  .answer-sheet-field {
+    border-width: 1pt !important;
+  }
+  .answer-sheet-symbol-table th,
+  .answer-sheet-symbol-table td {
+    border-width: 0.5pt !important;
+  }
   .print-corner-mark {
     position: fixed;
     z-index: 9999;
