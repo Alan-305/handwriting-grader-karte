@@ -16,8 +16,7 @@ import { usePrintShortcut } from "@/hooks/usePrintShortcut";
 import { useSavePrintArtifact, useSession, useUpdateQuestionResults } from "@/hooks/useSession";
 import { apiClient } from "@/lib/api-client";
 import { isQuestionIncluded } from "@/lib/grading-print-config";
-import { exportElementToPdf } from "@/lib/pdf-export";
-import { printDocument } from "@/lib/print-layout-settings";
+import { exportElementToPdf, printPreviewFromRef } from "@/lib/pdf-export";
 import { sortQuestionResults, updateQuestionPassageTranslation } from "@/lib/question-results";
 import type { TeacherPrintSections } from "@/lib/grading-print-config";
 import type { QuestionResult } from "@/types/firestore";
@@ -107,7 +106,7 @@ export function PrintTeacherPage() {
   };
 
   const handlePrint = () => {
-    printDocument();
+    printPreviewFromRef(printRef);
   };
 
   const handlePdf = async () => {

@@ -226,6 +226,11 @@ function getAppStylesheetHref(): string {
   return link ? (link as HTMLLinkElement).href : "";
 }
 
+/** プレビュー ref の中身だけを iframe に載せて印刷する */
+export function printPreviewFromRef(ref: { current: HTMLElement | null }) {
+  if (ref.current) printElement(ref.current);
+}
+
 /** 印刷対象だけを iframe に載せて印刷（Mac Safari / Chrome 向けに CSS を隔離） */
 export function printElement(element: HTMLElement) {
   const iframe = document.createElement("iframe");

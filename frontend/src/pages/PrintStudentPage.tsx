@@ -19,8 +19,7 @@ import {
 } from "@/hooks/useSession";
 import { usePrintShortcut } from "@/hooks/usePrintShortcut";
 import { useGradingPrintPreferences } from "@/hooks/useGradingPrintPreferences";
-import { exportElementToPdf } from "@/lib/pdf-export";
-import { printDocument } from "@/lib/print-layout-settings";
+import { exportElementToPdf, printPreviewFromRef } from "@/lib/pdf-export";
 import { getDb } from "@/lib/firebase";
 import { isQuestionIncluded } from "@/lib/grading-print-config";
 import { sortQuestionResults, updateQuestionPassageTranslation } from "@/lib/question-results";
@@ -172,7 +171,7 @@ export function PrintStudentPage() {
   };
 
   const handlePrint = () => {
-    printDocument();
+    printPreviewFromRef(printRef);
   };
 
   const handlePdf = async () => {
@@ -291,6 +290,14 @@ export function PrintStudentPage() {
                 disabled={saveState === "saving" || !isDirty}
               >
                 下書きを保存
+              </Button>
+              <Button
+                className="min-h-11 gap-2"
+                variant="outline"
+                onClick={handlePrint}
+              >
+                <Printer className="h-4 w-4" />
+                印刷
               </Button>
               <Button
                 className="min-h-11 gap-2"
