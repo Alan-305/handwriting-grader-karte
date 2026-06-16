@@ -287,12 +287,21 @@ body {
     page-break-inside: auto !important;
   }
 
+  .grading-print-document .print-question-group,
   .grading-print-document .print-question-wrap,
   .grading-print-document .print-question-block,
   .grading-print-document .grading-print-question,
   .grading-print-document .grading-print-block {
     break-inside: auto !important;
     page-break-inside: auto !important;
+  }
+
+  .grading-print-document .print-question-group .print-question-wrap {
+    margin-top: 0;
+  }
+
+  .grading-print-document .print-question-group .print-question-wrap + .print-question-wrap {
+    margin-top: 1.25rem;
   }
 
   .grading-print-document .grading-print-question > .flex:first-child {

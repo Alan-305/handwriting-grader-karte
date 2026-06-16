@@ -37,6 +37,25 @@ export function sortQuestionResults(results: QuestionResult[]): QuestionResult[]
   });
 }
 
+export type QuestionResultGroup = {
+  order: number;
+  items: QuestionResult[];
+};
+
+/** 印刷レイアウト用: 大問 order ごとに小問をまとめる */
+export function groupQuestionResultsByOrder(results: QuestionResult[]): QuestionResultGroup[] {
+  const groups: QuestionResultGroup[] = [];
+  for (const result of sortQuestionResults(results)) {
+    const last = groups[groups.length - 1];
+    if (last && last.order === result.order) {
+      last.items.push(result);
+    } else {
+      groups.push({ order: result.order, items: [result] });
+    }
+  }
+  return groups;
+}
+
 /** backend answer_parts._points_for_part と同じ配分 */
 export function pointsForPart(
   q: Pick<Question, "points" | "answerParts">,

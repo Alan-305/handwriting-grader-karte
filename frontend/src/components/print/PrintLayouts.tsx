@@ -21,6 +21,7 @@ import {
   modelAnswerForPrint,
   passageTranslationForPrint,
   shouldShowModelAnswerPanel,
+  groupQuestionResultsByOrder,
   sortQuestionResults,
   studentAnswerForPrint,
 } from "@/lib/question-results";
@@ -56,6 +57,7 @@ export function StudentPrintLayout({
   const sorted = sortQuestionResults(results).filter((r) =>
     isQuestionIncluded(includedQuestions, r.id),
   );
+  const grouped = groupQuestionResultsByOrder(sorted);
   const personalize = (text?: string) =>
     text ? depersonalizeForStudentPrint(text, studentName) : text;
   const compactName = compactStudentNameForPrintHeader(studentName);
@@ -83,22 +85,35 @@ export function StudentPrintLayout({
         </div>
       </header>
 
-      {sorted.map((r, index) => {
-        const studentText = studentAnswerForPrint(r, sorted);
-        const modelText = modelAnswerForPrint(r, sorted);
-        const passageTranslation = passageTranslationForPrint(r, sorted);
-        const composition = isCompositionResult(r);
-        const comprehensive = isComprehensiveReadingResult(r, sorted);
-        const breakBefore = shouldBreakBeforeQuestion(index, r.order, layout);
+      {grouped.map((group, groupIndex) => {
+        const breakBefore = shouldBreakBeforeQuestion(groupIndex, group.order, layout);
         const gapClass =
-          shouldApplyQuestionGap(index, layout) ? "print-question-gap" : "";
+          shouldApplyQuestionGap(groupIndex, layout) ? "print-question-gap" : "";
 
         return (
-          <PreviewAnchor
-            key={r.id}
-            anchor={resultAnchor(r.id)}
-            className={`print-question-wrap print-question-block--split-ok ${gapClass} ${breakBefore ? "print-break-before-page" : ""}`}
+          <div
+            key={`order-${group.order}`}
+            className={[
+              "print-question-group",
+              gapClass,
+              breakBefore ? "print-break-before-page" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
+            {group.items.map((r) => {
+              const studentText = studentAnswerForPrint(r, sorted);
+              const modelText = modelAnswerForPrint(r, sorted);
+              const passageTranslation = passageTranslationForPrint(r, sorted);
+              const composition = isCompositionResult(r);
+              const comprehensive = isComprehensiveReadingResult(r, sorted);
+
+              return (
+                <PreviewAnchor
+                  key={r.id}
+                  anchor={resultAnchor(r.id)}
+                  className="print-question-wrap print-question-block--split-ok"
+                >
             <section className="grading-print-question space-y-4 border-b border-slate-100 pb-8 print:border-black/20">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <h2 className="font-ja text-sm font-semibold text-slate-800">{questionHeading(r)}</h2>
@@ -204,7 +219,10 @@ export function StudentPrintLayout({
               ) : null}
 
             </section>
-          </PreviewAnchor>
+                </PreviewAnchor>
+              );
+            })}
+          </div>
         );
       })}
     </PrintFlowDocument>
@@ -225,6 +243,7 @@ export function TeacherPrintLayout({
   const sorted = sortQuestionResults(results).filter((r) =>
     isQuestionIncluded(includedQuestions, r.id),
   );
+  const grouped = groupQuestionResultsByOrder(sorted);
 
   return (
     <PrintFlowDocument
@@ -237,22 +256,35 @@ export function TeacherPrintLayout({
         <p className="font-ja text-sm text-slate-500">対面指導のポイント</p>
       </header>
 
-      {sorted.map((r, index) => {
-        const studentText = studentAnswerForPrint(r, sorted);
-        const modelText = modelAnswerForPrint(r, sorted);
-        const passageTranslation = passageTranslationForPrint(r, sorted);
-        const composition = isCompositionResult(r);
-        const comprehensive = isComprehensiveReadingResult(r, sorted);
-        const breakBefore = shouldBreakBeforeQuestion(index, r.order, layout);
+      {grouped.map((group, groupIndex) => {
+        const breakBefore = shouldBreakBeforeQuestion(groupIndex, group.order, layout);
         const gapClass =
-          shouldApplyQuestionGap(index, layout) ? "print-question-gap" : "";
+          shouldApplyQuestionGap(groupIndex, layout) ? "print-question-gap" : "";
 
         return (
-          <PreviewAnchor
-            key={r.id}
-            anchor={resultAnchor(r.id)}
-            className={`print-question-wrap print-question-block--split-ok ${gapClass} ${breakBefore ? "print-break-before-page" : ""}`}
+          <div
+            key={`order-${group.order}`}
+            className={[
+              "print-question-group",
+              gapClass,
+              breakBefore ? "print-break-before-page" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
+            {group.items.map((r) => {
+              const studentText = studentAnswerForPrint(r, sorted);
+              const modelText = modelAnswerForPrint(r, sorted);
+              const passageTranslation = passageTranslationForPrint(r, sorted);
+              const composition = isCompositionResult(r);
+              const comprehensive = isComprehensiveReadingResult(r, sorted);
+
+              return (
+                <PreviewAnchor
+                  key={r.id}
+                  anchor={resultAnchor(r.id)}
+                  className="print-question-wrap print-question-block--split-ok"
+                >
             <section className="grading-print-question space-y-3 border-b border-slate-100 pb-6 print:border-black/20">
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="font-ja text-lg font-semibold">{questionHeading(r)}</h2>
@@ -337,7 +369,10 @@ export function TeacherPrintLayout({
                 </div>
               ) : null}
             </section>
-          </PreviewAnchor>
+                </PreviewAnchor>
+              );
+            })}
+          </div>
         );
       })}
     </PrintFlowDocument>

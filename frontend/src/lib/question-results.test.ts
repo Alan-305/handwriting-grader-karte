@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   dedupeQuestionResults,
+  groupQuestionResultsByOrder,
   modelAnswerForPrint,
   passageTranslationForPrint,
   textForPart,
@@ -92,5 +93,24 @@ describe("modelAnswerForPrint", () => {
 
     expect(modelAnswerForPrint(siblings[0], siblings)).toBe("First answer");
     expect(modelAnswerForPrint(siblings[1], siblings)).toBe("Second answer");
+  });
+});
+
+describe("groupQuestionResultsByOrder", () => {
+  it("groups sub-parts under the same major question order", () => {
+    const results: QuestionResult[] = [
+      { ...row("q1", "q1", 0), order: 1 },
+      { ...row("q2a", "q2", 0), order: 2 },
+      { ...row("q3a", "q3", 0), order: 3, partIndex: 0, partLabel: "(1)" },
+      { ...row("q3b", "q3", 1), order: 3, partIndex: 1, partLabel: "(2)" },
+      { ...row("q4", "q4", 0), order: 4 },
+    ];
+
+    expect(groupQuestionResultsByOrder(results)).toEqual([
+      { order: 1, items: [results[0]] },
+      { order: 2, items: [results[1]] },
+      { order: 3, items: [results[2], results[3]] },
+      { order: 4, items: [results[4]] },
+    ]);
   });
 });

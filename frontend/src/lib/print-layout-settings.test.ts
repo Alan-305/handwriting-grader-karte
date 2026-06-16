@@ -22,6 +22,13 @@ describe("shouldBreakBeforeQuestion", () => {
     ).toBe(false);
   });
 
+  it("breaks before each major question group in one_per_question mode", () => {
+    const settings = { sectionMode: "one_per_question" as const, breakBeforeOrders: [] };
+    expect(shouldBreakBeforeQuestion(0, 1, settings)).toBe(false);
+    expect(shouldBreakBeforeQuestion(1, 2, settings)).toBe(true);
+    expect(shouldBreakBeforeQuestion(2, 3, settings)).toBe(true);
+  });
+
   it("respects custom breakBeforeOrders", () => {
     const settings = { sectionMode: "custom" as const, breakBeforeOrders: [3] };
     expect(shouldBreakBeforeQuestion(1, 2, settings)).toBe(false);
