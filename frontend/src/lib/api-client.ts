@@ -1,8 +1,10 @@
 import type {
+  BeginKarteAnalysisResponse,
   AnalyzeStudentResponse,
   ExamYearDetailResponse,
   ExamYearSummary,
   GradeSessionResponse,
+  KarteAnalysisStepResponse,
   PatchTranscriptionsRequest,
   PastExamCommitResponse,
   CropPreviewResponse,
@@ -26,6 +28,33 @@ import type {
 } from "@/types/question-design";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+
+function resolveApiUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = API_BASE.replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (!base) return normalizedPath;
+  return `${base}${normalizedPath}`;
+}
+
+function apiConnectionErrorMessage(): string {
+  return (
+    "API に接続できませんでした。" +
+    " 管理者は Hosting の /api 転送設定、または VITE_API_BASE の設定を確認してください。"
+  );
+}
+
+function parseJsonSafely<T>(text: string): T {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    const trimmed = text.trimStart();
+    if (trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) {
+      throw new Error(apiConnectionErrorMessage());
+    }
+    throw new Error("サーバーから不正な応答が返されました。");
+  }
+}
 
 function formatApiErrorMessage(
   err: unknown,
@@ -69,7 +98,7 @@ async function request<T>(
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+    res = await fetch(resolveApiUrl(path), { ...init, headers });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (/aborted|timeout|network|failed to fetch|load failed/i.test(msg)) {
@@ -77,14 +106,28 @@ async function request<T>(
         "サーバーに接続できませんでした。バックエンドが起動しているか、ネットワークを確認してください。",
       );
     }
+    if (/did not match the expected pattern/i.test(msg)) {
+      throw new Error(apiConnectionErrorMessage());
+    }
     throw new Error(msg || "通信エラーが発生しました");
   }
 
+  const responseText = await res.text();
+  const contentType = res.headers.get("content-type") ?? "";
+
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+    const err =
+      contentType.includes("application/json") && responseText
+        ? parseJsonSafely<unknown>(responseText)
+        : {};
     throw new Error(formatApiErrorMessage(err, res.status, res.statusText));
   }
-  return res.json() as Promise<T>;
+
+  if (!responseText) {
+    return {} as T;
+  }
+
+  return parseJsonSafely<T>(responseText);
 }
 
 export const apiClient = {
@@ -214,6 +257,20 @@ export const apiClient = {
   completeSession: (token: string, sessionId: string) =>
     request<{ status: string }>(`/api/sessions/${sessionId}/complete`, {
       method: "POST",
+      token,
+    }),
+
+  beginKarteAnalysis: (token: string, studentId: string) =>
+    request<BeginKarteAnalysisResponse>(`/api/students/${studentId}/analyze/begin`, {
+      method: "POST",
+      token,
+    }),
+
+  karteAnalysisStep: (token: string, studentId: string, stepIndex: number) =>
+    request<KarteAnalysisStepResponse>(`/api/students/${studentId}/analyze/step`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stepIndex }),
       token,
     }),
 

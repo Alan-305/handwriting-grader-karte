@@ -42,6 +42,25 @@ class FirebaseAdminService:
         data["updatedAt"] = datetime.now(timezone.utc)
         db.collection(collection).document(doc_id).set(data, merge=merge)
 
+    def get_nested_doc(self, path_segments: list[str]) -> dict | None:
+        db = self.db()
+        if not db or len(path_segments) < 2 or len(path_segments) % 2 != 0:
+            return None
+        ref = db.collection(path_segments[0]).document(path_segments[1])
+        for i in range(2, len(path_segments), 2):
+            ref = ref.collection(path_segments[i]).document(path_segments[i + 1])
+        snap = ref.get()
+        return snap.to_dict() if snap.exists else None
+
+    def delete_nested_doc(self, path_segments: list[str]) -> None:
+        db = self.db()
+        if not db or len(path_segments) < 2 or len(path_segments) % 2 != 0:
+            return
+        ref = db.collection(path_segments[0]).document(path_segments[1])
+        for i in range(2, len(path_segments), 2):
+            ref = ref.collection(path_segments[i]).document(path_segments[i + 1])
+        ref.delete()
+
     def set_nested_doc(self, path_segments: list[str], data: dict, merge: bool = False):
         """path_segments: [collection, docId, subcollection, docId, ...]"""
         db = self.db()

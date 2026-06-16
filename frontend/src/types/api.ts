@@ -127,6 +127,21 @@ export interface AnalyzeStudentResponse {
   readinessComment: string;
 }
 
+export interface BeginKarteAnalysisResponse {
+  studentId: string;
+  total: number;
+  message: string;
+}
+
+export interface KarteAnalysisStepResponse {
+  studentId: string;
+  stepIndex: number;
+  total: number;
+  done: boolean;
+  message: string;
+  snapshot?: AnalyzeStudentResponse;
+}
+
 export interface PastExamImportResponse {
   sessionId: string;
   universitySlug: string;

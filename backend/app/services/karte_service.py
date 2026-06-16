@@ -25,8 +25,17 @@ from app.services.error_tags import categorize_error_tag
 from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.karte_aggregation import dedupe_completed_for_karte
 from app.services.session_service import SessionService
+from app.utils.json_helpers import to_json_safe
 
 logger = logging.getLogger(__name__)
+
+KARTE_ANALYSIS_TOTAL_STEPS = 4
+KARTE_ANALYSIS_STAGE_LABELS = (
+    "弱点診断",
+    "志望校ギャップ分析",
+    "指導プラン生成",
+    "整合チェックと保存",
+)
 
 
 class KarteService:
@@ -273,34 +282,92 @@ class KarteService:
             logger.warning("Integrity check failed; saving snapshot without verification", exc_info=True)
             return IntegrityCheck(passed=True, violations=[], fabrication_risk=[])
 
-    def analyze_student(self, student_id: str, teacher_id: str) -> dict:
-        """多段カルテ分析: 診断 → ギャップ → プラン → 整合チェック。
+    def _analysis_job_path(self, student_id: str) -> list[str]:
+        return ["students", student_id, "karte_analysis_jobs", "active"]
 
-        既存カルテ画面との後方互換のため、トップレベルに
-        weaknessSummary / readinessComment / adviceCards / errorFrequency を保持する。
-        """
+    def _ctx_from_job(self, job: dict) -> dict:
+        stored = job.get("context") or {}
+        return {
+            "context_block": stored.get("context_block", ""),
+            "session_ids": stored.get("session_ids", []),
+            "error_stats": stored.get("error_stats", {}),
+            "target_unis": stored.get("target_unis", []),
+            "interview_profile": stored.get("interview_profile") or {},
+        }
+
+    def _load_analysis_job(self, student_id: str, teacher_id: str) -> dict:
+        job = self.firebase.get_nested_doc(self._analysis_job_path(student_id))
+        if not job:
+            raise ValueError("カルテ分析が開始されていません。もう一度「AI分析を実行」を押してください。")
+        if job.get("teacherId") != teacher_id:
+            raise PermissionError("Access denied")
+        return job
+
+    def begin_analysis(self, student_id: str, teacher_id: str) -> dict:
+        """カルテ分析の第1段前準備。Hosting 60秒制限を避けるため段階実行の入口。"""
         ctx = self._build_karte_context(student_id, teacher_id)
+        job = {
+            "teacherId": teacher_id,
+            "status": "running",
+            "total": KARTE_ANALYSIS_TOTAL_STEPS,
+            "context": to_json_safe(
+                {
+                    "context_block": ctx["context_block"],
+                    "session_ids": ctx["session_ids"],
+                    "error_stats": ctx["error_stats"],
+                    "target_unis": ctx["target_unis"],
+                    "interview_profile": ctx.get("interview_profile") or {},
+                }
+            ),
+            "startedAt": datetime.now(timezone.utc),
+        }
+        self.firebase.set_nested_doc(self._analysis_job_path(student_id), job)
+        return {
+            "studentId": student_id,
+            "total": KARTE_ANALYSIS_TOTAL_STEPS,
+            "message": KARTE_ANALYSIS_STAGE_LABELS[0],
+        }
 
-        diagnosis = self._run_diagnosis(ctx)
-        readiness = self._run_readiness(ctx, diagnosis)
-        plan = self._run_advice_plan(ctx, diagnosis, readiness)
-        integrity = self._run_integrity_check(ctx, diagnosis, readiness, plan)
+    @staticmethod
+    def _analysis_step_payload(
+        student_id: str,
+        step_index: int,
+        *,
+        done: bool,
+        message: str,
+        snapshot: dict | None = None,
+    ) -> dict:
+        payload = {
+            "studentId": student_id,
+            "stepIndex": step_index,
+            "total": KARTE_ANALYSIS_TOTAL_STEPS,
+            "done": done,
+            "message": message,
+        }
+        if snapshot is not None:
+            payload["snapshot"] = snapshot
+        return payload
 
+    def _assemble_snapshot(
+        self,
+        ctx: dict,
+        diagnosis: DiagnosisResult,
+        readiness: ReadinessResult,
+        plan: AdvicePlanResult,
+        integrity: IntegrityCheck,
+    ) -> dict:
         integrity_warnings = list(integrity.violations) + list(integrity.fabrication_risk)
-
-        snapshot = {
+        return {
             "generatedAt": datetime.now(timezone.utc),
             "sessionIdsIncluded": ctx["session_ids"],
             "sessionCount": len(ctx["session_ids"]),
             "schemaVersion": 2,
             "reviewStatus": "draft",
-            # --- 後方互換フィールド（既存フロントが無改修で表示） ---
             "weaknessSummary": diagnosis.weakness_summary,
             "errorFrequency": ctx["error_stats"],
             "adviceCards": [c.model_dump() for c in plan.advice_cards],
             "readinessComment": readiness.readiness_comment,
             "geminiModel": self.gemini.model_name if self.gemini.model else "gemini",
-            # --- 多段の追加成果 ---
             "integrityPassed": integrity.passed,
             "integrityWarnings": integrity_warnings,
             "stages": {
@@ -311,7 +378,75 @@ class KarteService:
             },
         }
 
-        snapshot_id = self.firebase.add_subdoc(["students", student_id, "karte_snapshots"], snapshot)
+    def analysis_step(self, student_id: str, teacher_id: str, step_index: int) -> dict:
+        if step_index < 0 or step_index >= KARTE_ANALYSIS_TOTAL_STEPS:
+            raise ValueError(f"stepIndex が不正です: {step_index}")
+
+        job = self._load_analysis_job(student_id, teacher_id)
+        ctx = self._ctx_from_job(job)
+
+        if step_index == 0:
+            diagnosis = self._run_diagnosis(ctx)
+            job["diagnosis"] = diagnosis.model_dump(by_alias=True)
+            self.firebase.set_nested_doc(self._analysis_job_path(student_id), job, merge=True)
+            return self._analysis_step_payload(
+                student_id,
+                step_index,
+                done=False,
+                message=KARTE_ANALYSIS_STAGE_LABELS[1],
+            )
+
+        if step_index == 1:
+            diagnosis = DiagnosisResult.model_validate(job.get("diagnosis") or {})
+            readiness = self._run_readiness(ctx, diagnosis)
+            job["readiness"] = readiness.model_dump(by_alias=True)
+            self.firebase.set_nested_doc(self._analysis_job_path(student_id), job, merge=True)
+            return self._analysis_step_payload(
+                student_id,
+                step_index,
+                done=False,
+                message=KARTE_ANALYSIS_STAGE_LABELS[2],
+            )
+
+        if step_index == 2:
+            diagnosis = DiagnosisResult.model_validate(job.get("diagnosis") or {})
+            readiness = ReadinessResult.model_validate(job.get("readiness") or {})
+            plan = self._run_advice_plan(ctx, diagnosis, readiness)
+            job["plan"] = plan.model_dump(by_alias=True)
+            self.firebase.set_nested_doc(self._analysis_job_path(student_id), job, merge=True)
+            return self._analysis_step_payload(
+                student_id,
+                step_index,
+                done=False,
+                message=KARTE_ANALYSIS_STAGE_LABELS[3],
+            )
+
+        diagnosis = DiagnosisResult.model_validate(job.get("diagnosis") or {})
+        readiness = ReadinessResult.model_validate(job.get("readiness") or {})
+        plan = AdvicePlanResult.model_validate(job.get("plan") or {})
+        integrity = self._run_integrity_check(ctx, diagnosis, readiness, plan)
+        snapshot = self._assemble_snapshot(ctx, diagnosis, readiness, plan, integrity)
+        snapshot_id = self.firebase.add_subdoc(
+            ["students", student_id, "karte_snapshots"],
+            snapshot,
+        )
         self.update_aggregated_stats(student_id, teacher_id)
         snapshot["id"] = snapshot_id
-        return snapshot
+        self.firebase.delete_nested_doc(self._analysis_job_path(student_id))
+        return self._analysis_step_payload(
+            student_id,
+            step_index,
+            done=True,
+            message="完了",
+            snapshot=to_json_safe(snapshot),
+        )
+
+    def analyze_student(self, student_id: str, teacher_id: str) -> dict:
+        """多段カルテ分析（一括）。段階 API と同じ処理を連続実行する。"""
+        self.begin_analysis(student_id, teacher_id)
+        result: dict | None = None
+        for step_index in range(KARTE_ANALYSIS_TOTAL_STEPS):
+            result = self.analysis_step(student_id, teacher_id, step_index)
+        if not result or not result.get("snapshot"):
+            raise RuntimeError("カルテ分析の結果を保存できませんでした。")
+        return result["snapshot"]

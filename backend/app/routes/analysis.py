@@ -51,6 +51,50 @@ def generate_past_exam_advice(session_id: str):
         return jsonify({"error": str(exc)}), 503
 
 
+@analysis_bp.post("/students/<student_id>/analyze/begin")
+@require_auth
+def begin_student_analysis(student_id: str):
+    try:
+        karte = KarteService()
+        payload = karte.begin_analysis(student_id, g.teacher_id)
+        return jsonify(to_json_safe(payload))
+    except PermissionError:
+        return jsonify({"error": "アクセス権がありません"}), 403
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        logger.exception("Analysis begin failed for student %s", student_id)
+        return jsonify({"error": f"カルテ分析の開始に失敗しました: {exc}"}), 500
+
+
+@analysis_bp.post("/students/<student_id>/analyze/step")
+@require_auth
+def student_analysis_step(student_id: str):
+    body = request.get_json(silent=True) or {}
+    step_index = body.get("stepIndex")
+    if step_index is None:
+        return jsonify({"error": "stepIndex が必要です"}), 400
+    try:
+        step_index = int(step_index)
+    except (TypeError, ValueError):
+        return jsonify({"error": "stepIndex は整数で指定してください"}), 400
+
+    try:
+        karte = KarteService()
+        payload = karte.analysis_step(student_id, g.teacher_id, step_index)
+        return jsonify(to_json_safe(payload))
+    except PermissionError:
+        return jsonify({"error": "アクセス権がありません"}), 403
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        logger.exception("Analysis step failed for student %s step %s", student_id, step_index)
+        return jsonify({"error": str(exc)}), 502
+    except Exception as exc:
+        logger.exception("Analysis step failed for student %s step %s", student_id, step_index)
+        return jsonify({"error": f"カルテ分析に失敗しました: {exc}"}), 500
+
+
 @analysis_bp.post("/students/<student_id>/analyze")
 @require_auth
 def analyze_student(student_id: str):

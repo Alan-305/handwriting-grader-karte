@@ -18,6 +18,7 @@ import { LoadingOverlay } from "@/components/feedback/LoadingOverlay";
 import { useAuth } from "@/hooks/useAuth";
 import { apiClient } from "@/lib/api-client";
 import { getDb } from "@/lib/firebase";
+import { runKarteAnalysisSteps } from "@/lib/karte-pipeline";
 import type { AggregatedStats, KarteSnapshot, Student } from "@/types/firestore";
 
 export function StudentDashboardPage() {
@@ -29,6 +30,7 @@ export function StudentDashboardPage() {
   const [studentLoading, setStudentLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [snapshotLoadError, setSnapshotLoadError] = useState<string | null>(null);
 
@@ -107,6 +109,7 @@ export function StudentDashboardPage() {
   const runAnalysis = async () => {
     if (!studentId) return;
     setAnalyzing(true);
+    setAnalysisProgress(null);
     setAnalysisError(null);
     try {
       const token = await getIdToken();
@@ -114,7 +117,9 @@ export function StudentDashboardPage() {
         setAnalysisError("ログインが必要です");
         return;
       }
-      const result = await apiClient.analyzeStudent(token, studentId);
+      const result = await runKarteAnalysisSteps(token, studentId, (_current, _total, message) => {
+        setAnalysisProgress(message);
+      });
       setSnapshot(result as unknown as KarteSnapshot);
     } catch (err) {
       setAnalysisError(
@@ -122,12 +127,16 @@ export function StudentDashboardPage() {
       );
     } finally {
       setAnalyzing(false);
+      setAnalysisProgress(null);
     }
   };
 
   return (
     <div>
-      <LoadingOverlay visible={analyzing || pageLoading} message={analyzing ? "考えてます" : "読み込み中..."} />
+      <LoadingOverlay
+        visible={analyzing || pageLoading}
+        message={analyzing ? analysisProgress ?? "考えてます" : "読み込み中..."}
+      />
       <PageHeader
         title={`${student?.name ?? (pageLoading ? "読み込み中…" : "")} のカルテ`}
         description="成績推移・弱点分析・志望校対策アドバイス"
