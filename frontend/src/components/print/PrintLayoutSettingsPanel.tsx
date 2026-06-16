@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
+import { CustomPageBreakControls } from "@/components/print/CustomPageBreakControls";
 import { Input } from "@/components/ui/input";
 import {
   clampFontScale,
@@ -130,42 +131,15 @@ export function PrintLayoutSettingsPanel({
         </Field>
       </div>
 
-      {settings.sectionMode === "custom" && sortedOrders.length > 1 ? (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-          <p className="font-ja text-sm font-semibold text-slate-800">改ページ位置</p>
-          <p className="mt-1 font-ja text-xs leading-relaxed text-slate-600">
-            チェックを入れた大問の<strong>直前</strong>で改ページします。チェックなしの連続大問は同じページに続けて配置されます。
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {sortedOrders.slice(1).map((order) => {
-              const checked = (settings.breakBeforeOrders ?? []).includes(order);
-              return (
-                <label
-                  key={order}
-                  className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 font-ja text-sm text-slate-800"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(e) =>
-                      onChange(toggleBreakBeforeOrder(settings, order, e.target.checked))
-                    }
-                  />
-                  第{order}問の前
-                </label>
-              );
-            })}
-          </div>
-          <p className="mt-3 font-ja text-xs text-slate-500">
-            例：チェックなし → スペースが足りる限り連続配置。第3問の前だけチェック → 第1–2問を同じページに、第3問から改ページ。
-          </p>
-        </div>
-      ) : null}
-
-      {settings.sectionMode === "custom" && sortedOrders.length <= 1 ? (
-        <p className="mt-4 font-ja text-xs text-slate-500">
-          大問が2問以上あると、改ページ位置を指定できます。
-        </p>
+      {settings.sectionMode === "custom" ? (
+        <CustomPageBreakControls
+          sectionMode={settings.sectionMode}
+          questionOrders={sortedOrders}
+          breakBeforeOrders={settings.breakBeforeOrders}
+          onToggle={(order, enabled) =>
+            onChange(toggleBreakBeforeOrder(settings, order, enabled))
+          }
+        />
       ) : null}
 
       <div className="mt-4 flex justify-end">

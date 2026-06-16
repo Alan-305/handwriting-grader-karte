@@ -55,6 +55,10 @@ export function PrintTeacherPage() {
 
   const sortedDrafts = useMemo(() => sortQuestionResults(drafts), [drafts]);
   const activeResults = sortedDrafts.length ? sortedDrafts : sortQuestionResults(results);
+  const questionOrders = useMemo(
+    () => [...new Set(activeResults.map((r) => r.order))].sort((a, b) => a - b),
+    [activeResults],
+  );
 
   const isDirty = useMemo(
     () =>
@@ -138,6 +142,7 @@ export function PrintTeacherPage() {
       <GradingPrintControlsPanel
         kind="teacher"
         prefs={prefs}
+        questionOrders={questionOrders}
         onSectionsChange={setSections}
         onLayoutChange={setLayout}
         onResetLayout={resetLayout}

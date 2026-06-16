@@ -38,6 +38,8 @@ export interface GradingPrintLayoutSettings {
   blockGapMm: number;
   fontScalePercent: number;
   lineHeight: number;
+  /** custom モード: この order の大問の直前で改ページ（第1問は不可） */
+  breakBeforeOrders?: number[];
 }
 
 export interface GradingPrintTemplate {
@@ -115,6 +117,7 @@ export const DEFAULT_GRADING_PRINT_LAYOUT: GradingPrintLayoutSettings = {
   blockGapMm: 4,
   fontScalePercent: 100,
   lineHeight: 1.55,
+  breakBeforeOrders: [],
 };
 
 const STORAGE_PREFIX = "grading-print-prefs:";
@@ -147,6 +150,11 @@ export function gradingPrintDocumentStyle(layout: GradingPrintLayoutSettings): C
 export function migrateLayoutFromPartial(
   raw: Partial<GradingPrintLayoutSettings>,
 ): GradingPrintLayoutSettings {
+  const breakBeforeOrders = Array.isArray(raw.breakBeforeOrders)
+    ? [...new Set(raw.breakBeforeOrders.map(Number))]
+        .filter((n) => Number.isFinite(n) && n > 1)
+        .sort((a, b) => a - b)
+    : [];
   return {
     ...DEFAULT_GRADING_PRINT_LAYOUT,
     ...raw,
@@ -161,6 +169,7 @@ export function migrateLayoutFromPartial(
     ),
     fontScalePercent: clampFontScale(raw.fontScalePercent ?? DEFAULT_GRADING_PRINT_LAYOUT.fontScalePercent),
     lineHeight: clampLineHeight(raw.lineHeight ?? DEFAULT_GRADING_PRINT_LAYOUT.lineHeight),
+    breakBeforeOrders,
   };
 }
 

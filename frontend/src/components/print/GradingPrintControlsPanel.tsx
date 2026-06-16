@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
+import { CustomPageBreakControls } from "@/components/print/CustomPageBreakControls";
 import { confirmDeleteTarget } from "@/lib/confirm-delete";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import {
 import {
   PAGE_MARGIN_LABEL,
   SECTION_MODE_LABEL,
+  toggleBreakBeforeOrderInSettings,
   type PrintPageMargin,
   type PrintSectionMode,
 } from "@/lib/print-layout-settings";
@@ -28,6 +30,7 @@ import {
 export function GradingPrintControlsPanel({
   kind,
   prefs,
+  questionOrders = [],
   onSectionsChange,
   onLayoutChange,
   onResetLayout,
@@ -39,6 +42,8 @@ export function GradingPrintControlsPanel({
 }: {
   kind: GradingPrintKind;
   prefs: GradingPrintPreferences;
+  /** 大問 order の一覧（custom モードの改ページチェック用） */
+  questionOrders?: number[];
   onSectionsChange: (sections: GradingPrintPreferences["sections"]) => void;
   onLayoutChange: (layout: GradingPrintLayoutSettings) => void;
   onResetLayout: () => void;
@@ -216,6 +221,16 @@ export function GradingPrintControlsPanel({
             </p>
           </Field>
         </section>
+
+        <CustomPageBreakControls
+          sectionMode={layout.sectionMode}
+          questionOrders={questionOrders}
+          breakBeforeOrders={layout.breakBeforeOrders}
+          onToggle={(order, enabled) =>
+            onLayoutChange(toggleBreakBeforeOrderInSettings(layout, order, enabled))
+          }
+        />
+
         <button
           type="button"
           className="font-ja text-sm text-slate-500 underline hover:text-slate-700"

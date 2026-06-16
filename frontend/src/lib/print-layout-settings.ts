@@ -151,6 +151,14 @@ export function toggleBreakBeforeOrder(
   questionOrder: number,
   enabled: boolean,
 ): PrintLayoutSettings {
+  return toggleBreakBeforeOrderInSettings(settings, questionOrder, enabled);
+}
+
+export function toggleBreakBeforeOrderInSettings<T extends LayoutBreakSettings>(
+  settings: T,
+  questionOrder: number,
+  enabled: boolean,
+): T {
   if (questionOrder <= 1) return settings;
   const current = settings.breakBeforeOrders ?? [];
   const breakBeforeOrders = enabled
