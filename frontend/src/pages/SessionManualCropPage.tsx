@@ -150,6 +150,10 @@ export function SessionManualCropPage() {
       setError("すべての設問に切り出し範囲を設定してください");
       return;
     }
+    if (data?.status === "transcription_review") {
+      navigate(`/sessions/${sessionId}/transcription`);
+      return;
+    }
     setTranscribing(true);
     setTranscribeProgress("読み取りを開始しています…");
     setError("");
@@ -158,7 +162,7 @@ export function SessionManualCropPage() {
       if (!token) return;
       await runTranscriptionSteps(token, sessionId, (_current, _total, message) => {
         setTranscribeProgress(message);
-      });
+      }, { resume: true });
       navigate(`/sessions/${sessionId}/transcription`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "読み取りに失敗しました");
@@ -203,9 +207,14 @@ export function SessionManualCropPage() {
           <ol className="list-decimal space-y-1 pl-5">
             <li>リストから設問（第1問・第2問 (1) など）を選ぶ</li>
             <li>該当するページで、答案欄をドラッグして囲む</li>
-            <li>「この設問に設定」を押す（次の設問へ進みます）</li>
+            <li>「この設問に設定」を押す（保存されます。次の設問へ進みます）</li>
             <li>すべて ✓ になったら「読み取りへ進む」</li>
           </ol>
+          <p className="mt-2 text-slate-600">
+            各設問の設定は自動で途中保存されます。あとから
+            <strong> 生徒 → 過去の添削・面談</strong>
+            から再開できます。
+          </p>
         </Card>
 
         {imageUrls.length > 1 && (

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "@/components/layout/AppShell";
 import { ErrorRetry } from "@/components/feedback/ErrorRetry";
+import { InlineLoading } from "@/components/feedback/LoadingOverlay";
 import { LoadingOverlay } from "@/components/feedback/LoadingOverlay";
 import { SafeForm } from "@/components/forms/SafeForm";
 import { CroppedAnswerImage } from "@/components/sessions/CroppedAnswerImage";
@@ -10,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useSession, useUpdateQuestionResults } from "@/hooks/useSession";
 import { apiClient } from "@/lib/api-client";
+import { touchSessionDraft } from "@/lib/session-draft";
 import { runGradingSteps } from "@/lib/session-pipeline";
 import { formatGradingProgressMessage } from "@/lib/session-progress-message";
 import type { QuestionResult, TranscriptionStatus } from "@/types/firestore";
@@ -25,6 +27,8 @@ export function SessionTranscriptionReviewPage() {
 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [pipelineMessage, setPipelineMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -48,6 +52,32 @@ export function SessionTranscriptionReviewPage() {
     if (processing) return "添削を準備中";
     return null;
   }, [session?.gradingProgress, processing, pipelineMessage]);
+
+  const handleSaveDraft = async () => {
+    if (!sessionId || sortedResults.length === 0) return;
+    setSavingDraft(true);
+    setError("");
+    setDraftSaved(false);
+    try {
+      const token = await getIdToken();
+      if (!token) return;
+
+      const items = sortedResults.map((r) => ({
+        id: r.id,
+        studentAnswerText: (drafts[r.id] ?? "").trim(),
+        transcriptionStatus: "pending_review" as TranscriptionStatus,
+      }));
+
+      await saveResults(items);
+      await apiClient.patchTranscriptions(token, sessionId, { items });
+      await touchSessionDraft(sessionId);
+      setDraftSaved(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "途中保存に失敗しました");
+    } finally {
+      setSavingDraft(false);
+    }
+  };
 
   const handleConfirmAndGrade = async () => {
     if (!sessionId || sortedResults.length === 0) return;
@@ -129,8 +159,17 @@ export function SessionTranscriptionReviewPage() {
         onSafeSubmit={handleConfirmAndGrade}
       >
         <Card className="border-blue-100 bg-blue-50/80 p-4 font-ja text-sm text-slate-700">
-          手書きは試験中の字の乱れを想定して読み取っています。誤りがあればそのまま修正し、問題なければ「確定して添削へ」を押してください。設問ごとに添削するため、問数が多いと数分かかることがあります。
+          手書きは試験中の字の乱れを想定して読み取っています。誤りがあればそのまま修正してください。
+          <strong>途中保存</strong>で作業を止め、あとから
+          <strong> 生徒 → 過去の添削・面談</strong>
+          から再開できます。内容が問題なければ「確定して添削へ」を押してください。
         </Card>
+
+        {draftSaved ? (
+          <Card className="border-green-200 bg-green-50 p-4 font-ja text-sm text-green-900">
+            途中保存しました。あとから生徒一覧の「過去の添削・面談」で作業を再開できます。
+          </Card>
+        ) : null}
 
         {sortedResults.map((r) => (
           <Card key={r.id} className="space-y-4 p-5">
@@ -167,9 +206,21 @@ export function SessionTranscriptionReviewPage() {
 
         {error && <ErrorRetry message={error} onRetry={handleConfirmAndGrade} />}
 
-        <Button type="submit" className="min-h-11 w-full" disabled={processing}>
-          確定して添削へ
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            type="button"
+            className="min-h-11 w-full sm:w-auto"
+            variant="outline"
+            disabled={processing || savingDraft}
+            onClick={handleSaveDraft}
+          >
+            途中保存
+          </Button>
+          <Button type="submit" className="min-h-11 w-full sm:flex-1" disabled={processing || savingDraft}>
+            確定して添削へ
+          </Button>
+        </div>
+        {savingDraft ? <InlineLoading message="途中保存中..." /> : null}
       </SafeForm>
     </div>
   );

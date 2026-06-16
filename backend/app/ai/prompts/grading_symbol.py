@@ -66,7 +66,8 @@ def _build_symbol_user_prompt(
 {student_address_block(student_name)}
 {answer_block}
 記号・選択の正誤を照合して採点してください。
-explanation は小問ごとに改行し、「(1) 正解：…」「(2) 不正解：…」形式で書くこと。模範解答の内容は explanation に含め、別欄に頼らないこと。{USER_PROMPT_SCORING_NOTE}"""
+explanation は小問ごとに改行し、「(1) 正解：…」「(2) 不正解：…」形式で書くこと。模範解答の内容は explanation に含め、別欄に頼らないこと。
+各行の先頭で正誤を明示しているため、「したがって正解。」「よって不正解。」などの締めは書かないこと。{USER_PROMPT_SCORING_NOTE}"""
 
 
 def build_symbol_prompt(**kwargs) -> str:

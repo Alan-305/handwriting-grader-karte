@@ -223,6 +223,8 @@ export interface Session {
   gradingConfirmedAt?: Timestamp;
   /** 生徒用返却プリントの内容が教師により確定された日時 */
   studentPrintFinalizedAt?: Timestamp;
+  /** 教師が途中保存した日時（作業再開用） */
+  draftSavedAt?: Timestamp;
   /** Gemini による過去問視点のアドバイス */
   pastExamAdvice?: import("./past-exam-advice").SessionPastExamAdvice;
   /** 教師が指定した手動切り出し（キー: "{order}-{partIndex}"） */

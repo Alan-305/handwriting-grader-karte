@@ -37,7 +37,12 @@ export function SessionResultPage() {
 
   useEffect(() => {
     if (!session || loading) return;
-    if (session.status === "crop_review" || session.status === "aligned") {
+    if (
+      session.status === "uploaded" ||
+      session.status === "aligning" ||
+      session.status === "aligned" ||
+      session.status === "crop_review"
+    ) {
       navigate(`/sessions/${sessionId}/crop-review`, { replace: true });
       return;
     }
@@ -48,7 +53,10 @@ export function SessionResultPage() {
       navigate(`/sessions/${sessionId}/transcription`, { replace: true });
       return;
     }
-    if (session.status === "review" && !session.gradingConfirmedAt) {
+    if (
+      (session.status === "review" || session.status === "grading") &&
+      !session.gradingConfirmedAt
+    ) {
       navigate(`/sessions/${sessionId}/grading-review`, { replace: true });
     }
   }, [session, loading, navigate, sessionId]);

@@ -16,9 +16,81 @@ from app.services.university_context_service import UniversityContextService
 
 logger = logging.getLogger(__name__)
 
+TEACHER_PRIORITY_FIELDS = (
+    "grade",
+    "score",
+    "feedback",
+    "explanation",
+    "contentEvaluation",
+    "grammarEvaluation",
+    "polishedAnswer",
+    "modelAnswer",
+    "teacherNotes",
+    "errorTags",
+)
+
 
 def _result_key(result: dict) -> tuple:
     return (result.get("questionId"), result.get("partIndex"))
+
+
+def build_preserved_grade_update(
+    *,
+    stored: dict,
+    target: dict,
+    student_text: str,
+) -> dict:
+    """教師確認画面で保存済みの採点・解説を維持したまま再採点する。"""
+    max_points = float(target.get("points", stored.get("maxPoints", 10)))
+    score = clamp_score(float(stored.get("score") or 0), max_points)
+    update_data: dict = {
+        "grade": stored.get("grade"),
+        "score": score,
+        "maxPoints": max_points,
+        "studentAnswerText": student_text,
+        "feedback": stored.get("feedback", ""),
+        "explanation": stored.get("explanation", ""),
+        "modelAnswer": stored.get("modelAnswer", target.get("modelAnswer", "")),
+        "errorTags": stored.get("errorTags") or [],
+        "teacherNotes": stored.get("teacherNotes", ""),
+        "transcriptionStatus": "confirmed",
+        "graded": True,
+        "teacherReviewed": bool(stored.get("teacherReviewed")),
+    }
+    content_eval = stored.get("contentEvaluation")
+    grammar_eval = stored.get("grammarEvaluation")
+    polished = stored.get("polishedAnswer")
+    update_data["contentEvaluation"] = content_eval if content_eval else DELETE_FIELD
+    update_data["grammarEvaluation"] = grammar_eval if grammar_eval else DELETE_FIELD
+    update_data["polishedAnswer"] = polished if polished else DELETE_FIELD
+    return update_data
+
+
+def apply_teacher_priority(stored: dict, update_data: dict) -> dict:
+    """AI 採点結果に、教師が保存済みのフィールドを上書きして反映する。"""
+    merged = dict(update_data)
+    for field in TEACHER_PRIORITY_FIELDS:
+        if field not in stored:
+            continue
+        value = stored[field]
+        if field in ("feedback", "explanation", "contentEvaluation", "grammarEvaluation", "polishedAnswer", "teacherNotes"):
+            if value is None:
+                continue
+        elif field == "errorTags":
+            if value is None:
+                continue
+        elif field == "score":
+            if stored.get("score") is None:
+                continue
+            merged["score"] = clamp_score(float(stored["score"]), float(merged.get("maxPoints") or stored.get("maxPoints") or 0))
+            continue
+        elif field == "grade":
+            if not value:
+                continue
+        merged[field] = value
+    if stored.get("teacherReviewed"):
+        merged["teacherReviewed"] = True
+    return merged
 
 
 class GradingService:
@@ -77,6 +149,7 @@ class GradingService:
         step_index: int,
         *,
         teacher_id_for_context: str | None = None,
+        preserve_teacher_edits: bool = False,
     ) -> dict:
         tid = teacher_id_for_context or teacher_id
         session, targets, _, by_key, uni_slug, student_name = self._load_grading_context(
@@ -99,6 +172,28 @@ class GradingService:
         if not student_text:
             raise ValueError(
                 f"第{target.get('order')}問の転記が空です。確認画面で入力してください。"
+            )
+
+        if preserve_teacher_edits and stored.get("graded"):
+            update_data = build_preserved_grade_update(
+                stored=stored,
+                target=target,
+                student_text=student_text,
+            )
+            self.session_svc.update_question_result(session_id, stored["id"], update_data)
+            result_data = {
+                k: v for k, v in update_data.items() if v is not DELETE_FIELD
+            }
+            result_data["id"] = stored["id"]
+            result_data["questionId"] = stored.get("questionId")
+            result_data["order"] = stored.get("order")
+            result_data["partLabel"] = stored.get("partLabel")
+            return self._finalize_step_payload(
+                session_id=session_id,
+                session=session,
+                step_index=step_index,
+                targets=targets,
+                result_data=result_data,
             )
 
         system, _prompt_fn = select_grading_prompts(target)
@@ -146,6 +241,8 @@ class GradingService:
         update_data["contentEvaluation"] = content_eval if content_eval else DELETE_FIELD
         update_data["grammarEvaluation"] = grammar_eval if grammar_eval else DELETE_FIELD
         update_data["polishedAnswer"] = polished if polished else DELETE_FIELD
+        if preserve_teacher_edits:
+            update_data = apply_teacher_priority(stored, update_data)
         self.session_svc.update_question_result(session_id, stored["id"], update_data)
 
         result_data = {
@@ -155,7 +252,23 @@ class GradingService:
         result_data["questionId"] = stored.get("questionId")
         result_data["order"] = stored.get("order")
         result_data["partLabel"] = stored.get("partLabel")
+        return self._finalize_step_payload(
+            session_id=session_id,
+            session=session,
+            step_index=step_index,
+            targets=targets,
+            result_data=result_data,
+        )
 
+    def _finalize_step_payload(
+        self,
+        *,
+        session_id: str,
+        session: dict,
+        step_index: int,
+        targets: list[dict],
+        result_data: dict,
+    ) -> dict:
         done = step_index >= len(targets) - 1
         payload: dict = {
             "sessionId": session_id,
@@ -186,12 +299,23 @@ class GradingService:
             )
         return payload
 
-    def grade_session(self, session_id: str, teacher_id: str) -> dict:
+    def grade_session(
+        self,
+        session_id: str,
+        teacher_id: str,
+        *,
+        preserve_teacher_edits: bool = False,
+    ) -> dict:
         begin = self.begin_grading(session_id, teacher_id)
         total = begin["total"]
         last_payload: dict = {}
         for i in range(total):
-            last_payload = self.grade_step(session_id, teacher_id, i)
+            last_payload = self.grade_step(
+                session_id,
+                teacher_id,
+                i,
+                preserve_teacher_edits=preserve_teacher_edits,
+            )
         results = self.session_svc.get_question_results(session_id)
         return {
             "sessionId": session_id,

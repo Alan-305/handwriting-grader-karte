@@ -5,9 +5,16 @@ export async function runTranscriptionSteps(
   token: string,
   sessionId: string,
   onProgress?: (current: number, total: number, message: string) => void,
+  options?: { resume?: boolean },
 ): Promise<void> {
-  const { total } = await apiClient.beginTranscription(token, sessionId);
-  for (let stepIndex = 0; stepIndex < total; stepIndex += 1) {
+  const { total, resumeFrom = 0 } = await apiClient.beginTranscription(token, sessionId, {
+    resume: options?.resume ?? false,
+  });
+  if (resumeFrom >= total) {
+    onProgress?.(total, total, "読み取り済み");
+    return;
+  }
+  for (let stepIndex = resumeFrom; stepIndex < total; stepIndex += 1) {
     const label = `読み取り中（${stepIndex + 1}/${total}）`;
     onProgress?.(stepIndex, total, label);
     await apiClient.transcribeStep(token, sessionId, stepIndex);

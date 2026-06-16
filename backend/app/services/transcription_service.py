@@ -17,6 +17,21 @@ def _crop_key(order: int, part_index: int) -> str:
     return f"{order}-{part_index}"
 
 
+def _result_key(result: dict) -> tuple:
+    return (result.get("questionId"), result.get("partIndex"))
+
+
+def first_pending_transcription_step(existing: list[dict], targets: list[dict]) -> int:
+    """最初に未転記の設問インデックス。すべて完了なら len(targets)。"""
+    by_key = {_result_key(r): r for r in existing}
+    for index, target in enumerate(targets):
+        stored = by_key.get(_result_key(target))
+        text = (stored or {}).get("studentAnswerText") or ""
+        if not str(text).strip():
+            return index
+    return len(targets)
+
+
 def _resolve_crop_path(
     session: dict,
     *,
@@ -81,13 +96,36 @@ class TranscriptionService:
             )
         return session, questions, targets
 
-    def begin_transcription(self, session_id: str, teacher_id: str) -> dict:
+    def begin_transcription(
+        self, session_id: str, teacher_id: str, *, resume: bool = False
+    ) -> dict:
         session, _, targets = self._load_transcription_context(session_id, teacher_id)
+        if resume:
+            existing = self.session_svc.get_question_results(session_id)
+            resume_from = first_pending_transcription_step(existing, targets)
+            if resume_from >= len(targets):
+                self.session_svc.update_status(
+                    session_id,
+                    "transcription_review",
+                    gradingProgress=None,
+                )
+                return {
+                    "sessionId": session_id,
+                    "total": len(targets),
+                    "resumeFrom": len(targets),
+                }
+            self.session_svc.update_status(session_id, "transcribing")
+            return {
+                "sessionId": session_id,
+                "total": len(targets),
+                "resumeFrom": resume_from,
+            }
+
         if session.get("status") == "transcribing":
             logger.info("Restarting interrupted transcription for session %s", session_id)
         self.session_svc.clear_question_results(session_id)
         self.session_svc.update_status(session_id, "transcribing")
-        return {"sessionId": session_id, "total": len(targets)}
+        return {"sessionId": session_id, "total": len(targets), "resumeFrom": 0}
 
     def transcribe_step(
         self, session_id: str, teacher_id: str, step_index: int

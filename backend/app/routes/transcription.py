@@ -32,8 +32,12 @@ def _transcription_error_response(exc: Exception):
 @transcription_bp.post("/sessions/<session_id>/transcribe/begin")
 @require_auth
 def begin_transcription(session_id: str):
+    body = request.get_json(silent=True) or {}
+    resume = bool(body.get("resume"))
     try:
-        payload = TranscriptionService().begin_transcription(session_id, g.teacher_id)
+        payload = TranscriptionService().begin_transcription(
+            session_id, g.teacher_id, resume=resume
+        )
         return jsonify(payload)
     except Exception as exc:
         logger.exception("Transcription begin failed for session %s", session_id)
@@ -107,6 +111,10 @@ def patch_transcriptions(session_id: str):
                 row["id"],
                 {"transcriptionStatus": "confirmed"},
             )
+    elif items:
+        session_svc.touch_draft_saved(session_id)
+        if session.get("status") in ("transcribing", "transcription_review", "crop_review"):
+            session_svc.update_status(session_id, "transcription_review")
 
     results = session_svc.get_question_results(session_id)
     results.sort(key=lambda r: (r.get("order", 0), r.get("partIndex") or 0))

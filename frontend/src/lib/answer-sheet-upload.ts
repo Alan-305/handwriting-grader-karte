@@ -3,7 +3,14 @@
 export const MAX_ANSWER_SHEET_PAGES = 4;
 
 export const ANSWER_SHEET_ACCEPT =
-  "image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,application/pdf";
+  "image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,.pdf";
+
+const PDF_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/x-pdf",
+  "application/acrobat",
+  "application/vnd.pdf",
+]);
 
 export function isAnswerSheetImageFile(file: File): boolean {
   if (file.type.startsWith("image/")) return true;
@@ -14,8 +21,20 @@ export function isAnswerSheetImageFile(file: File): boolean {
 }
 
 export function isAnswerSheetPdfFile(file: File): boolean {
-  if (file.type === "application/pdf") return true;
-  return file.name.toLowerCase().endsWith(".pdf");
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) return true;
+  const type = (file.type || "").toLowerCase();
+  return PDF_MIME_TYPES.has(type);
+}
+
+/** DataTransfer から File 一覧を取り出す（Safari 等で files が空のとき items を使う） */
+export function filesFromDataTransfer(dataTransfer: DataTransfer): File[] {
+  const fromFiles = Array.from(dataTransfer.files ?? []);
+  if (fromFiles.length > 0) return fromFiles;
+  return Array.from(dataTransfer.items ?? [])
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => file != null);
 }
 
 export function isAcceptedAnswerSheetFile(file: File): boolean {

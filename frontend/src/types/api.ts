@@ -66,6 +66,7 @@ export interface CropPreviewResponse {
 
 export interface CropTargetsResponse {
   sessionId: string;
+  status?: import("./firestore").SessionStatus;
   alignedImagePaths: string[];
   pageWidth: number;
   pageHeight: number;

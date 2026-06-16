@@ -1,4 +1,5 @@
 import type { Session } from "@/types/firestore";
+import { filterInProgressSessions } from "@/lib/session-resume";
 
 function sessionActivityMs(s: Session): number {
   const pick =
@@ -34,4 +35,18 @@ export function dedupeSessionsByTest(sessions: Session[]): Session[] {
     const tb = firstSeen.get(b.testId || b.id) ?? sessionActivityMs(b);
     return ta - tb;
   });
+}
+
+/** 生徒履歴: 作業中セッション（すべて）＋完了済み（テストごとに最新1件） */
+export function listSessionsForStudentHistory(sessions: Session[]): {
+  inProgress: Session[];
+  completed: Session[];
+} {
+  const inProgress = filterInProgressSessions(sessions);
+  const completed = dedupeSessionsByTest(sessions);
+  const inProgressIds = new Set(inProgress.map((s) => s.id));
+  return {
+    inProgress,
+    completed: completed.filter((s) => !inProgressIds.has(s.id)),
+  };
 }

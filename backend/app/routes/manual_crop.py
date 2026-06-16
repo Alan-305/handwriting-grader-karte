@@ -70,6 +70,7 @@ def list_crop_targets(session_id: str):
     return jsonify(
         {
             "sessionId": session_id,
+            "status": session.get("status"),
             "alignedImagePaths": aligned_paths,
             "pageWidth": page_w,
             "pageHeight": page_h,
@@ -163,6 +164,7 @@ def save_manual_crop(session_id: str):
         "croppedImagePath": crop_path,
     }
     session_svc.update_status(session_id, "crop_review", manualCrops=manual)
+    session_svc.touch_draft_saved(session_id)
 
     targets = []
     for q in questions:

@@ -55,6 +55,7 @@ def begin_grading(session_id: str):
 @require_auth
 def grade_step(session_id: str):
     body = request.get_json(silent=True) or {}
+    preserve_teacher_edits = bool(body.get("preserveTeacherEdits"))
     step_index = body.get("stepIndex")
     if step_index is None:
         return jsonify({"error": "stepIndex が必要です"}), 400
@@ -67,7 +68,12 @@ def grade_step(session_id: str):
     session = SessionService().get_session(session_id)
     prior_status = session.get("status") if session else None
     try:
-        payload = service.grade_step(session_id, g.teacher_id, step_index)
+        payload = service.grade_step(
+            session_id,
+            g.teacher_id,
+            step_index,
+            preserve_teacher_edits=preserve_teacher_edits,
+        )
         return jsonify(payload)
     except Exception as exc:
         logger.exception("Grading step %s failed for session %s", step_index, session_id)
@@ -77,11 +83,17 @@ def grade_step(session_id: str):
 @grading_bp.post("/sessions/<session_id>/grade")
 @require_auth
 def grade_session(session_id: str):
+    body = request.get_json(silent=True) or {}
+    preserve_teacher_edits = bool(body.get("preserveTeacherEdits"))
     service = GradingService()
     session = SessionService().get_session(session_id)
     prior_status = session.get("status") if session else None
     try:
-        payload = service.grade_session(session_id, g.teacher_id)
+        payload = service.grade_session(
+            session_id,
+            g.teacher_id,
+            preserve_teacher_edits=preserve_teacher_edits,
+        )
         return jsonify(payload)
     except Exception as exc:
         logger.exception("Grading failed for session %s", session_id)

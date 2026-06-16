@@ -3,9 +3,11 @@ import { FileImage, FileText, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   ANSWER_SHEET_ACCEPT,
+  filesFromDataTransfer,
   formatAnswerSheetFileLabel,
   isAcceptedAnswerSheetFile,
   isAnswerSheetImageFile,
+  isAnswerSheetPdfFile,
   MAX_ANSWER_SHEET_PAGES,
   mergeAnswerSheetFiles,
 } from "@/lib/answer-sheet-upload";
@@ -80,7 +82,7 @@ export function AnswerSheetDropzone({
         onDrop={(e) => {
           e.preventDefault();
           setDragOver(false);
-          if (!disabled) addFiles(e.dataTransfer.files);
+          if (!disabled) addFiles(filesFromDataTransfer(e.dataTransfer));
         }}
       >
         <Upload className="h-10 w-10 text-slate-400" aria-hidden />
@@ -168,7 +170,7 @@ export function AnswerSheetDropzone({
         </ul>
       )}
 
-      {files.some((f) => f.name.toLowerCase().endsWith(".pdf") || f.type === "application/pdf") && (
+      {files.some(isAnswerSheetPdfFile) && (
         <p className="font-ja text-xs text-slate-500">
           PDF を含む場合、写真と合わせた総ページ数が {maxPages} ページを超えるとアップロードできません。
         </p>

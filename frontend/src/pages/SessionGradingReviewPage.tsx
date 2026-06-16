@@ -32,6 +32,7 @@ import {
   updateQuestionPassageTranslation,
 } from "@/lib/question-results";
 import { formatGradingProgressMessage } from "@/lib/session-progress-message";
+import { touchSessionDraft } from "@/lib/session-draft";
 import type { GradeLevel, QuestionResult } from "@/types/firestore";
 import type { SessionPastExamAdvice } from "@/types/past-exam-advice";
 
@@ -120,10 +121,12 @@ export function SessionGradingReviewPage() {
     setError("");
     setAdviceError("");
     try {
-      await saveResults(sortedDrafts);
+      await saveResults(
+        sortedDrafts.map((d) => ({ ...d, teacherReviewed: true })),
+      );
       const token = await getIdToken();
       if (!token) return;
-      await apiClient.gradeSession(token, sessionId);
+      await apiClient.gradeSession(token, sessionId, { preserveTeacherEdits: true });
       try {
         const res = await apiClient.generatePastExamAdvice(token, sessionId);
         setAdvice(res.advice);
@@ -147,6 +150,7 @@ export function SessionGradingReviewPage() {
       await saveResults(sortedDrafts);
       await syncSessionScores(sortedDrafts);
       if (advice) await persistAdvice(advice);
+      await touchSessionDraft(sessionId!);
       setDraftSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存に失敗しました");
@@ -230,6 +234,7 @@ export function SessionGradingReviewPage() {
               </p>
               <p className="mt-2">
                 「あなたの解答」を変えた場合は、<strong>修正内容で再採点</strong>を押してください。
+                得点・講評・解説など、ここで入力・修正した内容は再採点後もそのまま保持されます。
               </p>
             </>
           ) : (
@@ -240,12 +245,12 @@ export function SessionGradingReviewPage() {
               </p>
               <p className="mt-2">
                 「あなたの解答」を修正した場合は、<strong>修正内容で再採点</strong>を押してから確定してください。
-                採点・講評・過去問アドバイスが解答内容に合わせて更新されます。
+                再採点は解答テキストの反映と合計点の再計算を行い、ここで入力・修正した得点・講評・解説は上書きしません。
               </p>
               <p className="mt-2 text-slate-600">
-                <strong>下書き保存</strong>したあと再開するには、
+                <strong>途中保存</strong>したあと再開するには、
                 <strong>生徒</strong> → 該当生徒の<strong>「過去の添削・面談」</strong>
-                → <strong>「添削確認を続ける（下書き）」</strong>から開けます（サイドバーの「下書き」は問題生成用です）。
+                → <strong>作業中</strong> から<strong>作業を再開</strong>を選んでください。
               </p>
             </>
           )}
@@ -254,8 +259,8 @@ export function SessionGradingReviewPage() {
         {draftSaved && (
           <Card className="border-green-200 bg-green-50 p-4 font-ja text-sm text-green-900">
             下書きを保存しました。あとから
-            <strong> 生徒 → 過去の添削・面談 → 添削確認を続ける（下書き）</strong>
-            で再開できます。
+            <strong> 生徒 → 過去の添削・面談 → 作業中</strong>
+            から再開できます。
           </Card>
         )}
 
@@ -286,7 +291,7 @@ export function SessionGradingReviewPage() {
           ) : (
             <>
               <Button className="min-h-11 w-full sm:w-auto" variant="outline" onClick={handleSaveDraft} disabled={saving || confirming || generatingAdvice || regrading}>
-                下書き保存
+                途中保存
               </Button>
               <Button
                 className="min-h-11 w-full gap-2 sm:w-auto"

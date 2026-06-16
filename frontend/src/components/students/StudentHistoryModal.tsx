@@ -6,21 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useInterviewRecords, useSessionsForStudent } from "@/hooks/useSession";
-import { dedupeSessionsByTest } from "@/lib/session-list";
+import { listSessionsForStudentHistory } from "@/lib/session-list";
+import {
+  sessionResumeActionLabel,
+  sessionResumePath,
+  sessionWorkflowLabel,
+} from "@/lib/session-resume";
 import { getDb } from "@/lib/firebase";
-import type { Session, SessionStatus, Test } from "@/types/firestore";
-
-const STATUS_LABEL: Partial<Record<SessionStatus, string>> = {
-  uploaded: "アップロード済",
-  aligning: "位置合わせ中",
-  aligned: "位置合わせ済",
-  crop_review: "切り出し確認中",
-  transcribing: "読み取り中",
-  transcription_review: "転記確認中",
-  grading: "添削中",
-  review: "添削確認待ち",
-  completed: "完了",
-};
+import type { Session, Test } from "@/types/firestore";
 
 function formatTs(ts: Timestamp | undefined): string {
   if (!ts?.toDate) return "—";
@@ -60,7 +53,59 @@ export function StudentHistoryModal({ open, onClose, studentId, studentName }: S
     });
   }, [open, user]);
 
-  const sessionsChrono = useMemo(() => dedupeSessionsByTest(sessions), [sessions]);
+  const { inProgress: inProgressSessions, completed: completedSessions } = useMemo(
+    () => listSessionsForStudentHistory(sessions),
+    [sessions],
+  );
+
+  const renderSessionRow = (s: Session, labelPrefix: string) => {
+    const title = s.testId ? testsById[s.testId] ?? "（テスト読込中…）" : "（テスト未設定）";
+    const score = s.maxScore > 0 ? `${s.totalScore ?? 0} / ${s.maxScore}点` : "得点未反映";
+    const status = sessionWorkflowLabel(s.status);
+    const resumePath = sessionResumePath(s);
+    const resumeLabel = sessionResumeActionLabel(s);
+    const savedAt = s.draftSavedAt ?? s.sessionDate;
+
+    return (
+      <li
+        key={s.id}
+        className="rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-3 font-ja text-sm"
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <span className="font-semibold text-slate-900">
+            {labelPrefix}
+            <span className="ml-2 font-normal text-slate-500">（{formatTs(savedAt)}）</span>
+          </span>
+          <span className="text-xs text-slate-500">{status}</span>
+        </div>
+        <p className="mt-1 text-slate-700">{title}</p>
+        <p className="mt-0.5 text-xs text-slate-500">{score}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button asChild size="sm" className="min-h-10">
+            <Link to={resumePath} onClick={onClose}>
+              {resumeLabel}
+            </Link>
+          </Button>
+          {s.gradingConfirmedAt ? (
+            <Button asChild variant="outline" size="sm" className="min-h-10">
+              <Link to={`/sessions/${s.id}/print/student`} onClick={onClose}>
+                返却プリント
+              </Link>
+            </Button>
+          ) : (
+            <span className="inline-flex min-h-10 items-center rounded-md border border-dashed border-slate-200 px-3 font-ja text-xs text-slate-400">
+              返却プリント（添削確定後）
+            </span>
+          )}
+          <Button asChild variant="outline" size="sm" className="min-h-10">
+            <Link to={`/sessions/${s.id}/print/teacher`} onClick={onClose}>
+              教師用資料
+            </Link>
+          </Button>
+        </div>
+      </li>
+    );
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -100,75 +145,30 @@ export function StudentHistoryModal({ open, onClose, studentId, studentName }: S
             {studentName} — 過去の添削・面談
           </CardTitle>
           <CardDescription className="font-ja leading-relaxed">
-            添削は<strong>第何回目のテスト</strong>として時系列で並んでいます。結果画面では各問の<strong>解説</strong>と、生成済みなら
-            <strong>過去問アドバイス</strong>も確認できます。面談は<strong>第何回目の面談</strong>で相談・アドバイス記録を開きます。
+            作業中の添削は<strong>途中保存</strong>された状態から再開できます（確定申告と同様）。
+            完了した添削は<strong>第何回目のテスト</strong>として時系列で並んでいます。
           </CardDescription>
         </CardHeader>
 
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 pb-6 sm:px-6">
+          {inProgressSessions.length > 0 ? (
+            <section>
+              <h3 className="mb-2 font-ja text-sm font-semibold text-slate-800">作業中（途中保存）</h3>
+              <ul className="space-y-2">
+                {inProgressSessions.map((s) => renderSessionRow(s, "作業中"))}
+              </ul>
+            </section>
+          ) : null}
+
           <section>
-            <h3 className="mb-2 font-ja text-sm font-semibold text-slate-800">添削セッション（テスト）</h3>
-            {sessionsChrono.length === 0 ? (
-              <p className="font-ja text-sm text-slate-500">まだ添削セッションがありません。</p>
+            <h3 className="mb-2 font-ja text-sm font-semibold text-slate-800">完了した添削</h3>
+            {completedSessions.length === 0 ? (
+              <p className="font-ja text-sm text-slate-500">まだ完了した添削がありません。</p>
             ) : (
               <ul className="space-y-2">
-                {sessionsChrono.map((s: Session, idx: number) => {
-                  const n = idx + 1;
-                  const title = s.testId ? testsById[s.testId] ?? "（テスト読込中…）" : "（テスト未設定）";
-                  const score =
-                    s.maxScore > 0 ? `${s.totalScore ?? 0} / ${s.maxScore}点` : "得点未反映";
-                  const status = STATUS_LABEL[s.status] ?? s.status;
-                  const needsGradingReview =
-                    !s.gradingConfirmedAt &&
-                    (s.status === "review" || s.status === "grading");
-                  return (
-                    <li
-                      key={s.id}
-                      className="rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-3 font-ja text-sm"
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <span className="font-semibold text-slate-900">
-                          第{n}回のテスト
-                          <span className="ml-2 font-normal text-slate-500">（{formatTs(s.sessionDate)}）</span>
-                        </span>
-                        <span className="text-xs text-slate-500">{status}</span>
-                      </div>
-                      <p className="mt-1 text-slate-700">{title}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">{score}</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {needsGradingReview ? (
-                          <Button asChild size="sm" className="min-h-10">
-                            <Link to={`/sessions/${s.id}/grading-review`} onClick={onClose}>
-                              添削確認を続ける（下書き）
-                            </Link>
-                          </Button>
-                        ) : (
-                          <Button asChild size="sm" className="min-h-10">
-                            <Link to={`/sessions/${s.id}`} onClick={onClose}>
-                              添削結果・解説を見る
-                            </Link>
-                          </Button>
-                        )}
-                        {s.gradingConfirmedAt ? (
-                          <Button asChild variant="outline" size="sm" className="min-h-10">
-                            <Link to={`/sessions/${s.id}/print/student`} onClick={onClose}>
-                              返却プリント
-                            </Link>
-                          </Button>
-                        ) : (
-                          <span className="inline-flex min-h-10 items-center rounded-md border border-dashed border-slate-200 px-3 font-ja text-xs text-slate-400">
-                            返却プリント（添削確定後）
-                          </span>
-                        )}
-                        <Button asChild variant="outline" size="sm" className="min-h-10">
-                          <Link to={`/sessions/${s.id}/print/teacher`} onClick={onClose}>
-                            教師用資料
-                          </Link>
-                        </Button>
-                      </div>
-                    </li>
-                  );
-                })}
+                {completedSessions.map((s, idx) =>
+                  renderSessionRow(s, `第${idx + 1}回のテスト`),
+                )}
               </ul>
             )}
           </section>

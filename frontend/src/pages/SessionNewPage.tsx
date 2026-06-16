@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { PageHeader } from "@/components/layout/AppShell";
 import { AnswerSheetDropzone } from "@/components/upload/AnswerSheetDropzone";
@@ -13,9 +13,14 @@ import { useStudents } from "@/hooks/useStudent";
 import { apiClient } from "@/lib/api-client";
 import { generateAnswerSheetLayout, layoutPageCount } from "@/lib/answer-sheet-layout";
 import { loadPrintLayoutSettings } from "@/lib/print-layout-settings";
+import {
+  canStartSessionUpload,
+  sessionUploadBlockReason,
+} from "@/lib/session-upload-readiness";
+import { isInProgressSession, sessionResumePath, sessionWorkflowLabel } from "@/lib/session-resume";
 import { getDb } from "@/lib/firebase";
 import { primaryPastExamSlug } from "@/lib/resolve-university";
-import type { Question, Test } from "@/types/firestore";
+import type { Question, Session, Test } from "@/types/firestore";
 
 export function SessionNewPage() {
   const { user, getIdToken } = useAuth();
@@ -30,6 +35,7 @@ export function SessionNewPage() {
   const [loading, setLoading] = useState(false);
   const [progressMsg, setProgressMsg] = useState<string>("位置合わせ中");
   const [error, setError] = useState("");
+  const [inProgressSession, setInProgressSession] = useState<Session | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -66,6 +72,30 @@ export function SessionNewPage() {
     }
   }, [testsForStudent, testId]);
 
+  useEffect(() => {
+    if (!user || !studentId || !testId) {
+      setInProgressSession(null);
+      return;
+    }
+    const q = query(
+      collection(getDb(), "sessions"),
+      where("teacherId", "==", user.uid),
+      where("studentId", "==", studentId),
+      where("testId", "==", testId),
+    );
+    return onSnapshot(q, (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Session);
+      const inProgress = rows
+        .filter(isInProgressSession)
+        .sort(
+          (a, b) =>
+            (b.draftSavedAt?.toMillis?.() ?? b.sessionDate?.toMillis?.() ?? 0) -
+            (a.draftSavedAt?.toMillis?.() ?? a.sessionDate?.toMillis?.() ?? 0),
+        );
+      setInProgressSession(inProgress[0] ?? null);
+    });
+  }, [user, studentId, testId]);
+
   const selectedTest = testsForStudent.find((t) => t.id === testId);
   const selectedQuestions = testId ? questionsByTest[testId] ?? [] : [];
 
@@ -83,16 +113,38 @@ export function SessionNewPage() {
     return `このテストは最大 ${expectedPages} 枚の解答用紙想定です。書けた枚数だけでも構いません（1枚のみ可）。ある場合は印刷順どおり 1枚目→2枚目… の順で追加してください。`;
   }, [expectedPages]);
 
-  const canGrade =
-    students.length > 0 &&
-    selectedTest &&
-    selectedTest.questionCount > 0 &&
-    selectedTest.templateId &&
-    backendOk === true &&
-    files.length > 0;
+  const effectiveQuestionCount = Math.max(
+    selectedQuestions.length,
+    selectedTest?.questionCount ?? 0,
+  );
+
+  const canGrade = canStartSessionUpload({
+    studentId,
+    selectedTest,
+    questionCount: effectiveQuestionCount,
+    backendOk,
+    fileCount: files.length,
+  });
+
+  const uploadBlockReason = sessionUploadBlockReason({
+    studentId,
+    selectedTest,
+    questionCount: effectiveQuestionCount,
+    backendOk,
+    fileCount: files.length,
+    loading,
+  });
 
   const runGrading = async () => {
     if (files.length === 0 || !studentId || !testId) return;
+    if (
+      inProgressSession &&
+      !window.confirm(
+        "この生徒・テストには未完了の添削があります。新しい答案をアップロードすると、途中保存された作業内容は上書きされます。続けますか？",
+      )
+    ) {
+      return;
+    }
     setLoading(true);
     setError("");
     setProgressMsg("位置合わせ中");
@@ -187,6 +239,23 @@ export function SessionNewPage() {
           </div>
         </Card>
 
+        {inProgressSession ? (
+          <Card className="border-amber-200 bg-amber-50/90 p-4 font-ja text-sm leading-relaxed text-slate-800">
+            <p>
+              この生徒・テストには<strong>未完了の添削</strong>があります（
+              {sessionWorkflowLabel(inProgressSession.status)}）。
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button asChild className="min-h-11">
+                <Link to={sessionResumePath(inProgressSession)}>作業を再開</Link>
+              </Button>
+              <p className="flex min-h-11 items-center font-ja text-xs text-slate-600">
+                新しい答案をアップロードすると、途中保存された内容は上書きされます。
+              </p>
+            </div>
+          </Card>
+        ) : null}
+
         <AnswerSheetDropzone
           files={files}
           onFilesChange={setFiles}
@@ -196,13 +265,20 @@ export function SessionNewPage() {
 
         {error && <ErrorRetry message={error} onRetry={runGrading} />}
 
-        <Button
-          className="w-full min-h-11"
-          disabled={!canGrade || loading}
-          onClick={runGrading}
-        >
-          アップロードして切り出し
-        </Button>
+        <div className="space-y-2">
+          <Button
+            className="w-full min-h-11"
+            disabled={!canGrade || loading}
+            onClick={runGrading}
+          >
+            アップロードして切り出し
+          </Button>
+          {uploadBlockReason && (
+            <p className="font-ja text-center text-sm text-slate-600" role="status">
+              {uploadBlockReason}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

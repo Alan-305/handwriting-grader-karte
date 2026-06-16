@@ -107,6 +107,13 @@ class SessionService:
         data = {"status": status, **extra}
         self.firebase.update_doc("sessions", session_id, data)
 
+    def touch_draft_saved(self, session_id: str) -> None:
+        self.firebase.update_doc(
+            "sessions",
+            session_id,
+            {"draftSavedAt": datetime.now(timezone.utc)},
+        )
+
     def update_progress(self, session_id: str, current: int, total: int, message: str = "添削中"):
         self.firebase.update_doc(
             "sessions",

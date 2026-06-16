@@ -7,6 +7,7 @@ def test_symbol_system_uses_correct_incorrect_explanation_format():
     assert "不正解：" in GRADING_SYSTEM_SYMBOL
     assert "①" not in GRADING_SYSTEM_SYMBOL
     assert "模範解答欄は使わず" in GRADING_SYSTEM_SYMBOL
+    assert "したがって正解" in GRADING_SYSTEM_SYMBOL
 
 
 def test_select_symbol_prompt_for_short_answer_format():
@@ -33,6 +34,7 @@ def test_build_symbol_text_prompt_includes_part_label_and_format_hint():
     )
     assert "採点対象の小問: (4)" in text
     assert "(1) 正解" in text
+    assert "したがって正解" in text
     assert "b" in text
 
 

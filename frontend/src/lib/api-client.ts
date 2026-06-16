@@ -124,10 +124,19 @@ export const apiClient = {
       token,
     }),
 
-  beginTranscription: (token: string, sessionId: string) =>
-    request<{ sessionId: string; total: number }>(
+  beginTranscription: (
+    token: string,
+    sessionId: string,
+    options?: { resume?: boolean },
+  ) =>
+    request<{ sessionId: string; total: number; resumeFrom?: number }>(
       `/api/sessions/${sessionId}/transcribe/begin`,
-      { method: "POST", token },
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resume: options?.resume ?? false }),
+        token,
+      },
     ),
 
   transcribeStep: (token: string, sessionId: string, stepIndex: number) =>
@@ -179,9 +188,17 @@ export const apiClient = {
       },
     ),
 
-  gradeSession: (token: string, sessionId: string) =>
+  gradeSession: (
+    token: string,
+    sessionId: string,
+    options?: { preserveTeacherEdits?: boolean },
+  ) =>
     request<GradeSessionResponse>(`/api/sessions/${sessionId}/grade`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        preserveTeacherEdits: options?.preserveTeacherEdits ?? false,
+      }),
       token,
     }),
 
