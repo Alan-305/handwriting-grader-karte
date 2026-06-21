@@ -7,7 +7,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from app.ai.gemini_client import GeminiAnalysisClient
+from app.ai.generation_structured_client import GenerationStructuredClient
 from app.ai.prompts.question_generation_q4b import (
     build_q4b_generation_user_prompt,
     build_q4b_validator_user_prompt,
@@ -136,7 +136,7 @@ class QuestionQ4BService:
         self.firebase = FirebaseAdminService()
         self.design = QuestionDesignService()
         self.university_ctx = UniversityContextService()
-        self.gemini = GeminiAnalysisClient()
+        self.llm = GenerationStructuredClient()
 
     def _drafts_collection(self, teacher_id: str):
         return self.design._drafts_collection(teacher_id)
@@ -245,7 +245,7 @@ class QuestionQ4BService:
             if fix_hint:
                 user_text += f"\n\n【前回の検証で指摘された点を必ず修正】\n{fix_hint}"
 
-            current = self.gemini.complete_structured(
+            current = self.llm.complete_structured(
                 system=build_q4b_generation_system(university_slug, university_name),
                 user_text=user_text,
                 response_schema=Q4BGenerationResult,
@@ -254,7 +254,7 @@ class QuestionQ4BService:
             current.passage = normalize_prompt_markup(current.passage)
 
             block = format_q4b_for_validator(current)
-            validator = self.gemini.complete_structured(
+            validator = self.llm.complete_structured(
                 system=build_q4b_validator_system(university_slug, ""),
                 user_text=build_q4b_validator_user_prompt(problem_block=block),
                 response_schema=Q4BValidatorResult,

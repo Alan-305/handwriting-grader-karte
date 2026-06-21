@@ -35,6 +35,8 @@ _GRADING_SYSTEM_SUFFIX = (
     " 講評・解説は各2〜3文または丸数字5項目以内で簡潔に。"
 )
 
+_GENERATION_SYSTEM_SUFFIX = "\n\n出力は指定スキーマの JSON のみ。"
+
 
 def normalize_anthropic_model(raw: str | None) -> str:
     if not raw or not str(raw).strip():
@@ -186,6 +188,10 @@ class AnthropicVisionClient:
                 "AI 応答が max_tokens で切れました。再試行するか管理者に連絡してください。"
             )
 
+    def _system_with_suffix(self, system: str, *, for_generation: bool) -> str:
+        suffix = _GENERATION_SYSTEM_SUFFIX if for_generation else _GRADING_SYSTEM_SUFFIX
+        return system + suffix
+
     def _invoke_structured_parse(
         self,
         *,
@@ -194,11 +200,12 @@ class AnthropicVisionClient:
         model: str,
         max_tokens: int,
         response_schema: type[BaseModel],
+        for_generation: bool = False,
     ) -> BaseModel:
         response = self.client.messages.parse(
             model=model,
             max_tokens=max_tokens,
-            system=system + _GRADING_SYSTEM_SUFFIX,
+            system=self._system_with_suffix(system, for_generation=for_generation),
             messages=[{"role": "user", "content": content}],
             output_format=response_schema,
         )
@@ -222,11 +229,12 @@ class AnthropicVisionClient:
         model: str,
         max_tokens: int,
         response_schema: type[BaseModel],
+        for_generation: bool = False,
     ) -> BaseModel:
         response = self.client.messages.create(
             model=model,
             max_tokens=max_tokens,
-            system=system + _GRADING_SYSTEM_SUFFIX,
+            system=self._system_with_suffix(system, for_generation=for_generation),
             messages=[{"role": "user", "content": content}],
         )
         text = self._extract_response_text(response)
@@ -244,6 +252,7 @@ class AnthropicVisionClient:
         model: str,
         max_tokens: int,
         response_schema: type[BaseModel],
+        for_generation: bool = False,
     ) -> BaseModel:
         try:
             return self._invoke_structured_parse(
@@ -252,6 +261,7 @@ class AnthropicVisionClient:
                 model=model,
                 max_tokens=max_tokens,
                 response_schema=response_schema,
+                for_generation=for_generation,
             )
         except Exception as exc:
             if _is_structured_output_unsupported(exc):
@@ -266,6 +276,7 @@ class AnthropicVisionClient:
                     model=model,
                     max_tokens=max_tokens,
                     response_schema=response_schema,
+                    for_generation=for_generation,
                 )
             raise
 
@@ -278,6 +289,7 @@ class AnthropicVisionClient:
         image_base64: str | None = None,
         media_type: str = "image/jpeg",
         max_output_tokens: int | None = None,
+        for_generation: bool = False,
     ) -> BaseModel:
         if not self.client:
             return self._mock_response(response_schema)
@@ -311,6 +323,7 @@ class AnthropicVisionClient:
                         model=model,
                         max_tokens=token_limit,
                         response_schema=response_schema,
+                        for_generation=for_generation,
                     )
 
                 result = with_retry(call, max_retries=4)
@@ -333,7 +346,12 @@ class AnthropicVisionClient:
         raise RuntimeError(_format_grading_failure(last_error, models_tried)) from last_error
 
     def _mock_response(self, schema: type[BaseModel]) -> BaseModel:
+        from app.ai.gemini_client import _MOCK_PAYLOADS
         from app.ai.schemas.grading import EnglishCompositionGradeResult
+
+        generation_mock = _MOCK_PAYLOADS.get(schema.__name__)
+        if generation_mock is not None:
+            return schema.model_validate(generation_mock)
 
         mock: dict = {
             "grade": "良",

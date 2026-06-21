@@ -11,7 +11,11 @@ class Q4AUnderlinedPart(BaseModel):
 class Q4AItem(BaseModel):
     number: int = Field(ge=1, le=5)
     item_label: str = Field(alias="itemLabel", default="")
-    instruction_ja: str = Field(alias="instructionJa", default="")
+    instruction_ja: str = Field(
+        alias="instructionJa",
+        default="",
+        description="各パラグラフ用の日本語指示。東大第4問(A)では空文字にする",
+    )
     english_block: str = Field(alias="englishBlock", default="")
     parts: list[Q4AUnderlinedPart] = Field(default_factory=list)
     error_label: str = Field(alias="errorLabel", default="")

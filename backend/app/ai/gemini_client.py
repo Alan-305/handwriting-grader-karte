@@ -102,6 +102,18 @@ def _finish_reason_label(finish_reason) -> str:
         return str(finish_reason)
 
 
+def _check_gemini_truncation(response) -> None:
+    """候補テキストがあっても finish_reason=MAX_TOKENS なら切れた JSON として再試行させる。"""
+    if not getattr(response, "candidates", None):
+        return
+    finish = getattr(response.candidates[0], "finish_reason", None)
+    label = _finish_reason_label(finish)
+    if label == "MAX_TOKENS" or finish == 2:
+        raise ValueError(
+            "Gemini の応答が長さ制限で切れました。再試行してください。"
+        )
+
+
 def _extract_response_text(response) -> str:
     """response.text を使わず Part からテキストを取り出す（空応答時の例外を避ける）。"""
     if not getattr(response, "candidates", None):
@@ -368,14 +380,14 @@ _MOCK_PAYLOADS: dict[str, dict] = {
         "vocabularyList": ["ashamed — 恥ずかしい"],
     },
     "Q4AProblemResult": {
-        "instructions": "次の各英文について、下線部のうち不適切なものを1つずつ選べ。",
+        "instructions": "次の英文の下線部(a)～(e)のうち、文法上または内容上の誤りを含むものを一つ選べ。",
         "layout": "five_paragraphs",
         "sourceNote": "モック: AI社会の倫理",
         "items": [
             {
                 "number": i,
                 "itemLabel": f"({i})",
-                "instructionJa": "次の英文の下線部のうち、文法・語法・構文・文脈のいずれかの観点から不適切なものを1つ選べ。",
+                "instructionJa": "",
                 "englishBlock": (
                     "The debate over AI ethics (a) *has been growing rapidly in recent years across* "
                     "society as systems (b) *are deployed in many sensitive domains today* where "
@@ -564,6 +576,7 @@ class GeminiAnalysisClient:
                 else:
                     raise
             text = _extract_response_text(response) or "{}"
+            _check_gemini_truncation(response)
             logger.info(
                 "Gemini analysis completed (model=%s)",
                 model_name or self.model_name,

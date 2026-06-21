@@ -34,6 +34,8 @@ def build_q4a_problem_user_prompt(
         f"難易度: {difficulty_label(difficulty)}{uni_note}{topic}{source}{ref_block}\n"
         "上記に従い、東大第4問(A)・誤り指摘問題を作成してください。"
         "5つの独立パラグラフ（(1)〜(5)）各に下線部5箇所を (a) *5〜10語の英文* 形式で設けてください。"
+        "冒頭指示は instructions に1回だけ入れ、各パラグラフの instructionJa は空にし、"
+        "「(1)」の直後から英文が始まるレイアウトにしてください。"
     )
 
 

@@ -7,7 +7,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from app.ai.gemini_client import GeminiAnalysisClient
+from app.ai.generation_structured_client import GenerationStructuredClient
 from app.ai.prompts.question_generation_q5 import (
     Q5_TEACHER_PACK_SYSTEM,
     build_q5_passage_user_prompt,
@@ -55,6 +55,14 @@ def _question_anchor_tokens(q: Q5SubQuestion) -> set[str]:
         if part.strip():
             tokens |= _anchor_tokens(part)
     return tokens
+
+
+def _normalize_questions_result(questions: Q5QuestionsResult, source_passage: str) -> None:
+    """AI が本文全文を passageForExam に重複出力した場合は破棄する（JSON 切れ防止）。"""
+    pfe = questions.passage_for_exam.strip()
+    src = source_passage.strip()
+    if pfe and src and len(pfe) >= len(src) * 0.85:
+        questions.passage_for_exam = ""
 
 
 def _exam_passage(questions: Q5QuestionsResult, fallback: str) -> str:
@@ -156,7 +164,7 @@ class QuestionQ5Service:
         self.firebase = FirebaseAdminService()
         self.design = QuestionDesignService()
         self.university_ctx = UniversityContextService()
-        self.gemini = GeminiAnalysisClient()
+        self.llm = GenerationStructuredClient()
 
     def _drafts_collection(self, teacher_id: str):
         return self.design._drafts_collection(teacher_id)
@@ -182,7 +190,7 @@ class QuestionQ5Service:
         )
         topic = topic_hint.strip()
 
-        passage: Q5PassageResult = self.gemini.complete_structured(
+        passage: Q5PassageResult = self.llm.complete_structured(
             system=build_q5_passage_system(university_slug, uni_name),
             user_text=build_q5_passage_user_prompt(
                 topic_hint=topic,
@@ -205,7 +213,7 @@ class QuestionQ5Service:
         solver_line = format_solver_answers_for_teacher(solver)
         questions_block = format_q5_questions_block(questions)
 
-        pack: Q5TeacherPackResult = self.gemini.complete_structured(
+        pack: Q5TeacherPackResult = self.llm.complete_structured(
             system=build_q5_teacher_pack_system(university_slug, Q5_TEACHER_PACK_SYSTEM),
             user_text=build_q5_teacher_pack_user_prompt(
                 passage=exam_body,
@@ -271,7 +279,7 @@ class QuestionQ5Service:
         solver: Q5SolverResult | None = None
 
         for attempt in range(max_attempts):
-            questions = self.gemini.complete_structured(
+            questions = self.llm.complete_structured(
                 system=build_q5_questions_system(university_slug, university_name),
                 user_text=build_q5_questions_user_prompt(
                     passage=passage,
@@ -282,6 +290,7 @@ class QuestionQ5Service:
                 response_schema=Q5QuestionsResult,
                 max_output_tokens=16384,
             )
+            _normalize_questions_result(questions, passage)
             kyotsu_hits = [
                 q.question_type.lower()
                 for q in questions.questions
@@ -311,7 +320,7 @@ class QuestionQ5Service:
 
             exam_body = _exam_passage(questions, passage)
             questions_block = format_q5_questions_block(questions)
-            solver = self.gemini.complete_structured(
+            solver = self.llm.complete_structured(
                 system=build_q5_solver_system(university_slug, ""),
                 user_text=build_q5_solver_user_prompt(
                     passage=exam_body,

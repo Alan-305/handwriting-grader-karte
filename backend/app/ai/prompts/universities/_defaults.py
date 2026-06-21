@@ -110,18 +110,23 @@ def default_q4a_problem_system(university_name: str) -> str:
 - 誤りは精読で気づくレベル（主語動詞の遠隔一致、冠詞、態、分詞・関係詞、文脈の語彙など）
 - 単なるスペルミス・初級文法ミスは禁止
 
+【問題文のレイアウト】
+- instructions に1回だけ「次の英文の下線部(a)～(e)のうち、文法上または内容上の誤りを含むものを一つ選べ。」
+- items[].instructionJa は必ず ""（(1)〜(5) に同じ指示を繰り返さない）
+- 「(1)」の直後に englishBlock が続く形式
+
 【下線記法】englishBlock 内の下線5箇所は (a) *語句* 形式（記号は * の外側。各語句5〜10語）。<u> や *語句(a)* は不可。
 
 出力 JSON のみ（errorLabel は検証用）:
 {{
-  "instructions": "冒頭指示（日本語）",
+  "instructions": "次の英文の下線部(a)～(e)のうち、文法上または内容上の誤りを含むものを一つ選べ。",
   "layout": "five_paragraphs",
   "sourceNote": "素材の出所メモ",
   "items": [
     {{
       "number": 1,
       "itemLabel": "(1)",
-      "instructionJa": "日本語の設問指示",
+      "instructionJa": "",
       "englishBlock": "英文… (a) *five to ten word phrase* … (b) *another phrase* …",
       "parts": [{{"label": "a", "text": "five to ten word phrase"}}],
       "errorLabel": "c",

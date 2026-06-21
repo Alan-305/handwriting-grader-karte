@@ -6,9 +6,11 @@ from app.ai.schemas.q4a_generation import (
     Q4AUnderlinedPart,
 )
 from app.services.question_q4a_service import (
+    Q4A_DEFAULT_INSTRUCTIONS,
     QuestionQ4AService,
     assemble_q4a_model_answer,
     assemble_q4a_prompt,
+    normalize_q4a_problem_layout,
 )
 
 _LONG_PARTS = [
@@ -33,12 +35,12 @@ def _sample_problem() -> Q4AProblemResult:
         "(e) *researchers continue to develop new technologies rapidly*."
     )
     return Q4AProblemResult(
-        instructions="次の各英文について、下線部のうち不適切なものを1つ選べ。",
+        instructions=Q4A_DEFAULT_INSTRUCTIONS,
         items=[
             Q4AItem(
                 number=i,
                 itemLabel=f"({i})",
-                instructionJa="不適切なものを1つ選べ。",
+                instructionJa="",
                 englishBlock=english,
                 parts=parts,
                 errorLabel="c",
@@ -52,11 +54,22 @@ def _sample_problem() -> Q4AProblemResult:
 def test_assemble_q4a_prompt_has_five_items_and_asterisk_markup():
     problem = _sample_problem()
     text = assemble_q4a_prompt(problem=problem)
-    assert "(1)" in text
+    assert Q4A_DEFAULT_INSTRUCTIONS in text
+    assert "(1) The debate" in text
     assert "(5)" in text
     assert "(21)" not in text
     assert "←誤り" not in text
     assert "(a) *has been growing rapidly in recent years across*" in text
+    assert "不適切なものを1つ選べ" not in text.replace(Q4A_DEFAULT_INSTRUCTIONS, "")
+
+
+def test_normalize_q4a_problem_layout_clears_per_paragraph_instructions():
+    problem = _sample_problem()
+    problem.items[0].instruction_ja = "次の英文の下線部のうち…"
+    problem.items[2].instruction_ja = "繰り返し指示"
+    normalized = normalize_q4a_problem_layout(problem)
+    assert normalized.instructions == Q4A_DEFAULT_INSTRUCTIONS
+    assert all(item.instruction_ja == "" for item in normalized.items)
 
 
 def test_ensure_markup_wraps_bare_phrases_and_adds_labels():
@@ -102,6 +115,8 @@ def test_assemble_q4a_model_answer():
 def test_run_pipeline_mock_without_api_key(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "")
     monkeypatch.setenv("HGK_GEMINI_API_KEY", "")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("HGK_ANTHROPIC_API_KEY", "")
 
     svc = QuestionQ4AService()
     monkeypatch.setattr(svc.university_ctx, "_load_past_questions_for_years", lambda *a, **k: [])

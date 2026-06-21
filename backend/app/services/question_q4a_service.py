@@ -6,7 +6,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from app.ai.gemini_client import GeminiAnalysisClient
+from app.ai.generation_structured_client import GenerationStructuredClient
 from app.ai.prompts.question_generation_q4a import (
     build_q4a_problem_user_prompt,
     build_q4a_teacher_pack_user_prompt,
@@ -40,6 +40,17 @@ logger = logging.getLogger(__name__)
 
 Q4A_DEFAULT_POINTS = 15
 Q4A_PART_LABEL = "(A)"
+Q4A_DEFAULT_INSTRUCTIONS = (
+    "次の英文の下線部(a)～(e)のうち、文法上または内容上の誤りを含むものを一つ選べ。"
+)
+
+
+def normalize_q4a_problem_layout(problem: Q4AProblemResult) -> Q4AProblemResult:
+    """各パラグラフごとの日本語指示を除き、冒頭1回の指示 + (1)直後に英文の形式に揃える。"""
+    problem.instructions = Q4A_DEFAULT_INSTRUCTIONS
+    for item in problem.items:
+        item.instruction_ja = ""
+    return problem
 
 
 def format_q4a_problem_for_teacher(problem: Q4AProblemResult) -> str:
@@ -49,10 +60,8 @@ def format_q4a_problem_for_teacher(problem: Q4AProblemResult) -> str:
         lines.append("")
     for item in sorted(problem.items, key=lambda x: x.number):
         label = item.item_label.strip() or f"({item.number})"
-        lines.append(label)
-        if item.instruction_ja.strip():
-            lines.append(item.instruction_ja.strip())
-        lines.append(ensure_q4a_english_block_markup(item))
+        english = ensure_q4a_english_block_markup(item)
+        lines.append(f"{label} {english.lstrip()}")
         for p in item.parts:
             mark = " ←誤り" if p.label.lower() == item.error_label.lower() else ""
             lines.append(f"  ({p.label}) {p.text.strip()}{mark}")
@@ -69,11 +78,8 @@ def assemble_q4a_prompt(*, problem: Q4AProblemResult) -> str:
         lines.append("")
     for item in sorted(problem.items, key=lambda x: x.number):
         label = item.item_label.strip() or f"({item.number})"
-        lines.append(label)
-        if item.instruction_ja.strip():
-            lines.append(item.instruction_ja.strip())
-        lines.append(ensure_q4a_english_block_markup(item))
-        lines.append("")
+        english = ensure_q4a_english_block_markup(item)
+        lines.append(f"{label} {english.lstrip()}")
     return normalize_prompt_markup("\n".join(lines).strip())
 
 
@@ -95,7 +101,7 @@ class QuestionQ4AService:
         self.firebase = FirebaseAdminService()
         self.design = QuestionDesignService()
         self.university_ctx = UniversityContextService()
-        self.gemini = GeminiAnalysisClient()
+        self.llm = GenerationStructuredClient()
 
     def _drafts_collection(self, teacher_id: str):
         return self.design._drafts_collection(teacher_id)
@@ -131,7 +137,7 @@ class QuestionQ4AService:
                 max_chars=5000,
             )
 
-        problem: Q4AProblemResult = self.gemini.complete_structured(
+        problem: Q4AProblemResult = self.llm.complete_structured(
             system=build_q4a_problem_system(university_slug, uni_name),
             user_text=build_q4a_problem_user_prompt(
                 topic_hint=topic_hint,
@@ -144,6 +150,7 @@ class QuestionQ4AService:
             max_output_tokens=16384,
         )
         problem = normalize_q4a_problem_markup(problem)
+        problem = normalize_q4a_problem_layout(problem)
 
         problem, validator, retried = self._validate_problem(
             problem=problem,
@@ -157,7 +164,7 @@ class QuestionQ4AService:
         )
 
         teacher_block = format_q4a_problem_for_teacher(problem)
-        pack: Q4ATeacherPackResult = self.gemini.complete_structured(
+        pack: Q4ATeacherPackResult = self.llm.complete_structured(
             system=build_q4a_teacher_pack_system(university_slug, ""),
             user_text=build_q4a_teacher_pack_user_prompt(
                 problem_block=teacher_block,
@@ -216,13 +223,14 @@ class QuestionQ4AService:
 
         for attempt in range(max_attempts):
             block = format_q4a_problem_for_teacher(current)
-            validator = self.gemini.complete_structured(
+            validator = self.llm.complete_structured(
                 system=build_q4a_validator_system(university_slug, ""),
                 user_text=build_q4a_validator_user_prompt(problem_block=block),
                 response_schema=Q4AValidatorResult,
                 max_output_tokens=4096,
             )
             current = normalize_q4a_problem_markup(current)
+            current = normalize_q4a_problem_layout(current)
             structural = self._structural_issues(current)
             markup = q4a_markup_issues(current)
             all_issues = list(validator.issues) + structural + markup
@@ -248,13 +256,14 @@ class QuestionQ4AService:
                 )
                 + f"\n\n【前回の検証で指摘された点を必ず修正】\n{fix}"
             )
-            current = self.gemini.complete_structured(
+            current = self.llm.complete_structured(
                 system=build_q4a_problem_system(university_slug, university_name),
                 user_text=user_text,
                 response_schema=Q4AProblemResult,
                 max_output_tokens=16384,
             )
             current = normalize_q4a_problem_markup(current)
+            current = normalize_q4a_problem_layout(current)
 
         assert validator is not None
         return current, validator, retried

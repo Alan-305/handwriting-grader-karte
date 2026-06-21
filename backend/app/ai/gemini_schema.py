@@ -7,7 +7,25 @@ from typing import Any
 
 from pydantic import BaseModel
 
-_STRIP_KEYS = frozenset({"$defs", "title", "default", "additionalProperties"})
+_STRIP_KEYS = frozenset(
+    {
+        "$defs",
+        "title",
+        "default",
+        "additionalProperties",
+        # google.generativeai の response_schema（OpenAPI 3.0 サブセット）非対応
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "minLength",
+        "maxLength",
+        "minItems",
+        "maxItems",
+        "multipleOf",
+        "pattern",
+    }
+)
 
 
 def gemini_response_schema(model: type[BaseModel]) -> dict[str, Any]:

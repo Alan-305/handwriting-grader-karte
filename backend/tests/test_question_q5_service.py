@@ -100,6 +100,8 @@ def test_structural_issues_count_and_overlap():
 def test_run_pipeline_mock_without_api_key(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "")
     monkeypatch.setenv("HGK_GEMINI_API_KEY", "")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("HGK_ANTHROPIC_API_KEY", "")
 
     svc = QuestionQ5Service()
     monkeypatch.setattr(svc.university_ctx, "_load_past_questions_for_years", lambda *a, **k: [])
