@@ -6,12 +6,17 @@ from app.ai.schemas.q5_generation import (
     Q5SubQuestion,
     Q5TeacherPackResult,
 )
+from app.ai.schemas.q5_generation_claude import (
+    Q5ExplanationClaude,
+    Q5TeacherPackClaudeResult,
+)
 from app.services.q5_scoring import (
     choice_design_issues,
     choice_passage_overlap_ratio,
     format_q5_part_rubric,
     format_q5_scoring_points_lines,
     has_long_verbatim_phrase,
+    teacher_pack_from_claude,
 )
 from app.services.question_q5_service import assemble_q5_model_answer
 
@@ -94,6 +99,50 @@ def test_choice_design_issues_flags_copy_heavy_choices():
     )
     issues = choice_design_issues(questions, passage)
     assert any("コピー" in i or "パラフレーズ" in i for i in issues)
+
+
+def test_teacher_pack_from_claude_merges_inherited_basis():
+    questions = Q5QuestionsResult(
+        questions=[
+            Q5SubQuestion(
+                number=2,
+                questionType="reason_explanation",
+                prompt="理由を述べよ",
+                passageAnchor="theatrical hospitality",
+                scoringPoints=[
+                    Q5ScoringPoint(
+                        pointJa="演劇的なもてなし",
+                        passageBasis="theatrical hospitality",
+                        pointsHint="必須",
+                    ),
+                    Q5ScoringPoint(
+                        pointJa="素朴な善意",
+                        passageBasis="without performance",
+                        pointsHint="必須",
+                    ),
+                ],
+                directionCriterionJa="因果が本文に沿っていれば可",
+            )
+        ]
+    )
+    raw = Q5TeacherPackClaudeResult(
+        modelAnswerSummary="(B) 記述例",
+        explanations=[
+            Q5ExplanationClaude(
+                number=2,
+                answerText="都市の演劇的な歓待に慣れ、少女の素朴な善意に打ちのめされたから。",
+                requiredPoints=["演劇的なもてなしに慣れていた", "素朴な善意の対比"],
+                explanationJa="本文の対比が根拠。",
+            )
+        ],
+    )
+    pack = teacher_pack_from_claude(raw, questions)
+    assert pack.full_translation_ja == ""
+    assert len(pack.explanations) == 1
+    pts = pack.explanations[0].scoring_points
+    assert pts[0].passage_basis == "theatrical hospitality"
+    assert pts[0].point_ja == "演劇的なもてなしに慣れていた"
+    assert pack.explanations[0].direction_criterion_ja == "因果が本文に沿っていれば可"
 
 
 def test_assemble_q5_model_answer_shows_scoring_block():

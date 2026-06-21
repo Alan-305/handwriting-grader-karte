@@ -4,7 +4,14 @@ from __future__ import annotations
 
 import re
 
-from app.ai.schemas.q5_generation import Q5QuestionsResult, Q5ScoringPoint, Q5SubQuestion
+from app.ai.schemas.q5_generation import (
+    Q5QuestionExplanation,
+    Q5QuestionsResult,
+    Q5ScoringPoint,
+    Q5SubQuestion,
+    Q5TeacherPackResult,
+)
+from app.ai.schemas.q5_generation_claude import Q5TeacherPackClaudeResult
 
 Q5_JA_EXPLANATION_TYPES = frozenset({
     "content_explanation",
@@ -80,6 +87,57 @@ def scoring_points_from_dicts(raw: list[dict] | None) -> list[Q5ScoringPoint]:
         if isinstance(item, dict) and str(item.get("pointJa") or item.get("point_ja") or "").strip():
             out.append(Q5ScoringPoint.model_validate(item))
     return out
+
+
+def teacher_pack_from_claude(
+    raw: Q5TeacherPackClaudeResult,
+    questions: Q5QuestionsResult | None = None,
+) -> Q5TeacherPackResult:
+    """Claude 簡略スキーマ → 内部 Q5TeacherPackResult に変換。"""
+    q_by_num: dict[int, Q5SubQuestion] = {}
+    if questions:
+        q_by_num = {q.number: q for q in questions.questions}
+
+    explanations: list[Q5QuestionExplanation] = []
+    for ex in raw.explanations:
+        sub = q_by_num.get(ex.number)
+        inherited = list(sub.scoring_points) if sub else []
+        points: list[Q5ScoringPoint] = []
+        for i, line in enumerate(ex.required_points):
+            hint = "必須"
+            basis = ""
+            if inherited and i < len(inherited):
+                hint = inherited[i].points_hint or hint
+                basis = inherited[i].passage_basis
+            points.append(
+                Q5ScoringPoint(
+                    pointJa=line.strip(),
+                    passageBasis=basis,
+                    pointsHint=hint,
+                )
+            )
+        if not points and inherited:
+            points = inherited
+        direction = ex.direction_criterion_ja.strip()
+        if not direction and sub:
+            direction = sub.direction_criterion_ja.strip()
+        explanations.append(
+            Q5QuestionExplanation(
+                number=ex.number,
+                correctChoice=ex.correct_choice,
+                answerText=ex.answer_text,
+                explanationJa=ex.explanation_ja,
+                scoringPoints=points,
+                directionCriterionJa=direction,
+            )
+        )
+
+    return Q5TeacherPackResult(
+        modelAnswerSummary=raw.model_answer_summary,
+        explanations=explanations,
+        fullTranslationJa="",
+        vocabularyList=raw.vocabulary_list,
+    )
 
 
 def _content_tokens(text: str) -> list[str]:

@@ -70,15 +70,16 @@ def build_q5_solver_user_prompt(*, passage: str, questions_block: str) -> str:
 あいまいな設問（複数正解ありうる・採点基準不明・キーワードマッチだけで解ける）は issues に「問N: 理由」と書き passed=false にしてください。"""
 
 
-Q5_TEACHER_PACK_SYSTEM = """あなたは入試英語・第5問の教師用資料作成者です。
-試験用本文・設問・検証済み正答に基づき、模範解答・解説・全訳を作成してください。
+Q5_TEACHER_PACK_SYSTEM = """あなたは入試英語・第5問の解答・解説作成者です。
+試験用本文・設問・検証済み正答に基づき、模範解答・解説・語彙リストを作成してください。
 
 - modelAnswerSummary: 各問の正答（記号または日本語）を列挙し、要点を2文以内
 - explanations: 各問の解説（日本語・簡潔）。和訳の英語は「」で囲む
 - 選択式の解説では**正解の根拠**に加え、主要な**誤肢がどの誤読 trap か**を1〜2肢に触れて簡潔に述べる
-- 日本語記述問には answerText（模範例）+ scoringPoints（2〜4個）+ directionCriterionJa を必ず含める
-- fullTranslationJa: 本文の日本語全訳（2段落以上の長文は各段落の先頭に ¶1、¶2… を付ける）
+- 日本語記述問には answerText（模範例）+ **requiredPoints**（必須採点ポイント2〜4個・日本語文字列の配列）+ directionCriterionJa
+- ネストした scoringPoints オブジェクトは使わない（requiredPoints に要点だけ列挙）
 - vocabularyList: 重要語句5〜10個（英 — 日）
+- **本文の日本語全訳（fullTranslationJa）は出力しない**（別工程で後から生成する）
 
 出力 JSON のみ:
 {
@@ -86,11 +87,10 @@ Q5_TEACHER_PACK_SYSTEM = """あなたは入試英語・第5問の教師用資料
   "explanations": [{
     "number": 2,
     "answerText": "模範解答例",
-    "scoringPoints": [{"pointJa": "必須1", "passageBasis": "根拠", "pointsHint": "必須"}],
+    "requiredPoints": ["必須ポイント1", "必須ポイント2"],
     "directionCriterionJa": "核心を押さえていれば可",
     "explanationJa": "..."
   }],
-  "fullTranslationJa": "...",
   "vocabularyList": []
 }"""
 
@@ -110,8 +110,8 @@ def build_q5_teacher_pack_user_prompt(
 【検証済み正答】
 {solver_answers}
 
-教師用の模範解答・解説・全訳・語彙リストを作成してください。
-日本語記述問には必ず scoringPoints（2〜4個）と directionCriterionJa を付けてください。"""
+模範解答・解説・語彙リストを作成してください（本文全訳は不要）。
+日本語記述問には必ず requiredPoints（2〜4個）と directionCriterionJa を付けてください。"""
 
 
 def build_q5_questions_user_prompt(

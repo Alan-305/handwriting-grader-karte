@@ -21,23 +21,25 @@ from app.ai.prompts.universities.registry import (
     build_q5_solver_system,
     build_q5_teacher_pack_system,
 )
+from app.generation_limits import GEMINI_MAX_OUTPUT_STANDARD
 from app.services.university_context_service import UniversityContextService
 from app.ai.schemas.q5_generation import (
     Q5_MAX_SUB_QUESTIONS,
     Q5_MIN_SUB_QUESTIONS,
     Q5PassageResult,
     Q5QuestionsResult,
-    Q5ScoringPoint,
     Q5SolverResult,
     Q5SubQuestion,
     Q5TeacherPackResult,
 )
+from app.ai.schemas.q5_generation_claude import Q5TeacherPackClaudeResult
 from app.services.q5_scoring import (
     Q5_JA_EXPLANATION_TYPES,
     choice_design_issues,
     format_q5_part_rubric,
     format_q5_scoring_points_lines,
     scoring_points_from_dicts,
+    teacher_pack_from_claude,
 )
 from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.question_design_service import QuestionDesignService, format_type_label
@@ -165,8 +167,9 @@ def assemble_q5_model_answer(pack: Q5TeacherPackResult) -> str:
         parts.append("【重要語句】")
         parts.extend(f"- {v}" for v in pack.vocabulary_list)
         parts.append("")
-    parts.append("【全訳】")
-    parts.append(pack.full_translation_ja.strip())
+    if pack.full_translation_ja.strip():
+        parts.append("【全訳】")
+        parts.append(pack.full_translation_ja.strip())
     return "\n".join(parts).strip()
 
 
@@ -290,16 +293,17 @@ class QuestionQ5Service:
         solver_line = format_solver_answers_for_teacher(solver)
         questions_block = format_q5_questions_block(questions)
 
-        pack: Q5TeacherPackResult = self.llm.complete_structured(
+        pack_raw: Q5TeacherPackClaudeResult = self.llm.complete_structured(
             system=build_q5_teacher_pack_system(university_slug, Q5_TEACHER_PACK_SYSTEM),
             user_text=build_q5_teacher_pack_user_prompt(
                 passage=exam_body,
                 questions_block=questions_block,
                 solver_answers=solver_line,
             ),
-            response_schema=Q5TeacherPackResult,
-            max_output_tokens=16384,
+            response_schema=Q5TeacherPackClaudeResult,
+            max_output_tokens=GEMINI_MAX_OUTPUT_STANDARD,
         )
+        pack = teacher_pack_from_claude(pack_raw, questions)
 
         prompt = assemble_q5_prompt(
             instructions=questions.instructions,

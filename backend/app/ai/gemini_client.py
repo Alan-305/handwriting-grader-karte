@@ -375,6 +375,34 @@ _MOCK_PAYLOADS: dict[str, dict] = {
             "¶2\n二段落目の和訳です。",
         ],
     },
+    "Q5TeacherPackClaudeResult": {
+        "modelAnswerSummary": "1 a, 2 失敗を恥じた心情, 3 同じ失敗を防ぐため, 4 a, 5 a, 6 b。",
+        "explanations": [
+            {
+                "number": 1,
+                "correctChoice": "a",
+                "answerText": "",
+                "explanationJa": "文脈上 cancelled が適切。",
+            },
+            {
+                "number": 2,
+                "correctChoice": "",
+                "answerText": "失敗を恥じ、落胆した心情だった。",
+                "requiredPoints": ["失敗を恥じた心情", "イベント失敗の状況"],
+                "directionCriterionJa": "失敗後の心情を本文に沿って述べていれば可",
+                "explanationJa": "ashamed と disappointed の描写が根拠。",
+            },
+            {
+                "number": 3,
+                "correctChoice": "",
+                "answerText": "同じ失敗を繰り返さないため。",
+                "requiredPoints": ["同じ失敗を防ぐため", "謝罪と改善の姿勢"],
+                "directionCriterionJa": "チェックリスト作成の理由を因果で述べていれば可",
+                "explanationJa": "checklist は再発防止の具体策。",
+            },
+        ],
+        "vocabularyList": ["ashamed — 恥ずかしい"],
+    },
     "Q5TeacherPackResult": {
         "modelAnswerSummary": "1 a, 2 失敗を恥じた心情, 3 同じ失敗を防ぐため, 4 a, 5 a, 6 b。",
         "explanations": [

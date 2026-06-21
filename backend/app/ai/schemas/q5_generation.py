@@ -34,70 +34,26 @@ class Q5ChoiceItem(BaseModel):
 
 class Q5ScoringPoint(BaseModel):
     point_ja: str = Field(alias="pointJa")
-    passage_basis: str = Field(
-        default="",
-        alias="passageBasis",
-        description="本文中の根拠箇所（短い引用または要約）",
-    )
-    points_hint: str = Field(
-        default="",
-        alias="pointsHint",
-        description="配点目安・必須/加点の区別など",
-    )
+    passage_basis: str = Field(default="", alias="passageBasis")
+    points_hint: str = Field(default="", alias="pointsHint")
 
     model_config = {"populate_by_name": True}
 
 
 class Q5SubQuestion(BaseModel):
     number: int
-    part_label: str = Field(
-        default="",
-        alias="partLabel",
-        description="小問記号 A, B, C …（表示は (A)(B)(C)）",
-    )
-    question_type: str = Field(
-        alias="questionType",
-        description=(
-            "cloze|content_explanation|reason_explanation|word_usage_match|"
-            "expression_meaning|english_match|underlined_explanation|content_match|"
-            "short_answer_ja|ordering "
-            "（共通テスト型 chronology/story_map/theme は不可）"
-        ),
-    )
+    part_label: str = Field(default="", alias="partLabel")
+    question_type: str = Field(alias="questionType")
     prompt: str
-    passage_anchor: str = Field(
-        default="",
-        alias="passageAnchor",
-        description="本文中の当該箇所・根拠フレーズ（小問間で重複させない）",
-    )
-    target_word: str = Field(
-        default="",
-        alias="targetWord",
-        description="word_usage_match で問う語",
-    )
+    passage_anchor: str = Field(default="", alias="passageAnchor")
+    target_word: str = Field(default="", alias="targetWord")
     choices: list[Q5ChoiceItem] = Field(default_factory=list)
     underlined_text: str = Field(default="", alias="underlinedText")
     char_limit_ja: int | None = Field(default=None, alias="charLimitJa")
-    select_count: int | None = Field(
-        default=None,
-        alias="selectCount",
-        description="内容一致で「正しいものをすべて選べ」等のとき",
-    )
-    blank_labels: list[str] = Field(
-        default_factory=list,
-        alias="blankLabels",
-        description="空所補充の小問ラベル（(A)(B) 形式。試験番号 (21) は使わない）",
-    )
-    scoring_points: list[Q5ScoringPoint] = Field(
-        default_factory=list,
-        alias="scoringPoints",
-        description="日本語記述問の必須採点ポイント（2〜4個）",
-    )
-    direction_criterion_ja: str = Field(
-        default="",
-        alias="directionCriterionJa",
-        description="解答全体の方向性判定基準（日本語1文）",
-    )
+    select_count: int | None = Field(default=None, alias="selectCount")
+    blank_labels: list[str] = Field(default_factory=list, alias="blankLabels")
+    scoring_points: list[Q5ScoringPoint] = Field(default_factory=list, alias="scoringPoints")
+    direction_criterion_ja: str = Field(default="", alias="directionCriterionJa")
 
     model_config = {"populate_by_name": True}
 
@@ -173,7 +129,7 @@ class Q5QuestionExplanation(BaseModel):
 class Q5TeacherPackResult(BaseModel):
     model_answer_summary: str = Field(alias="modelAnswerSummary")
     explanations: list[Q5QuestionExplanation] = Field(default_factory=list)
-    full_translation_ja: str = Field(alias="fullTranslationJa")
+    full_translation_ja: str = Field(default="", alias="fullTranslationJa")
     vocabulary_list: list[str] = Field(default_factory=list, alias="vocabularyList")
 
     model_config = {"populate_by_name": True}

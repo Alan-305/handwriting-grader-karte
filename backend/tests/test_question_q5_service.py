@@ -55,7 +55,7 @@ def test_assemble_q5_prompt_includes_passage_and_questions():
     assert "A. Cancelled" in prompt
 
 
-def test_assemble_q5_model_answer_includes_translation():
+def test_assemble_q5_model_answer_includes_translation_when_present():
     pack = Q5TeacherPackResult(
         modelAnswerSummary="1 A",
         explanations=[
@@ -66,6 +66,19 @@ def test_assemble_q5_model_answer_includes_translation():
     text = assemble_q5_model_answer(pack)
     assert "【全訳】" in text
     assert "物語の全訳です。" in text
+
+
+def test_assemble_q5_model_answer_omits_translation_when_empty():
+    pack = Q5TeacherPackResult(
+        modelAnswerSummary="1 A",
+        explanations=[
+            Q5QuestionExplanation(number=1, correctChoice="A", explanationJa="本文どおり"),
+        ],
+        fullTranslationJa="",
+    )
+    text = assemble_q5_model_answer(pack)
+    assert "【全訳】" not in text
+    assert "本文どおり" in text
 
 
 def test_structural_issues_count_and_overlap():

@@ -19,7 +19,7 @@ const PIPELINE_STEPS = [
   "物語本文を作成中",
   "設問を作成中",
   "解答の妥当性を検証中",
-  "解答・解説・全訳を作成中",
+  "解答・解説を作成中",
   "下書きを保存中",
 ] as const;
 
@@ -269,7 +269,7 @@ export function QuestionGenerateQ5Page() {
 
           <Card className="border-blue-100 bg-blue-50/50 p-4">
             <p className="font-ja text-sm text-slate-700">
-              生成の流れ：①物語・随筆本文 → ②小問6〜8個（多技能） → ③妥当性検証 → ④正答・解説・全訳
+              生成の流れ：①物語・随筆本文 → ②小問6〜8個（多技能） → ③妥当性検証 → ④正答・解説（全訳は答案用紙画面で後から生成）
             </p>
             <p className="mt-2 font-ja text-xs text-slate-500">
               完了まで1〜3分かかることがあります。チャットでの修正は次の段階で追加予定です。
