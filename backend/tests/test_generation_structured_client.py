@@ -153,9 +153,9 @@ def test_generation_client_uses_flash_when_only_gemini(monkeypatch):
     assert gemini_mock.call_args.kwargs["model_name"] == "gemini-2.5-flash"
 
 
-def test_should_not_fallback_to_gemini_on_schema_complexity():
+def test_should_fallback_to_gemini_on_schema_complexity():
     exc = ValueError("Schema is too complex.")
-    assert _should_fallback_to_gemini(exc) is False
+    assert _should_fallback_to_gemini(exc) is True
 
 
 def test_is_output_truncation_detects_max_tokens():

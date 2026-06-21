@@ -5,13 +5,17 @@ from __future__ import annotations
 import re
 
 from app.ai.schemas.q5_generation import (
+    Q5ChoiceItem,
     Q5QuestionExplanation,
     Q5QuestionsResult,
     Q5ScoringPoint,
     Q5SubQuestion,
     Q5TeacherPackResult,
 )
-from app.ai.schemas.q5_generation_claude import Q5TeacherPackClaudeResult
+from app.ai.schemas.q5_generation_claude import (
+    Q5QuestionsClaudeResult,
+    Q5TeacherPackClaudeResult,
+)
 
 Q5_JA_EXPLANATION_TYPES = frozenset({
     "content_explanation",
@@ -79,6 +83,81 @@ def format_q5_part_rubric(
     return " ".join(parts)
 
 
+_CHOICE_LINE_RE = re.compile(r"^([a-fA-F])\s*[.:：]\s*(.+)$", re.DOTALL)
+
+
+def parse_q5_choice_line(line: str) -> Q5ChoiceItem | None:
+    """Claude 簡略スキーマの \"a: 選択肢\" 形式を Q5ChoiceItem に変換。"""
+    stripped = line.strip()
+    if not stripped:
+        return None
+    match = _CHOICE_LINE_RE.match(stripped)
+    if match:
+        return Q5ChoiceItem(label=match.group(1).lower(), text=match.group(2).strip())
+    if ":" in stripped:
+        label, _, text = stripped.partition(":")
+        label = label.strip().lower()
+        text = text.strip()
+        if len(label) == 1 and label.isalpha() and text:
+            return Q5ChoiceItem(label=label, text=text)
+    return None
+
+
+def required_points_to_scoring_points(
+    lines: list[str],
+    *,
+    passage_basis: str = "",
+) -> list[Q5ScoringPoint]:
+    basis = passage_basis.strip()
+    return [
+        Q5ScoringPoint(
+            pointJa=line.strip(),
+            passageBasis=basis,
+            pointsHint="必須",
+        )
+        for line in lines
+        if line.strip()
+    ]
+
+
+def questions_from_claude(raw: Q5QuestionsClaudeResult) -> Q5QuestionsResult:
+    """Claude 簡略スキーマ → 内部 Q5QuestionsResult に変換。"""
+    questions: list[Q5SubQuestion] = []
+    for q in raw.questions:
+        basis = q.passage_anchor.strip()
+        choices: list[Q5ChoiceItem] = []
+        for line in q.choices:
+            if isinstance(line, dict):
+                choices.append(Q5ChoiceItem.model_validate(line))
+                continue
+            parsed = parse_q5_choice_line(str(line))
+            if parsed:
+                choices.append(parsed)
+        questions.append(
+            Q5SubQuestion(
+                number=q.number,
+                partLabel=q.part_label,
+                questionType=q.question_type,
+                prompt=q.prompt,
+                passageAnchor=q.passage_anchor,
+                targetWord=q.target_word,
+                underlinedText=q.underlined_text,
+                charLimitJa=q.char_limit_ja,
+                choices=choices,
+                scoringPoints=required_points_to_scoring_points(
+                    q.required_points,
+                    passage_basis=basis,
+                ),
+                directionCriterionJa=q.direction_criterion_ja,
+            )
+        )
+    return Q5QuestionsResult(
+        instructions=raw.instructions,
+        passageForExam=raw.passage_for_exam,
+        questions=questions,
+    )
+
+
 def scoring_points_from_dicts(raw: list[dict] | None) -> list[Q5ScoringPoint]:
     if not raw:
         return []
@@ -136,7 +215,7 @@ def teacher_pack_from_claude(
         modelAnswerSummary=raw.model_answer_summary,
         explanations=explanations,
         fullTranslationJa="",
-        vocabularyList=raw.vocabulary_list,
+        vocabularyList=[],
     )
 
 

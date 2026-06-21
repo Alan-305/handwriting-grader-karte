@@ -80,6 +80,7 @@ Q5_TEACHER_PACK_SYSTEM = """あなたは入試英語・第5問の解答・解説
 - ネストした scoringPoints オブジェクトは使わない（requiredPoints に要点だけ列挙）
 - vocabularyList: 重要語句5〜10個（英 — 日）
 - **本文の日本語全訳（fullTranslationJa）は出力しない**（別工程で後から生成する）
+- **vocabularyList も出力しない**（重要語句は modelAnswerSummary 末尾に列挙してよい）
 
 出力 JSON のみ:
 {
@@ -90,8 +91,7 @@ Q5_TEACHER_PACK_SYSTEM = """あなたは入試英語・第5問の解答・解説
     "requiredPoints": ["必須ポイント1", "必須ポイント2"],
     "directionCriterionJa": "核心を押さえていれば可",
     "explanationJa": "..."
-  }],
-  "vocabularyList": []
+  }]
 }"""
 
 
@@ -142,7 +142,8 @@ def build_q5_questions_user_prompt(
 - prompt の先頭に (A) 等を付けない
 - passageForExam は必ず ""
 - 各問で「他肢・別解でも正解になりうるか」を確認し、なりうる設問は作らない
-- **日本語記述問**には scoringPoints（2〜4個）と directionCriterionJa を必ず付ける
+- **日本語記述問**には requiredPoints（2〜4個の文字列）と directionCriterionJa を必ず付ける
+- **選択式**の choices は **\"a: 選択肢文\" 形式の文字列配列**（ネストしたオブジェクトにしない）
 - **選択式**は正解一つ＋誤読 trap 2個以上。本文語句の並べ替えだけで解けない言い換え肢にすること
 - instructions は次の文面を基本とする:
   「次の英文を読み、(A)〜(G)の問いに答えなさい。なお、下線部のある問はそれぞれ本文中に示された箇所に対応する。記述解答は日本語で、選択式解答は記号で答えよ。」

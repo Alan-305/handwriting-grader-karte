@@ -8,6 +8,8 @@ from app.ai.schemas.q5_generation import (
 )
 from app.ai.schemas.q5_generation_claude import (
     Q5ExplanationClaude,
+    Q5QuestionsClaudeResult,
+    Q5SubQuestionClaude,
     Q5TeacherPackClaudeResult,
 )
 from app.services.q5_scoring import (
@@ -16,6 +18,8 @@ from app.services.q5_scoring import (
     format_q5_part_rubric,
     format_q5_scoring_points_lines,
     has_long_verbatim_phrase,
+    parse_q5_choice_line,
+    questions_from_claude,
     teacher_pack_from_claude,
 )
 from app.services.question_q5_service import assemble_q5_model_answer
@@ -99,6 +103,45 @@ def test_choice_design_issues_flags_copy_heavy_choices():
     )
     issues = choice_design_issues(questions, passage)
     assert any("コピー" in i or "パラフレーズ" in i for i in issues)
+
+
+def test_parse_q5_choice_line():
+    item = parse_q5_choice_line("a: First choice text")
+    assert item is not None
+    assert item.label == "a"
+    assert item.text == "First choice text"
+
+
+def test_questions_from_claude_converts_choices_and_points():
+    raw = Q5QuestionsClaudeResult(
+        instructions="読んで答えよ",
+        questions=[
+            Q5SubQuestionClaude(
+                number=1,
+                questionType="english_match",
+                prompt="一致する英文を選べ",
+                passageAnchor="unique anchor phrase",
+                choices=[
+                    "a: Paraphrased option one",
+                    "b: Paraphrased option two",
+                ],
+            ),
+            Q5SubQuestionClaude(
+                number=2,
+                questionType="reason_explanation",
+                prompt="理由を述べよ",
+                passageAnchor="theatrical hospitality scene",
+                charLimitJa=80,
+                requiredPoints=["ポイント1", "ポイント2"],
+                directionCriterionJa="因果が本文に沿っていれば可",
+            ),
+        ],
+    )
+    result = questions_from_claude(raw)
+    assert len(result.questions) == 2
+    assert result.questions[0].choices[0].label == "a"
+    assert result.questions[1].scoring_points[0].point_ja == "ポイント1"
+    assert result.questions[1].scoring_points[0].passage_basis == "theatrical hospitality scene"
 
 
 def test_teacher_pack_from_claude_merges_inherited_basis():

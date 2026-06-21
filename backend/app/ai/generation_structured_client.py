@@ -27,10 +27,19 @@ def _is_output_truncation(exc: Exception) -> bool:
     )
 
 
+def _is_schema_too_complex(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "schema is too complex" in msg or (
+        "invalid_request_error" in msg and "too complex" in msg
+    )
+
+
 def _should_fallback_to_gemini(exc: Exception) -> bool:
-    """Claude 失敗時に Gemini へ切り替える条件（出力切れ・スキーマ複雑さは除く）。"""
+    """Claude 失敗時に Gemini へ切り替える条件（出力切れは除く）。"""
     if _is_output_truncation(exc):
         return False
+    if _is_schema_too_complex(exc):
+        return True
     if _is_retryable_ai_error(exc):
         return True
     msg = str(exc).lower()

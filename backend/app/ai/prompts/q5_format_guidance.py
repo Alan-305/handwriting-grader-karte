@@ -30,7 +30,7 @@ Q5_CLARITY_BLOCK = """
 
 ■ 日本語記述（content_explanation / reason_explanation / underlined_explanation / short_answer_ja）
 - **charLimitJa を必ず指定**（40〜80字）
-- **scoringPoints を2〜4個**（pointJa + passageBasis + pointsHint）
+- **requiredPoints を2〜4個**（日本語文字列の配列。passageBasis は不要）
 - **directionCriterionJa**（解答全体の方向性判定を1文）
 - 問いは「本文のどの箇所の何を」述べよと範囲が特定できること
 - 模範解答の要点が本文の特定1〜2文から導けること（文言一致は不要求）

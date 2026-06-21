@@ -375,6 +375,21 @@ _MOCK_PAYLOADS: dict[str, dict] = {
             "¶2\n二段落目の和訳です。",
         ],
     },
+    "Q5QuestionsClaudeResult": {
+        "instructions": "次の英文を読み、(A)〜(G)の問いに答えなさい。",
+        "passageForExam": "",
+        "questions": [
+            {
+                "number": 1,
+                "partLabel": "A",
+                "questionType": "word_usage_match",
+                "prompt": "語法一致",
+                "passageAnchor": "anchor phrase here",
+                "targetWord": "accumulation",
+                "choices": ["a: choice one", "b: choice two"],
+            }
+        ],
+    },
     "Q5TeacherPackClaudeResult": {
         "modelAnswerSummary": "1 a, 2 失敗を恥じた心情, 3 同じ失敗を防ぐため, 4 a, 5 a, 6 b。",
         "explanations": [
@@ -401,7 +416,6 @@ _MOCK_PAYLOADS: dict[str, dict] = {
                 "explanationJa": "checklist は再発防止の具体策。",
             },
         ],
-        "vocabularyList": ["ashamed — 恥ずかしい"],
     },
     "Q5TeacherPackResult": {
         "modelAnswerSummary": "1 a, 2 失敗を恥じた心情, 3 同じ失敗を防ぐため, 4 a, 5 a, 6 b。",

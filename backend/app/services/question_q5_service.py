@@ -32,13 +32,14 @@ from app.ai.schemas.q5_generation import (
     Q5SubQuestion,
     Q5TeacherPackResult,
 )
-from app.ai.schemas.q5_generation_claude import Q5TeacherPackClaudeResult
+from app.ai.schemas.q5_generation_claude import Q5QuestionsClaudeResult, Q5TeacherPackClaudeResult
 from app.services.q5_scoring import (
     Q5_JA_EXPLANATION_TYPES,
     choice_design_issues,
     format_q5_part_rubric,
     format_q5_scoring_points_lines,
     scoring_points_from_dicts,
+    questions_from_claude,
     teacher_pack_from_claude,
 )
 from app.services.firebase_admin_service import FirebaseAdminService
@@ -367,7 +368,7 @@ class QuestionQ5Service:
         solver: Q5SolverResult | None = None
 
         for attempt in range(max_attempts):
-            questions = self.llm.complete_structured(
+            questions_raw: Q5QuestionsClaudeResult = self.llm.complete_structured(
                 system=build_q5_questions_system(university_slug, university_name),
                 user_text=build_q5_questions_user_prompt(
                     passage=passage,
@@ -375,9 +376,10 @@ class QuestionQ5Service:
                     reference_context=reference_context,
                     university_name=university_name,
                 ),
-                response_schema=Q5QuestionsResult,
+                response_schema=Q5QuestionsClaudeResult,
                 max_output_tokens=16384,
             )
+            questions = questions_from_claude(questions_raw)
             _normalize_questions_result(questions, passage)
             removed_dupes = 0
             questions, removed_dupes = sanitize_q5_questions(questions)
