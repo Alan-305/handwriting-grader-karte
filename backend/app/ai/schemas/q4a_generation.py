@@ -76,5 +76,10 @@ class Q4AExplanationItem(BaseModel):
 class Q4ATeacherPackResult(BaseModel):
     model_answer_summary: str = Field(alias="modelAnswerSummary")
     explanations: list[Q4AExplanationItem] = Field(default_factory=list)
+    full_translation_ja: str = Field(
+        default="",
+        alias="fullTranslationJa",
+        description="(1)〜(5) の英文本文の日本語全訳",
+    )
 
     model_config = {"populate_by_name": True}

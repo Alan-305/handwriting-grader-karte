@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -43,6 +44,38 @@ Q4A_PART_LABEL = "(A)"
 Q4A_DEFAULT_INSTRUCTIONS = (
     "次の英文の下線部(a)～(e)のうち、文法上または内容上の誤りを含むものを一つ選べ。"
 )
+Q4A_EXPECTED_ITEM_COUNT = 5
+
+
+def format_q4a_passage_plain(problem: Q4AProblemResult) -> str:
+    """全訳用に (a) *...* 記法を除いた英文5段落を返す。"""
+    lines: list[str] = []
+    for item in sorted(problem.items, key=lambda x: x.number):
+        block = ensure_q4a_english_block_markup(item)
+        plain = re.sub(r"\([a-e]\)\s*", "", block, flags=re.IGNORECASE)
+        plain = re.sub(r"\*([^*]+)\*", r"\1", plain)
+        plain = re.sub(r"\s+", " ", plain).strip()
+        label = item.item_label.strip() or f"({item.number})"
+        lines.append(f"{label} {plain}")
+    return "\n\n".join(lines)
+
+
+def _teacher_pack_issues(pack: Q4ATeacherPackResult, *, item_count: int) -> list[str]:
+    issues: list[str] = []
+    if len(pack.explanations) != item_count:
+        issues.append(
+            f"解説が{item_count}件ではない（{len(pack.explanations)}件）。"
+            f" number 1〜{item_count} をすべて出力すること"
+        )
+    numbers = {ex.number for ex in pack.explanations}
+    expected = set(range(1, item_count + 1))
+    if numbers != expected:
+        missing = sorted(expected - numbers)
+        if missing:
+            issues.append(f"解説の number が不足: {missing}")
+    if not pack.full_translation_ja.strip():
+        issues.append("fullTranslationJa（(1)〜(5) の本文全訳）が空")
+    return issues
 
 
 def normalize_q4a_problem_layout(problem: Q4AProblemResult) -> Q4AProblemResult:
@@ -93,6 +126,9 @@ def assemble_q4a_model_answer(pack: Q4ATeacherPackResult) -> str:
         if ex.correction_en.strip():
             parts.append(f"修正例: {ex.correction_en.strip()}")
         parts.append("")
+    if pack.full_translation_ja.strip():
+        parts.append("【全訳】")
+        parts.append(pack.full_translation_ja.strip())
     return "\n".join(parts).strip()
 
 
@@ -164,14 +200,13 @@ class QuestionQ4AService:
         )
 
         teacher_block = format_q4a_problem_for_teacher(problem)
-        pack: Q4ATeacherPackResult = self.llm.complete_structured(
-            system=build_q4a_teacher_pack_system(university_slug, ""),
-            user_text=build_q4a_teacher_pack_user_prompt(
-                problem_block=teacher_block,
-                validator_summary=validator.summary,
-            ),
-            response_schema=Q4ATeacherPackResult,
-            max_output_tokens=8192,
+        passage_plain = format_q4a_passage_plain(problem)
+        pack = self._generate_teacher_pack(
+            problem=problem,
+            teacher_block=teacher_block,
+            passage_plain=passage_plain,
+            validator_summary=validator.summary,
+            university_slug=university_slug,
         )
 
         prompt = assemble_q4a_prompt(problem=problem)
@@ -198,6 +233,7 @@ class QuestionQ4AService:
                 "layout": problem.layout,
                 "sourceNote": problem.source_note,
                 "items": [item.model_dump(by_alias=True) for item in problem.items],
+                "fullTranslationJa": pack.full_translation_ja,
                 "evaluatorPassed": validator.passed,
                 "evaluatorIssues": validator.issues,
                 "evaluatorSummary": validator.summary,
@@ -267,6 +303,45 @@ class QuestionQ4AService:
 
         assert validator is not None
         return current, validator, retried
+
+    def _generate_teacher_pack(
+        self,
+        *,
+        problem: Q4AProblemResult,
+        teacher_block: str,
+        passage_plain: str,
+        validator_summary: str,
+        university_slug: str,
+        max_attempts: int = 2,
+    ) -> Q4ATeacherPackResult:
+        item_count = len(problem.items) or Q4A_EXPECTED_ITEM_COUNT
+        fix_hint = ""
+        pack: Q4ATeacherPackResult | None = None
+
+        for attempt in range(max_attempts):
+            user_text = build_q4a_teacher_pack_user_prompt(
+                problem_block=teacher_block,
+                validator_summary=validator_summary,
+                passage_plain=passage_plain,
+            )
+            if fix_hint:
+                user_text += f"\n\n【前回の不足を必ず修正】\n{fix_hint}"
+
+            pack = self.llm.complete_structured(
+                system=build_q4a_teacher_pack_system(university_slug, ""),
+                user_text=user_text,
+                response_schema=Q4ATeacherPackResult,
+                max_output_tokens=16384,
+            )
+            issues = _teacher_pack_issues(pack, item_count=item_count)
+            if not issues:
+                return pack
+
+            fix_hint = "; ".join(issues)
+            logger.info("Q4A teacher pack retry (attempt %s): %s", attempt + 1, fix_hint)
+
+        assert pack is not None
+        return pack
 
     @staticmethod
     def _structural_issues(problem: Q4AProblemResult) -> list[str]:

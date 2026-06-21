@@ -46,14 +46,24 @@ def build_q4a_validator_user_prompt(*, problem_block: str) -> str:
 東大レベルの誤り指摘として成立しているか検証してください。"""
 
 
-def build_q4a_teacher_pack_user_prompt(*, problem_block: str, validator_summary: str) -> str:
+def build_q4a_teacher_pack_user_prompt(
+    *,
+    problem_block: str,
+    validator_summary: str,
+    passage_plain: str = "",
+) -> str:
+    passage_block = (
+        f"\n【全訳用・英文本文（下線記号なし）】\n{passage_plain.strip()}\n"
+        if passage_plain.strip()
+        else ""
+    )
     return f"""【問題】
 {problem_block}
-
+{passage_block}
 【検証メモ】
 {validator_summary}
 
-教師用の解答・解説を作成してください（生徒向け問題文には誤りの明示を含めない）。"""
+教師用の解答・解説（問1〜5すべて）と本文全訳を作成してください（生徒向け問題文には誤りの明示を含めない）。"""
 
 
 Q4A_VALIDATOR_SYSTEM_FALLBACK = """あなたは東京大学二次英語・第4問(A)誤り指摘の検証者です。
@@ -69,15 +79,21 @@ passed は issues が空なら true。
 {"passed": true, "issues": [], "summary": "..."}"""
 
 
-Q4A_TEACHER_PACK_SYSTEM_FALLBACK = """あなたは東京大学二次英語・第4問(A)の教師用解答・解説作成者です。
+Q4A_TEACHER_PACK_SYSTEM_FALLBACK = """あなたは東京大学二次英語・第4問(A)の教師用解答・解説・全訳作成者です。
 
-- modelAnswerSummary: 各問の正答記号を「(1) c, (2) a, …」形式で列挙し、要点を1文
-- explanations: 各問について、なぜ errorLabel が誤りか（文法・語法・構文・文脈）を日本語で簡潔に。修正例の英文 correctionEn を示す
+- modelAnswerSummary: 各問の正答記号を「(1) c, (2) a, …」形式ですべて列挙し、要点を1文
+- explanations: **必ず5件**（number 1〜5 すべて）。各問について errorLabel が誤りである理由（文法・語法・構文・文脈）を日本語で簡潔に。correctionEn に修正例
+- fullTranslationJa: (1)〜(5) の英文本文の自然な日本語全訳。各段落の先頭に ¶1、¶2… を付ける。引用英語の和訳は「」で囲む
 
 出力 JSON のみ:
 {
   "modelAnswerSummary": "...",
   "explanations": [
-    {"number": 1, "errorLabel": "c", "errorCategory": "syntax", "explanationJa": "...", "correctionEn": "..."}
-  ]
+    {"number": 1, "errorLabel": "c", "errorCategory": "syntax", "explanationJa": "...", "correctionEn": "..."},
+    {"number": 2, "errorLabel": "a", "errorCategory": "grammar", "explanationJa": "...", "correctionEn": "..."},
+    {"number": 3, "errorLabel": "d", "errorCategory": "context", "explanationJa": "...", "correctionEn": "..."},
+    {"number": 4, "errorLabel": "b", "errorCategory": "usage", "explanationJa": "...", "correctionEn": "..."},
+    {"number": 5, "errorLabel": "e", "errorCategory": "syntax", "explanationJa": "...", "correctionEn": "..."}
+  ],
+  "fullTranslationJa": "¶1 … ¶2 …"
 }"""

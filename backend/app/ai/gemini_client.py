@@ -414,16 +414,24 @@ _MOCK_PAYLOADS: dict[str, dict] = {
         "summary": "各問1誤り・東大レベルの誤りとして成立。",
     },
     "Q4ATeacherPackResult": {
-        "modelAnswerSummary": "(1) b, (2) b, (3) b, (4) b, (5) b。",
+        "modelAnswerSummary": "(1) b, (2) c, (3) a, (4) d, (5) e。",
         "explanations": [
             {
-                "number": 1,
-                "errorLabel": "b",
+                "number": i,
+                "errorLabel": ["b", "c", "a", "d", "e"][i - 1],
                 "errorCategory": "syntax",
-                "explanationJa": "主語 The debate は単数のため are deployed は不適切。",
-                "correctionEn": "is deployed",
+                "explanationJa": f"問{i}の誤り解説（モック）。",
+                "correctionEn": "corrected phrase",
             }
+            for i in range(1, 6)
         ],
+        "fullTranslationJa": (
+            "¶1 AI倫理に関する議論は近年急速に広がっている。\n\n"
+            "¶2 システムが多くの分野に導入されるにつれ、政策立案者は革新と規制のバランスに苦慮する。\n\n"
+            "¶3 研究者は新技術の開発を続けている。\n\n"
+            "¶4 公共の信頼と説明責任が問われる。\n\n"
+            "¶5 社会全体で倫理的配慮が求められる。"
+        ),
     },
 }
 

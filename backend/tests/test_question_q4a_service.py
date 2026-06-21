@@ -106,10 +106,23 @@ def test_assemble_q4a_model_answer():
                 correctionEn="is",
             ),
         ],
+        fullTranslationJa="¶1 これは本文の全訳です。",
     )
     text = assemble_q4a_model_answer(pack)
     assert "【解答・解説】" in text
     assert "修正例" in text
+    assert "【全訳】" in text
+    assert "¶1 これは本文の全訳です。" in text
+
+
+def test_format_q4a_passage_plain_strips_markup():
+    from app.services.question_q4a_service import format_q4a_passage_plain
+
+    problem = _sample_problem()
+    plain = format_q4a_passage_plain(problem)
+    assert "(1) The debate" in plain
+    assert "*has been growing*" not in plain
+    assert "(a)" not in plain
 
 
 def test_run_pipeline_mock_without_api_key(monkeypatch):
@@ -131,6 +144,8 @@ def test_run_pipeline_mock_without_api_key(monkeypatch):
     assert result["generationPipeline"] == "q4a"
     assert result["typeLabel"] == "第4問(A)"
     assert "【解答・解説】" in result["modelAnswer"]
+    assert "【全訳】" in result["modelAnswer"]
     assert len(result["generationArtifacts"]["items"]) == 5
+    assert result["generationArtifacts"]["fullTranslationJa"]
     assert "(1)" in result["prompt"]
     assert "(a) *has been growing rapidly in recent years across*" in result["prompt"]
