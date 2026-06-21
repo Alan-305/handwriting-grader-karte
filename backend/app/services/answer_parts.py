@@ -58,7 +58,7 @@ def _build_target(
         "prompt": q.get("prompt", ""),
         "modelAnswer": part_model or question_model,
         "points": _points_for_part(q, part, part_count),
-        "rubric": q.get("rubric"),
+        "rubric": (part or {}).get("rubric") or q.get("rubric"),
         "cropRegion": (part or q)["cropRegion"],
     }
 

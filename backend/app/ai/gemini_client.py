@@ -290,6 +290,26 @@ _MOCK_PAYLOADS: dict[str, dict] = {
                 "underlinedText": "face mistakes honestly" if i == 5 else "",
                 "targetWord": "grow" if i == 4 else "",
                 "charLimitJa": [None, 40, 50, None, None, None][i - 1],
+                "scoringPoints": (
+                    [
+                        {"pointJa": "失敗を恥じた心情", "passageBasis": "Ken felt ashamed", "pointsHint": "必須"},
+                        {"pointJa": "イベント失敗の状況", "passageBasis": "event was cancelled", "pointsHint": "必須"},
+                    ]
+                    if i == 2
+                    else [
+                        {"pointJa": "同じ失敗を防ぐため", "passageBasis": "made a checklist", "pointsHint": "必須"},
+                        {"pointJa": "謝罪と改善の姿勢", "passageBasis": "he apologized", "pointsHint": "必須"},
+                    ]
+                    if i == 3
+                    else []
+                ),
+                "directionCriterionJa": (
+                    "失敗後の心情を本文に沿って述べていれば可"
+                    if i == 2
+                    else "チェックリスト作成の理由を因果で述べていれば可"
+                    if i == 3
+                    else ""
+                ),
                 "choices": [
                     [
                         {"label": "a", "text": "cancelled"},
@@ -356,14 +376,36 @@ _MOCK_PAYLOADS: dict[str, dict] = {
         ],
     },
     "Q5TeacherPackResult": {
-        "modelAnswerSummary": "1 A, 2 恥ずかしく思った心情, 3 A。",
+        "modelAnswerSummary": "1 a, 2 失敗を恥じた心情, 3 同じ失敗を防ぐため, 4 a, 5 a, 6 b。",
         "explanations": [
             {
                 "number": 1,
-                "correctChoice": "A",
+                "correctChoice": "a",
                 "answerText": "",
-                "explanationJa": "失望のあと恥じている描写です。",
-            }
+                "explanationJa": "文脈上 cancelled が適切。",
+            },
+            {
+                "number": 2,
+                "correctChoice": "",
+                "answerText": "失敗を恥じ、落胆した心情だった。",
+                "scoringPoints": [
+                    {"pointJa": "失敗を恥じた心情", "passageBasis": "Ken felt ashamed", "pointsHint": "必須"},
+                    {"pointJa": "イベント失敗の状況", "passageBasis": "event was cancelled", "pointsHint": "必須"},
+                ],
+                "directionCriterionJa": "失敗後の心情を本文に沿って述べていれば可",
+                "explanationJa": "ashamed と disappointed の描写が根拠。",
+            },
+            {
+                "number": 3,
+                "correctChoice": "",
+                "answerText": "同じ失敗を繰り返さないため。",
+                "scoringPoints": [
+                    {"pointJa": "同じ失敗を防ぐため", "passageBasis": "made a checklist", "pointsHint": "必須"},
+                    {"pointJa": "謝罪と改善の姿勢", "passageBasis": "he apologized", "pointsHint": "必須"},
+                ],
+                "directionCriterionJa": "チェックリスト作成の理由を因果で述べていれば可",
+                "explanationJa": "checklist は再発防止の具体策。",
+            },
         ],
         "fullTranslationJa": "ケンがボランティア部に入ったとき…（モック全訳）",
         "vocabularyList": ["ashamed — 恥ずかしい"],

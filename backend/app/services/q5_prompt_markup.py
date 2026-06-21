@@ -4,11 +4,33 @@ from __future__ import annotations
 
 import re
 
-from app.ai.schemas.q5_generation import Q5SubQuestion, Q5QuestionsResult
+from app.ai.schemas.q5_generation import (
+    Q5_MAX_SUB_QUESTIONS,
+    Q5_MIN_SUB_QUESTIONS,
+    Q5SubQuestion,
+    Q5QuestionsResult,
+)
 from app.services.question_prompt_markup import normalize_prompt_markup
 
 _EXAM_BLANK = re.compile(r"^\(\d{1,3}\)$")
-_WORD_BOUNDARY = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?")
+_LEADING_PART_LABEL = re.compile(r"^\([A-Za-z]\)\s*")
+
+Q5_DEFAULT_INSTRUCTIONS = (
+    "次の英文を読み、(A)〜(G)の問いに答えなさい。"
+    "なお、下線部のある問はそれぞれ本文中に示された箇所に対応する。"
+    "記述解答は日本語で、選択式解答は記号で答えよ。"
+)
+
+
+def q5_instructions_for_count(count: int) -> str:
+    if count < 1:
+        return Q5_DEFAULT_INSTRUCTIONS
+    end = q5_part_label_letter(min(count, 26))
+    return (
+        f"次の英文を読み、(A)〜({end})の問いに答えなさい。"
+        "なお、下線部のある問はそれぞれ本文中に示された箇所に対応する。"
+        "記述解答は日本語で、選択式解答は記号で答えよ。"
+    )
 
 
 def q5_display_label(q: Q5SubQuestion) -> str:
@@ -48,9 +70,54 @@ def _normalize_blank_labels(q: Q5SubQuestion, display: str) -> list[str]:
 def _normalize_prompt_text(prompt: str, display: str) -> str:
     text = (prompt or "").strip()
     text = re.sub(r"空所\s*\(\d{1,3}\)", f"空所{display}", text)
+    text = re.sub(r"空所\s*\([A-Za-z]\)", f"空所{display}", text)
     text = re.sub(r"下線部\s*\(\d{1,3}\)", f"下線部{display}", text)
+    text = re.sub(r"下線部\s*\([A-Za-z]\)", f"下線部{display}", text)
     text = re.sub(r"問\s*\d+", display, text)
-    return text
+    text = _LEADING_PART_LABEL.sub("", text)
+    return text.strip()
+
+
+def strip_prompt_leading_label(prompt: str) -> str:
+    """表示用：行頭の (A) 等を除去（ラベル行と二重にならないように）。"""
+    return _LEADING_PART_LABEL.sub("", (prompt or "").strip()).strip()
+
+
+def q5_question_fingerprint(q: Q5SubQuestion) -> str:
+    ul = q.underlined_text.strip().lower()
+    tw = q.target_word.strip().lower()
+    anchor = q.passage_anchor.strip().lower()
+    prompt = strip_prompt_leading_label(q.prompt).lower()
+    qtype = q.question_type.lower()
+    if ul:
+        return f"{qtype}|ul:{ul}"
+    if tw:
+        return f"{qtype}|tw:{tw}"
+    if anchor:
+        return f"{qtype}|anchor:{anchor}"
+    return f"{qtype}|prompt:{prompt[:120]}"
+
+
+def dedupe_q5_questions(questions: Q5QuestionsResult) -> tuple[Q5QuestionsResult, int]:
+    """同一下線・同一設問の重複を除去。除去件数を返す。"""
+    seen: set[str] = set()
+    unique: list[Q5SubQuestion] = []
+    removed = 0
+    for q in sorted(questions.questions, key=lambda x: x.number):
+        fp = q5_question_fingerprint(q)
+        if fp in seen:
+            removed += 1
+            continue
+        seen.add(fp)
+        unique.append(q)
+    questions.questions = unique
+    return questions, removed
+
+
+def cap_q5_questions(questions: Q5QuestionsResult) -> Q5QuestionsResult:
+    if len(questions.questions) > Q5_MAX_SUB_QUESTIONS:
+        questions.questions = questions.questions[:Q5_MAX_SUB_QUESTIONS]
+    return questions
 
 
 def normalize_q5_questions(questions: Q5QuestionsResult) -> Q5QuestionsResult:
@@ -63,7 +130,18 @@ def normalize_q5_questions(questions: Q5QuestionsResult) -> Q5QuestionsResult:
         q.blank_labels = _normalize_blank_labels(q, display)
         q.prompt = _normalize_prompt_text(q.prompt, display)
     questions.questions = ordered
+    count = len(questions.questions)
+    if count >= Q5_MIN_SUB_QUESTIONS:
+        questions.instructions = q5_instructions_for_count(count)
     return questions
+
+
+def sanitize_q5_questions(questions: Q5QuestionsResult) -> tuple[Q5QuestionsResult, int]:
+    """重複除去 → 上限カット → ラベル正規化 → 冒頭指示の統一。"""
+    _, removed = dedupe_q5_questions(questions)
+    cap_q5_questions(questions)
+    normalize_q5_questions(questions)
+    return questions, removed
 
 
 def _wrap_once(text: str, phrase: str, wrapped: str) -> str:

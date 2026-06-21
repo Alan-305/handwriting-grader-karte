@@ -24,3 +24,30 @@ def test_points_split_across_answer_parts():
     assert all(t["points"] == 6.25 for t in targets)
     assert targets[0]["partIndex"] == 0
     assert targets[1]["partIndex"] == 1
+
+
+def test_part_level_rubric_overrides_question():
+    questions = [
+        {
+            "id": "q5",
+            "order": 5,
+            "type": "english",
+            "prompt": "長文",
+            "modelAnswer": "全体模範",
+            "points": 20,
+            "cropRegion": {"x": 0, "y": 0, "width": 100, "height": 100},
+            "rubric": "大問共通",
+            "answerParts": [
+                {
+                    "label": "(B)",
+                    "answerFormat": "japanese_grid",
+                    "modelAnswer": "記述模範",
+                    "rubric": "必須ポイント2つ",
+                    "cropRegion": {"x": 0, "y": 0, "width": 10, "height": 10},
+                },
+            ],
+        }
+    ]
+    targets = iter_crop_targets(questions)
+    assert targets[0]["rubric"] == "必須ポイント2つ"
+    assert targets[0]["modelAnswer"] == "記述模範"

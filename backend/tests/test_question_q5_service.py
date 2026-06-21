@@ -3,6 +3,7 @@ from app.ai.schemas.q5_generation import (
     Q5PassageResult,
     Q5QuestionExplanation,
     Q5QuestionsResult,
+    Q5ScoringPoint,
     Q5SubQuestion,
     Q5TeacherPackResult,
 )
@@ -101,6 +102,66 @@ def test_structural_issues_count_and_overlap():
     issues = QuestionQ5Service._structural_issues(overlap)
     assert any("重複" in i for i in issues)
     assert any("6" in i for i in issues)
+
+
+def test_clarity_issues_flags_missing_char_limit():
+    questions = Q5QuestionsResult(
+        questions=[
+            Q5SubQuestion(
+                number=1,
+                questionType="reason_explanation",
+                prompt="筆者が打ちのめされた理由を80字以内で説明せよ。",
+                passageAnchor="some anchor text here",
+                charLimitJa=80,
+                scoringPoints=[
+                    Q5ScoringPoint(pointJa="ポイント1"),
+                    Q5ScoringPoint(pointJa="ポイント2"),
+                ],
+                directionCriterionJa="因果が本文に沿っていれば可",
+            ),
+        ]
+    )
+    issues = QuestionQ5Service._clarity_issues(questions)
+    assert not any("charLimitJa" in i for i in issues)
+
+
+def test_clarity_issues_requires_scoring_points():
+    questions = Q5QuestionsResult(
+        questions=[
+            Q5SubQuestion(
+                number=1,
+                questionType="reason_explanation",
+                prompt="筆者が打ちのめされた理由を80字以内で説明せよ。",
+                passageAnchor="some anchor text here",
+                charLimitJa=80,
+            ),
+        ]
+    )
+    issues = QuestionQ5Service._clarity_issues(questions)
+    assert any("scoringPoints" in i for i in issues)
+    assert any("directionCriterionJa" in i for i in issues)
+
+
+def test_clarity_issues_flags_duplicate_choices():
+    questions = Q5QuestionsResult(
+        questions=[
+            Q5SubQuestion(
+                number=1,
+                questionType="expression_meaning",
+                prompt="下線部の意味を選べ。",
+                underlinedText="test phrase",
+                passageAnchor="anchor",
+                choices=[
+                    Q5ChoiceItem(label="a", text="Same"),
+                    Q5ChoiceItem(label="b", text="same"),
+                    Q5ChoiceItem(label="c", text="Other"),
+                    Q5ChoiceItem(label="d", text="Another"),
+                ],
+            ),
+        ]
+    )
+    issues = QuestionQ5Service._clarity_issues(questions)
+    assert any("同一文" in i for i in issues)
 
 
 def test_run_pipeline_mock_without_api_key(monkeypatch):

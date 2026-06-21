@@ -32,6 +32,22 @@ class Q5ChoiceItem(BaseModel):
     text: str
 
 
+class Q5ScoringPoint(BaseModel):
+    point_ja: str = Field(alias="pointJa")
+    passage_basis: str = Field(
+        default="",
+        alias="passageBasis",
+        description="本文中の根拠箇所（短い引用または要約）",
+    )
+    points_hint: str = Field(
+        default="",
+        alias="pointsHint",
+        description="配点目安・必須/加点の区別など",
+    )
+
+    model_config = {"populate_by_name": True}
+
+
 class Q5SubQuestion(BaseModel):
     number: int
     part_label: str = Field(
@@ -72,8 +88,27 @@ class Q5SubQuestion(BaseModel):
         alias="blankLabels",
         description="空所補充の小問ラベル（(A)(B) 形式。試験番号 (21) は使わない）",
     )
+    scoring_points: list[Q5ScoringPoint] = Field(
+        default_factory=list,
+        alias="scoringPoints",
+        description="日本語記述問の必須採点ポイント（2〜4個）",
+    )
+    direction_criterion_ja: str = Field(
+        default="",
+        alias="directionCriterionJa",
+        description="解答全体の方向性判定基準（日本語1文）",
+    )
 
     model_config = {"populate_by_name": True}
+
+    @field_validator("scoring_points", mode="before")
+    @classmethod
+    def coerce_scoring_points(cls, value: object) -> list:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return value
+        return []
 
     @field_validator("choices", mode="before")
     @classmethod
@@ -117,8 +152,22 @@ class Q5QuestionExplanation(BaseModel):
     correct_choice: str = Field(alias="correctChoice", default="")
     answer_text: str = Field(default="", alias="answerText")
     explanation_ja: str = Field(alias="explanationJa")
+    scoring_points: list[Q5ScoringPoint] = Field(
+        default_factory=list,
+        alias="scoringPoints",
+    )
+    direction_criterion_ja: str = Field(default="", alias="directionCriterionJa")
 
     model_config = {"populate_by_name": True}
+
+    @field_validator("scoring_points", mode="before")
+    @classmethod
+    def coerce_scoring_points(cls, value: object) -> list:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return value
+        return []
 
 
 class Q5TeacherPackResult(BaseModel):

@@ -1,6 +1,6 @@
 """第5問型（二次入試・長文読解）の多段生成プロンプト。"""
 
-from app.ai.prompts.q5_format_guidance import format_reference_block
+from app.ai.prompts.q5_format_guidance import Q5_CLARITY_BLOCK, Q5_MCQ_DESIGN_BLOCK, format_reference_block
 from app.ai.prompts.university_prompts import (
     build_q5_passage_system,
     build_q5_questions_system,
@@ -31,22 +31,30 @@ def build_q5_passage_user_prompt(
     )
 
 
-Q5_SOLVER_SYSTEM = """あなたは二次入試英語・第5問の解答・検証の専門家です。
-試験用本文と設問を読み、正答を推論し問題の成立性を検証してください（模範解答は与えられません）。
+Q5_SOLVER_SYSTEM = """あなたは二次入試英語・第5問の**ベテラン予備校講師**（検証担当）です。
+試験用本文と設問を読み、模範解答を推論し、**本番出題可能な品質か**を厳格に検証する（模範解答は与えられません）。
 
-- 4択: 本文の根拠から正解が一意（または selectCount 通り）か
-- 日本語記述: 字数内で答えられ、本文に根拠があるか
-- 共通テスト定型（時系列4択・Story Map・テーマ一問だけの5問）なら issues に記載
-- 小問数が6〜8個か、passageAnchor の重複がないか
+## passed=true
+- 全問で正解が**一意**、issues は空、summary に曖昧さの指摘がない
 
-passed は全設問が成立し issues が空なら true。
+## passed=false（issues に「問N:」で具体化）
+- 選択式で複数正解ありうる / 誤肢も部分的に正しい / 選択肢が酷似
+- 選択肢が本文コピー過多でキーワードマッチだけで解ける / 誤読 trap 不足
+- 日本語記述の採点範囲不明、charLimitJa 欠如
+- 空所に複数語が入りうる、下線部の説明が一意に定まらない
+- passageAnchor・underlinedText の重複
+
+- 小問数6〜8個か
+- 共通テスト定型なら issues に記載
+
+answers に全問の模範を記載。passed=false でも可能な限り answers を返す。
 
 出力 JSON のみ:
 {
   "passed": true,
   "answers": [{"number": 1, "choice": "B", "answerText": "", "briefReason": "..."}],
   "issues": [],
-  "summary": "日本語で総評（1〜2文）"
+  "summary": "全問で正解が一意に定まる。"
 }"""
 
 
@@ -57,7 +65,9 @@ def build_q5_solver_user_prompt(*, passage: str, questions_block: str) -> str:
 【設問】
 {questions_block}
 
-本文のみに基づいて解答し、東大型の設問として問題の品質も検証してください。"""
+本文のみに基づいて全問の模範解答を示し、**各問で正解が一意に定まるか**を厳格に検証してください。
+選択式は**誤読 trap があるか**、**言い換えで内容理解を要するか**も確認してください。
+あいまいな設問（複数正解ありうる・採点基準不明・キーワードマッチだけで解ける）は issues に「問N: 理由」と書き passed=false にしてください。"""
 
 
 Q5_TEACHER_PACK_SYSTEM = """あなたは入試英語・第5問の教師用資料作成者です。
@@ -65,13 +75,21 @@ Q5_TEACHER_PACK_SYSTEM = """あなたは入試英語・第5問の教師用資料
 
 - modelAnswerSummary: 各問の正答（記号または日本語）を列挙し、要点を2文以内
 - explanations: 各問の解説（日本語・簡潔）。和訳の英語は「」で囲む
+- 選択式の解説では**正解の根拠**に加え、主要な**誤肢がどの誤読 trap か**を1〜2肢に触れて簡潔に述べる
+- 日本語記述問には answerText（模範例）+ scoringPoints（2〜4個）+ directionCriterionJa を必ず含める
 - fullTranslationJa: 本文の日本語全訳（2段落以上の長文は各段落の先頭に ¶1、¶2… を付ける）
 - vocabularyList: 重要語句5〜10個（英 — 日）
 
 出力 JSON のみ:
 {
   "modelAnswerSummary": "...",
-  "explanations": [{"number": 1, "correctChoice": "B", "answerText": "", "explanationJa": "..."}],
+  "explanations": [{
+    "number": 2,
+    "answerText": "模範解答例",
+    "scoringPoints": [{"pointJa": "必須1", "passageBasis": "根拠", "pointsHint": "必須"}],
+    "directionCriterionJa": "核心を押さえていれば可",
+    "explanationJa": "..."
+  }],
   "fullTranslationJa": "...",
   "vocabularyList": []
 }"""
@@ -92,7 +110,8 @@ def build_q5_teacher_pack_user_prompt(
 【検証済み正答】
 {solver_answers}
 
-教師用の模範解答・解説・全訳・語彙リストを作成してください。"""
+教師用の模範解答・解説・全訳・語彙リストを作成してください。
+日本語記述問には必ず scoringPoints（2〜4個）と directionCriterionJa を付けてください。"""
 
 
 def build_q5_questions_user_prompt(
@@ -110,9 +129,23 @@ def build_q5_questions_user_prompt(
     return f"""【第5問・英文本文】
 {passage}
 {ref_block}{fix}
-上記本文にのみ基づき、東大第5問形式で **小問6〜8個** を作成してください。
-小問記号は **(A)(B)(C)…**（partLabel A〜H）とし、**(21)(22) 等の番号は使わない**。
-passageForExam は必ず空文字 "" にしてください（本文の複写禁止）。
-下線部は underlinedText、空所は blankLabels に (A) 形式で指定してください。
-技能例: 空所補充・内容説明・理由説明・語法一致(a〜e)・表現の意味(a〜e)・英文一致(a〜f)・下線部・内容一致・並べ替え。
-共通テスト第5問の定型5問にしない。各問の passageAnchor（本文中の当該箇所）が小問間で重複しないこと。"""
+上記本文にのみ基づき、**ベテラン予備校講師として**東大第5問形式の **小問6〜8個だけ** を作成してください。
+
+{Q5_CLARITY_BLOCK}
+
+{Q5_MCQ_DESIGN_BLOCK}
+
+【必須ルール】
+- questions 配列の要素は **6〜8個ちょうど**（9個以上・同一設問のコピーは禁止）
+- partLabel は A→B→C… と **1回ずつ**。(21)(22) 禁止
+- **同一下線部・同一 passageAnchor を2回以上問わない**
+- prompt の先頭に (A) 等を付けない
+- passageForExam は必ず ""
+- 各問で「他肢・別解でも正解になりうるか」を確認し、なりうる設問は作らない
+- **日本語記述問**には scoringPoints（2〜4個）と directionCriterionJa を必ず付ける
+- **選択式**は正解一つ＋誤読 trap 2個以上。本文語句の並べ替えだけで解けない言い換え肢にすること
+- instructions は次の文面を基本とする:
+  「次の英文を読み、(A)〜(G)の問いに答えなさい。なお、下線部のある問はそれぞれ本文中に示された箇所に対応する。記述解答は日本語で、選択式解答は記号で答えよ。」
+
+技能例: 語法一致(a〜e)・理由説明(80字)・表現の意味(a〜e)・空所補充・内容説明・英文一致(a〜f) などをバランスよく。
+共通テスト第5問の定型5問にしない。"""

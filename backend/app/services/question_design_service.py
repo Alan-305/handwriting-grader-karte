@@ -14,6 +14,7 @@ from app.services.question_prompt_markup import (
 )
 from app.ai.prompts.question_validity import VALIDITY_CHECK_SYSTEM, build_validity_user_prompt
 from app.ai.schemas.question_design import GeneratedQuestionItem, ValidityCheckResponse
+from app.services.q5_scoring import format_q5_part_rubric, scoring_points_from_dicts
 from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.generation_units import (
     _part_sort_key,
@@ -634,6 +635,17 @@ class QuestionDesignService:
                     "gridCols": 20,
                     "charLimit": int(sq.get("charLimitJa") or 80),
                 }
+                model_part = str(sq.get("modelAnswerPart") or "").strip()
+                if model_part:
+                    part["modelAnswer"] = model_part
+                points = scoring_points_from_dicts(sq.get("scoringPoints"))
+                direction = str(sq.get("directionCriterionJa") or "").strip()
+                if points or direction:
+                    part["rubric"] = format_q5_part_rubric(
+                        points,
+                        direction_criterion=direction,
+                        char_limit=int(sq.get("charLimitJa") or 80),
+                    )
             parts.append(part)
 
         base["answerFormat"] = "composite"

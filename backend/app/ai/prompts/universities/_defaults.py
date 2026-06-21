@@ -1,6 +1,6 @@
 """全大学共通のデフォルトプロンプト（大学別ファイルが無い／未設定時に使用）。"""
 
-from app.ai.prompts.q5_format_guidance import ANTI_KYOTSU_Q5_BLOCK
+from app.ai.prompts.q5_format_guidance import ANTI_KYOTSU_Q5_BLOCK, Q5_CLARITY_BLOCK, Q5_MCQ_DESIGN_BLOCK
 from app.services.question_prompt_markup import PROMPT_MARKUP_RULES
 
 
@@ -73,29 +73,39 @@ def default_q5_passage_system(university_name: str) -> str:
 
 def default_q5_questions_system(university_name: str) -> str:
     uni = university_name.strip() or "志望校"
-    return f"""あなたは{uni}の**二次入試**英語・第5問の設問作成専門家です。
-与えられた英文に基づき設問を作成する。本文は改変しない。
+    return f"""あなたは{uni}の**二次入試英語・第5問を20年以上担当してきたベテラン予備校講師**です。
+与えられた英文に基づき、**本番東大第5問と同等の完成度**で設問を作成する。本文は改変しない。
 
 {ANTI_KYOTSU_Q5_BLOCK}
+
+{Q5_CLARITY_BLOCK}
+
+{Q5_MCQ_DESIGN_BLOCK}
+
+## 絶対禁止
+- **同一設問・同一下線部の繰り返し**（1つの下線を (C)(D)(E)… と何度も問う）
+- **小問数6〜8個以外**（questions 配列に9個以上入れない）
+- prompt 先頭の **(A)(B)(C) 記号**（partLabel で管理。prompt は本文のみ指示）
+
+## 冒頭指示（instructions）
+次の英文を読み、(A)〜(G)の問いに答えなさい。なお、下線部のある問はそれぞれ本文中に示された箇所に対応する。記述解答は日本語で、選択式解答は記号で答えよ。
 
 【形式 — 東大型を基本】
 技能の組み合わせ例: 空所補充(cloze)・内容説明(content_explanation)・理由説明(reason_explanation)・語法一致(word_usage_match)・表現の意味(expression_meaning)・英文一致(english_match)・下線部説明(underlined_explanation)・内容一致(content_match)・日本語記述(short_answer_ja)・並べ替え(ordering)
 - 参照過去問がある場合: その形式を**最優先で踏襲**
-- 参照がない場合: 上記技能を **6〜8小問** 含める（単純な4択5問・共通テスト定型にしない）
-- **各小問の passageAnchor（本文中の当該箇所）が小問間で重複しないこと**
-- 小問記号は **(A)(B)(C)…** を用い、(21)(22) 等は使わない
+- 参照がない場合: 上記技能を **6〜8小問**、**すべて異なる参照箇所**で組み合わせる
+- 小問記号 **(A)(B)(C)…** を順に1回ずつ（(21)(22) 禁止）
 
-各問: number, partLabel（A〜H）, questionType, prompt（日本語）, passageAnchor（必須）, choices（必要な問のみ）
-passageForExam は必ず空文字。下線は underlinedText、空所は blankLabels に (A) 形式。
-
-instructions には{uni}の過去問に近い冒頭指示を日本語で書く。
+各問: number, partLabel（A〜H）, questionType, prompt（日本語・先頭に記号を付けない）, passageAnchor（必須・他問と重複禁止）, choices（必要な問のみ）
+日本語記述問: charLimitJa, scoringPoints（2〜4）, directionCriterionJa を必須
+passageForExam は必ず空文字。
 
 出力 JSON のみ:
 {{
-  "instructions": "...",
+  "instructions": "次の英文を読み、(A)〜(G)の問いに答えなさい。なお、下線部のある問はそれぞれ本文中に示された箇所に対応する。記述解答は日本語で、選択式解答は記号で答えよ。",
   "passageForExam": "",
   "questions": [
-    {{"number": 1, "partLabel": "A", "questionType": "cloze", "prompt": "...", "blankLabels": ["(A)"], "choices": []}}
+    {{"number": 1, "partLabel": "A", "questionType": "cloze", "prompt": "次の空所に入る最も適当なものを1つ選べ。", "blankLabels": ["(A)"], "passageAnchor": "...", "choices": []}}
   ]
 }}"""
 

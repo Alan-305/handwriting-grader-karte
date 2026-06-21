@@ -160,6 +160,8 @@ export interface AnswerPart {
   /** 未指定時は answerFormat / 問題文から自動判定 */
   gradingMode?: GradingMode;
   modelAnswer?: string;
+  /** 日本語記述など小問ごとの採点基準（必須ポイント・方向性） */
+  rubric?: string;
   cropRegion: CropRegion;
 }
 
