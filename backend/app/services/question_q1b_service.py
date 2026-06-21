@@ -1,4 +1,4 @@
-"""第1問(B)型（東大・文脈把握・空所補充）の AI 生成パイプライン。"""
+"""第1問(B)型（東大・文脈把握・空所補充＋語句並べ替え）の AI 生成パイプライン。"""
 
 from __future__ import annotations
 
@@ -17,8 +17,11 @@ from app.ai.prompts.universities.registry import (
     build_q1b_validator_system,
 )
 from app.ai.schemas.q1b_generation import (
-    Q1B_BLANK_LABELS,
     Q1B_CHOICE_LABELS,
+    Q1B_PART_A_BLANK_LABELS,
+    Q1B_PART_I_BLANK_LABEL,
+    Q1B_PART_I_MAX_WORDS,
+    Q1B_PART_I_MIN_WORDS,
     Q1BGenerationResult,
     Q1BValidatorResult,
 )
@@ -42,26 +45,55 @@ def _normalize_choice_label(label: str) -> str:
     return label.strip().lower().rstrip(")")
 
 
+def _blank_present(passage: str, label: str) -> bool:
+    return f"({label})" in passage or f"（{label}）" in passage
+
+
 def format_q1b_for_validator(result: Q1BGenerationResult) -> str:
-    words = english_word_count(result.passage)
+    part_a = result.part_a
+    part_i = result.part_i
+    words_a = english_word_count(part_a.passage)
+    words_i = english_word_count(part_i.passage)
     lines = [
         f"theme: {result.theme}",
-        f"wordCount(claimed): {result.word_count} / actual~{words}",
         f"instructionsJa: {result.instructions_ja}",
-        f"dummyChoiceLabel: {result.dummy_choice_label}",
+        "",
+        "=== 小問（ア） ===",
+        f"wordCount(claimed): {part_a.word_count} / actual~{words_a}",
+        f"instructionsJa: {part_a.instructions_ja}",
+        f"dummyChoiceLabel: {part_a.dummy_choice_label}",
         "",
         "passage:",
-        result.passage,
+        part_a.passage,
         "",
         "choices:",
     ]
-    for ch in sorted(result.choices, key=lambda x: _normalize_choice_label(x.label)):
+    for ch in sorted(part_a.choices, key=lambda x: _normalize_choice_label(x.label)):
         mark = " [DUMMY]" if ch.is_dummy else ""
         lines.append(f"  {ch.label}) {ch.text.strip()}{mark}")
     lines.append("")
     lines.append("answers:")
-    for ans in result.answers:
+    for ans in part_a.answers:
         lines.append(f"  ({ans.blank_label}): {ans.correct_choice}")
+    lines.extend(
+        [
+            "",
+            "=== 小問（イ） ===",
+            f"wordCount(claimed): {part_i.word_count} / actual~{words_i}",
+            f"instructionsJa: {part_i.instructions_ja}",
+            "",
+            "passage:",
+            part_i.passage,
+            "",
+            "wordBank:",
+        ]
+    )
+    for i, w in enumerate(part_i.word_bank, 1):
+        lines.append(f"  {i}. {w.strip()}")
+    lines.append("")
+    lines.append(f"correctOrder: {' / '.join(part_i.correct_order)}")
+    lines.append(f"correctExpressionEn: {part_i.correct_expression_en}")
+    lines.append(f"explanationJa: {part_i.explanation_ja}")
     return "\n".join(lines)
 
 
@@ -70,44 +102,82 @@ def assemble_q1b_prompt(*, result: Q1BGenerationResult) -> str:
     if result.instructions_ja.strip():
         lines.append(result.instructions_ja.strip())
         lines.append("")
-    lines.append(result.passage.strip())
+
+    part_a = result.part_a
+    lines.append("（ア）")
+    if part_a.instructions_ja.strip():
+        lines.append(part_a.instructions_ja.strip())
+    lines.append(part_a.passage.strip())
     lines.append("")
     lines.append("【選択肢】")
-    for ch in sorted(result.choices, key=lambda x: _normalize_choice_label(x.label)):
+    for ch in sorted(part_a.choices, key=lambda x: _normalize_choice_label(x.label)):
         label = ch.label.strip().rstrip(")")
         lines.append(f"{label}) {ch.text.strip()}")
+
+    part_i = result.part_i
+    lines.extend(["", "（イ）"])
+    if part_i.instructions_ja.strip():
+        lines.append(part_i.instructions_ja.strip())
+    lines.append(part_i.passage.strip())
+    if part_i.word_bank:
+        lines.append("")
+        lines.append("【並べ替える語句】")
+        lines.append(" / ".join(w.strip() for w in part_i.word_bank))
     return "\n".join(lines).strip()
 
 
 def assemble_q1b_model_answer(*, result: Q1BGenerationResult) -> str:
-    parts: list[str] = ["■ 選択肢 a) ～ f)"]
-    for ch in sorted(result.choices, key=lambda x: _normalize_choice_label(x.label)):
+    part_a = result.part_a
+    part_i = result.part_i
+    parts: list[str] = ["■ 小問（ア） 選択肢 a) ～ f)"]
+    for ch in sorted(part_a.choices, key=lambda x: _normalize_choice_label(x.label)):
         label = ch.label.strip().rstrip(")")
         dummy = "（ダミー）" if ch.is_dummy else ""
         parts.append(f"{label}) {ch.text.strip()}{dummy}")
 
-    parts.extend(["", "■ 解答"])
-    for label in Q1B_BLANK_LABELS:
-        match = next((a for a in result.answers if a.blank_label == label), None)
+    parts.extend(["", "■ 小問（ア） 解答"])
+    for label in Q1B_PART_A_BLANK_LABELS:
+        match = next((a for a in part_a.answers if a.blank_label == label), None)
         sym = match.correct_choice.strip().lower() if match else "?"
-        parts.append(f"（{label}）：{sym}")
+        parts.append(f"({label})：{sym}")
 
-    parts.extend(["", "■ 採点・解答のポイント（解説）"])
-    if result.overall_summary_ja.strip():
-        parts.extend(["・全体の論旨（簡単な要約）", result.overall_summary_ja.strip(), ""])
-
-    parts.append("・各空所の正解の根拠")
-    for ex in sorted(result.blank_explanations, key=lambda x: Q1B_BLANK_LABELS.index(x.blank_label) if x.blank_label in Q1B_BLANK_LABELS else 99):
+    parts.extend(["", "■ 小問（ア） 解説"])
+    for ex in sorted(
+        part_a.blank_explanations,
+        key=lambda x: (
+            Q1B_PART_A_BLANK_LABELS.index(x.blank_label)
+            if x.blank_label in Q1B_PART_A_BLANK_LABELS
+            else 99
+        ),
+    ):
         note = f"（{ex.discourse_note}）" if ex.discourse_note.strip() else ""
         parts.append(
-            f"  （{ex.blank_label}）→ {ex.correct_choice}: {ex.rationale_ja.strip()}{note}"
+            f"  ({ex.blank_label})→ {ex.correct_choice}: {ex.rationale_ja.strip()}{note}"
         )
 
-    if result.dummy_explanations:
+    if part_a.dummy_explanations:
         parts.append("")
         parts.append("・ダミー選択肢が不正解となる理由")
-        for d in result.dummy_explanations:
+        for d in part_a.dummy_explanations:
             parts.append(f"  {d.choice_label}): {d.why_wrong_ja.strip()}")
+
+    parts.extend(["", "■ 小問（イ） 解答"])
+    if part_i.correct_expression_en.strip():
+        parts.append(part_i.correct_expression_en.strip())
+    elif part_i.correct_order:
+        parts.append(" / ".join(w.strip() for w in part_i.correct_order))
+    else:
+        parts.append("（未設定）")
+
+    parts.extend(["", "■ 小問（イ） 解説"])
+    if part_i.explanation_ja.strip():
+        parts.append(part_i.explanation_ja.strip())
+    if part_i.structure_note_ja.strip():
+        parts.append(f"構造: {part_i.structure_note_ja.strip()}")
+
+    parts.extend(["", "■ 全体のポイント"])
+    if result.overall_summary_ja.strip():
+        parts.append(result.overall_summary_ja.strip())
 
     if result.common_mistakes_ja:
         parts.append("")
@@ -182,7 +252,7 @@ class QuestionQ1BService:
             "type": "english",
             "answerFormat": "short",
             "notes": (
-                f"{uni_name} 第1問(B)・空所補充パイプライン。"
+                f"{uni_name} 第1問(B)・空所補充＋語句並べ替えパイプライン。"
                 f" {result.theme or result.source_note}"
             ),
             "referenceExamples": [],
@@ -190,14 +260,10 @@ class QuestionQ1BService:
             "generationPipeline": "q1b",
             "generationArtifacts": {
                 "theme": result.theme,
-                "wordCount": result.word_count,
                 "instructionsJa": result.instructions_ja,
-                "dummyChoiceLabel": result.dummy_choice_label,
-                "choices": [c.model_dump(by_alias=True) for c in result.choices],
-                "answers": [a.model_dump(by_alias=True) for a in result.answers],
+                "partA": result.part_a.model_dump(by_alias=True),
+                "partI": result.part_i.model_dump(by_alias=True),
                 "overallSummaryJa": result.overall_summary_ja,
-                "blankExplanations": [e.model_dump(by_alias=True) for e in result.blank_explanations],
-                "dummyExplanations": [d.model_dump(by_alias=True) for d in result.dummy_explanations],
                 "evaluatorPassed": validator.passed,
                 "evaluatorIssues": validator.issues,
                 "evaluatorSummary": validator.summary,
@@ -268,54 +334,96 @@ class QuestionQ1BService:
     @staticmethod
     def _structural_issues(result: Q1BGenerationResult) -> list[str]:
         issues: list[str] = []
-        if not result.passage.strip():
-            issues.append("英文本文が空")
-        words = english_word_count(result.passage)
-        if words < 400 or words > 700:
-            issues.append(f"英文の語数が目安外（約{words}語。500〜600語程度）")
+        part_a = result.part_a
+        part_i = result.part_i
 
-        for label in Q1B_BLANK_LABELS:
-            if f"({label})" not in result.passage and f"（{label}）" not in result.passage:
-                issues.append(f"passage に空所 ({label}) がない")
+        if not part_a.passage.strip():
+            issues.append("小問（ア）の英文本文が空")
+        words_a = english_word_count(part_a.passage)
+        if words_a < 400 or words_a > 700:
+            issues.append(
+                f"小問（ア）の語数が目安外（約{words_a}語。500〜600語程度）"
+            )
 
-        if len(result.choices) != 6:
-            issues.append(f"選択肢が6つではない（{len(result.choices)}個）")
-        dummies = [c for c in result.choices if c.is_dummy]
+        for label in Q1B_PART_A_BLANK_LABELS:
+            if not _blank_present(part_a.passage, label):
+                issues.append(f"小問（ア）passage に空所 ({label}) がない")
+
+        if len(part_a.choices) != 6:
+            issues.append(f"小問（ア）の選択肢が6つではない（{len(part_a.choices)}個）")
+        dummies = [c for c in part_a.choices if c.is_dummy]
         if len(dummies) != 1:
-            issues.append(f"ダミー選択肢が1つではない（{len(dummies)}個）")
-        if result.dummy_choice_label.strip():
-            dummy_norm = _normalize_choice_label(result.dummy_choice_label)
-            if not any(_normalize_choice_label(c.label) == dummy_norm and c.is_dummy for c in result.choices):
+            issues.append(f"小問（ア）のダミー選択肢が1つではない（{len(dummies)}個）")
+        if part_a.dummy_choice_label.strip():
+            dummy_norm = _normalize_choice_label(part_a.dummy_choice_label)
+            if not any(
+                _normalize_choice_label(c.label) == dummy_norm and c.is_dummy
+                for c in part_a.choices
+            ):
                 issues.append("dummyChoiceLabel と isDummy の選択肢が一致しない")
 
-        choice_labels = {_normalize_choice_label(c.label) for c in result.choices}
+        choice_labels = {_normalize_choice_label(c.label) for c in part_a.choices}
         if choice_labels != set(Q1B_CHOICE_LABELS):
-            issues.append("選択肢ラベルが a〜f で揃っていない")
+            issues.append("小問（ア）の選択肢ラベルが a〜f で揃っていない")
 
-        if len(result.answers) != 5:
-            issues.append(f"answers が5件ではない（{len(result.answers)}件）")
-        for ans in result.answers:
-            if ans.blank_label not in Q1B_BLANK_LABELS:
+        if len(part_a.answers) != 5:
+            issues.append(f"小問（ア）answers が5件ではない（{len(part_a.answers)}件）")
+
+        used_choices: list[str] = []
+        for ans in part_a.answers:
+            if ans.blank_label not in Q1B_PART_A_BLANK_LABELS:
                 issues.append(f"不正な空所ラベル: {ans.blank_label}")
             norm = _normalize_choice_label(ans.correct_choice)
             if norm not in choice_labels:
-                issues.append(f"空所({ans.blank_label})の正解記号が選択肢にない: {ans.correct_choice}")
-            if norm == _normalize_choice_label(result.dummy_choice_label):
+                issues.append(
+                    f"空所({ans.blank_label})の正解記号が選択肢にない: {ans.correct_choice}"
+                )
+            if norm == _normalize_choice_label(part_a.dummy_choice_label):
                 issues.append(f"空所({ans.blank_label})の正解がダミーになっている")
+            used_choices.append(norm)
 
-        if len(result.blank_explanations) < 5:
-            issues.append("blankExplanations が5件未満")
-        if not result.dummy_explanations:
-            issues.append("dummyExplanations が空")
+        if len(used_choices) == 5 and len(set(used_choices)) != 5:
+            issues.append("小問（ア）で同じ選択肢記号が複数の空所に使われている（各記号1回のみ）")
+
+        if len(part_a.blank_explanations) < 5:
+            issues.append("小問（ア）blankExplanations が5件未満")
+        if not part_a.dummy_explanations:
+            issues.append("小問（ア）dummyExplanations が空")
+
+        if not part_i.passage.strip():
+            issues.append("小問（イ）の英文本文が空")
+        if not _blank_present(part_i.passage, Q1B_PART_I_BLANK_LABEL):
+            issues.append("小問（イ）passage に空所 (イ) がない")
+
+        bank_count = len(part_i.word_bank)
+        if bank_count < Q1B_PART_I_MIN_WORDS or bank_count > Q1B_PART_I_MAX_WORDS:
+            issues.append(
+                f"小問（イ）wordBank が{bank_count}個 "
+                f"（{Q1B_PART_I_MIN_WORDS}〜{Q1B_PART_I_MAX_WORDS}個にすること）"
+            )
+
+        if len(part_i.correct_order) != bank_count and bank_count > 0:
+            issues.append("小問（イ）correctOrder の件数が wordBank と一致しない")
+
+        if bank_count > 0 and part_i.correct_order:
+            bank_norm = {w.strip().lower() for w in part_i.word_bank}
+            order_norm = {w.strip().lower() for w in part_i.correct_order}
+            if bank_norm != order_norm:
+                issues.append("小問（イ）correctOrder が wordBank と一致しない")
+
+        if not part_i.correct_expression_en.strip() and not part_i.correct_order:
+            issues.append("小問（イ）の正解（correctExpressionEn または correctOrder）が空")
+        if not part_i.explanation_ja.strip():
+            issues.append("小問（イ）explanationJa が空")
 
         return issues
 
     @staticmethod
     def _default_anticipated_mistakes() -> list[str]:
         return [
-            "本文中のキーワードだけで選択し、接続詞・指示語の論理を読まない",
-            "ダミー選択肢を、語彙の類似だけで除外できない",
-            "空所前後の因果・逆接・対比の関係を無視して選ぶ",
+            "（ア）本文中のキーワードだけで選択し、接続詞・指示語の論理を読まない",
+            "（ア）同じ選択肢記号を複数の空所に使ってしまう",
+            "（イ）語句の並べ順だけでなく、句・節の構造と意味のつながりを確認しない",
         ]
 
     def generate_and_save_draft(

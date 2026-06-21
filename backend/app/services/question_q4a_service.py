@@ -26,9 +26,12 @@ from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.question_design_service import QuestionDesignService
 from app.services.question_type_labels import format_type_label
 from app.services.q4a_prompt_markup import (
+    Q4A_MAX_UNDERLINE_WORDS,
+    Q4A_MIN_UNDERLINE_WORDS,
     ensure_q4a_english_block_markup,
     normalize_q4a_problem_markup,
     q4a_markup_issues,
+    underline_word_count,
 )
 from app.services.question_prompt_markup import normalize_prompt_markup
 from app.services.university_context_service import UniversityContextService
@@ -45,7 +48,7 @@ def format_q4a_problem_for_teacher(problem: Q4AProblemResult) -> str:
         lines.append(problem.instructions.strip())
         lines.append("")
     for item in sorted(problem.items, key=lambda x: x.number):
-        label = item.item_label.strip() or f"({20 + item.number})"
+        label = item.item_label.strip() or f"({item.number})"
         lines.append(label)
         if item.instruction_ja.strip():
             lines.append(item.instruction_ja.strip())
@@ -65,7 +68,7 @@ def assemble_q4a_prompt(*, problem: Q4AProblemResult) -> str:
         lines.append(problem.instructions.strip())
         lines.append("")
     for item in sorted(problem.items, key=lambda x: x.number):
-        label = item.item_label.strip() or f"({20 + item.number})"
+        label = item.item_label.strip() or f"({item.number})"
         lines.append(label)
         if item.instruction_ja.strip():
             lines.append(item.instruction_ja.strip())
@@ -261,6 +264,10 @@ class QuestionQ4AService:
         issues: list[str] = []
         if len(problem.items) != 5:
             issues.append(f"設問数が5つではない（{len(problem.items)}個）")
+        if problem.layout.strip() and problem.layout.strip() != "five_paragraphs":
+            issues.append(
+                f"layout が five_paragraphs ではない（{problem.layout!r}）"
+            )
         for item in problem.items:
             if len(item.parts) != 5:
                 issues.append(
@@ -269,6 +276,13 @@ class QuestionQ4AService:
             labels = {p.label.lower() for p in item.parts}
             if len(labels) != 5:
                 issues.append(f"問{item.number}: 下線ラベル (a)〜(e) が重複または不足")
+            for part in item.parts:
+                wc = underline_word_count(part.text)
+                if wc < Q4A_MIN_UNDERLINE_WORDS or wc > Q4A_MAX_UNDERLINE_WORDS:
+                    issues.append(
+                        f"問{item.number}: ({part.label}) は{wc}語 "
+                        f"（{Q4A_MIN_UNDERLINE_WORDS}〜{Q4A_MAX_UNDERLINE_WORDS}語）"
+                    )
             err = item.error_label.strip().lower()
             if err not in labels:
                 issues.append(f"問{item.number}: errorLabel が parts に存在しない")

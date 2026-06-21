@@ -129,7 +129,7 @@ export function QuestionGenerateQ4APage() {
       <LoadingOverlay visible={generating} message={loadingMessage} />
       <PageHeader
         title="第4問(A)の生成（誤り指摘）"
-        description="東大第4問(A)形式で、各設問 (a)〜(e) の下線部から不適切な1つを選ぶ問題を生成します。素材英文を貼るか、テーマから英文を自作させられます。"
+        description="東大第4問(A)形式で、5つのパラグラフ各 (a)〜(e) の下線部から不適切な1つを選ぶ問題を生成します。素材英文を貼るか、テーマから英文を自作させられます。"
       />
       <div className="page-content space-y-6">
         <div className="flex flex-wrap gap-3">
@@ -161,7 +161,8 @@ export function QuestionGenerateQ4APage() {
             <CardHeader className="p-0">
               <CardTitle className="font-ja text-base">基本設定</CardTitle>
               <CardDescription className="font-ja">
-                設問5つ（(21)〜(25)相当）× 各5下線部。長文内の下線箇所は *語句* 記法で出力します（画面・印刷で下線表示）。
+                設問5つ（(1)〜(5)相当のパラグラフ）の中に各5下線部。下線部の単語数は5〜10語で、下線部の頭に(a)などの記号を入れます。パラグラフ内の下線箇所は
+                *語句* 記法で出力します（画面・印刷で下線表示）。
               </CardDescription>
             </CardHeader>
             <div className="grid gap-4 md:grid-cols-2">
@@ -276,7 +277,7 @@ export function QuestionGenerateQ4APage() {
 
           <Card className="border-blue-100 bg-blue-50/50 p-4">
             <p className="font-ja text-sm text-slate-700">
-              生成の流れ：①問題（5設問×5下線） → ②妥当性検証 → ③解答・解説
+              生成の流れ：①問題（5パラグラフ×5下線） → ②妥当性検証 → ③解答・解説
             </p>
           </Card>
 

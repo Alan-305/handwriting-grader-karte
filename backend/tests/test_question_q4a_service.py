@@ -11,23 +11,35 @@ from app.services.question_q4a_service import (
     assemble_q4a_prompt,
 )
 
+_LONG_PARTS = [
+    "has been growing rapidly in recent years across",
+    "are deployed in many sensitive domains today",
+    "policymakers struggle to balance innovation carefully",
+    "public trust and ethical accountability concerns",
+    "researchers continue to develop new technologies rapidly",
+]
+
 
 def _sample_problem() -> Q4AProblemResult:
     parts = [
-        Q4AUnderlinedPart(label=l, text=f"word_{l}")
-        for l in ["a", "b", "c", "d", "e"]
+        Q4AUnderlinedPart(label=l, text=_LONG_PARTS[i])
+        for i, l in enumerate(["a", "b", "c", "d", "e"])
     ]
+    english = (
+        "The debate (a) *has been growing rapidly in recent years across* society as "
+        "systems (b) *are deployed in many sensitive domains today* where "
+        "(c) *policymakers struggle to balance innovation carefully* against "
+        "(d) *public trust and ethical accountability concerns* while "
+        "(e) *researchers continue to develop new technologies rapidly*."
+    )
     return Q4AProblemResult(
         instructions="次の各英文について、下線部のうち不適切なものを1つ選べ。",
         items=[
             Q4AItem(
                 number=i,
-                itemLabel=f"({20 + i})",
+                itemLabel=f"({i})",
                 instructionJa="不適切なものを1つ選べ。",
-                englishBlock=(
-                    f"Sample *word_a* for item {i} with *word_b* and *word_c* "
-                    f"*word_d* and *word_e*."
-                ),
+                englishBlock=english,
                 parts=parts,
                 errorLabel="c",
                 errorCategory="syntax",
@@ -40,34 +52,38 @@ def _sample_problem() -> Q4AProblemResult:
 def test_assemble_q4a_prompt_has_five_items_and_asterisk_markup():
     problem = _sample_problem()
     text = assemble_q4a_prompt(problem=problem)
-    assert "(21)" in text
-    assert "(25)" in text
+    assert "(1)" in text
+    assert "(5)" in text
+    assert "(21)" not in text
     assert "←誤り" not in text
-    assert "*word_a*" in text
+    assert "(a) *has been growing rapidly in recent years across*" in text
 
 
-def test_ensure_markup_wraps_bare_phrases():
+def test_ensure_markup_wraps_bare_phrases_and_adds_labels():
     from app.services.q4a_prompt_markup import ensure_q4a_english_block_markup
 
+    phrase_a = "are deployed in many sensitive domains today"
+    phrase_b = "The debate over artificial intelligence ethics"
     item = Q4AItem(
         number=1,
-        englishBlock="The system are deployed quickly.",
+        englishBlock="The debate over artificial intelligence ethics are deployed in many sensitive domains today.",
         parts=[
-            Q4AUnderlinedPart(label="a", text="are deployed"),
-            Q4AUnderlinedPart(label="b", text="The system"),
-            Q4AUnderlinedPart(label="c", text="quickly"),
-            Q4AUnderlinedPart(label="d", text="system"),
-            Q4AUnderlinedPart(label="e", text="deployed"),
+            Q4AUnderlinedPart(label="a", text=phrase_a),
+            Q4AUnderlinedPart(label="b", text=phrase_b),
+            Q4AUnderlinedPart(label="c", text="policymakers struggle to balance innovation carefully"),
+            Q4AUnderlinedPart(label="d", text="public trust and ethical accountability concerns"),
+            Q4AUnderlinedPart(label="e", text="researchers continue to develop new technologies rapidly"),
         ],
         errorLabel="a",
     )
     block = ensure_q4a_english_block_markup(item)
-    assert "*are deployed*" in block
+    assert f"(a) *{phrase_a}*" in block
+    assert f"(b) *{phrase_b}*" in block
 
 
 def test_assemble_q4a_model_answer():
     pack = Q4ATeacherPackResult(
-        modelAnswerSummary="(21) c, (22) c",
+        modelAnswerSummary="(1) c, (2) c",
         explanations=[
             Q4AExplanationItem(
                 number=1,
@@ -101,3 +117,5 @@ def test_run_pipeline_mock_without_api_key(monkeypatch):
     assert result["typeLabel"] == "第4問(A)"
     assert "【解答・解説】" in result["modelAnswer"]
     assert len(result["generationArtifacts"]["items"]) == 5
+    assert "(1)" in result["prompt"]
+    assert "(a) *has been growing rapidly in recent years across*" in result["prompt"]

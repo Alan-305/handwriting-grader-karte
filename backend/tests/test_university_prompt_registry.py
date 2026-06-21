@@ -49,8 +49,9 @@ def test_todai_has_custom_q5_prompts_not_defaults():
 
     assert "q1b_generation_system" in status.configured_keys
     q1b = build_q1b_generation_system("todai", "東京大学")
-    assert "空所" in q1b or "(ア)" in q1b
+    assert "空所" in q1b or "(ア)" in q1b or "partA" in q1b.lower()
     assert "500" in q1b or "600" in q1b
+    assert "（イ）" in q1b or "partI" in q1b or "並べ替え" in q1b
 
     assert "q2a_generation_system" in status.configured_keys
     q2a = build_q2a_generation_system("todai", "東京大学")

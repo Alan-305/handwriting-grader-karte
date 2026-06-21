@@ -33,7 +33,7 @@ def build_q4a_problem_user_prompt(
     return (
         f"難易度: {difficulty_label(difficulty)}{uni_note}{topic}{source}{ref_block}\n"
         "上記に従い、東大第4問(A)・誤り指摘問題を作成してください。"
-        "各設問の長文では下線部5箇所を必ず *英文* で囲んでください。"
+        "5つの独立パラグラフ（(1)〜(5)）各に下線部5箇所を (a) *5〜10語の英文* 形式で設けてください。"
     )
 
 
@@ -69,7 +69,7 @@ passed は issues が空なら true。
 
 Q4A_TEACHER_PACK_SYSTEM_FALLBACK = """あなたは東京大学二次英語・第4問(A)の教師用解答・解説作成者です。
 
-- modelAnswerSummary: 各問の正答記号を「(21) c, (22) a, …」形式で列挙し、要点を1文
+- modelAnswerSummary: 各問の正答記号を「(1) c, (2) a, …」形式で列挙し、要点を1文
 - explanations: 各問について、なぜ errorLabel が誤りか（文法・語法・構文・文脈）を日本語で簡潔に。修正例の英文 correctionEn を示す
 
 出力 JSON のみ:

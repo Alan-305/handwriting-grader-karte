@@ -328,19 +328,21 @@ _MOCK_PAYLOADS: dict[str, dict] = {
         "items": [
             {
                 "number": i,
-                "itemLabel": f"({20 + i})",
+                "itemLabel": f"({i})",
                 "instructionJa": "次の英文の下線部のうち、文法・語法・構文・文脈のいずれかの観点から不適切なものを1つ選べ。",
                 "englishBlock": (
-                    "The debate over AI ethics *has been growing* rapidly as systems "
-                    "*are deployed* in sensitive domains where *policymakers struggle* "
-                    "to balance *innovation* with *public trust*."
+                    "The debate over AI ethics (a) *has been growing rapidly in recent years across* "
+                    "society as systems (b) *are deployed in many sensitive domains today* where "
+                    "(c) *policymakers struggle to balance innovation carefully* against "
+                    "(d) *public trust and ethical accountability concerns* while "
+                    "(e) *researchers continue to develop new technologies rapidly*."
                 ),
                 "parts": [
-                    {"label": "a", "text": "has been growing"},
-                    {"label": "b", "text": "are deployed"},
-                    {"label": "c", "text": "sensitive"},
-                    {"label": "d", "text": "domains"},
-                    {"label": "e", "text": "rapidly"},
+                    {"label": "a", "text": "has been growing rapidly in recent years across"},
+                    {"label": "b", "text": "are deployed in many sensitive domains today"},
+                    {"label": "c", "text": "policymakers struggle to balance innovation carefully"},
+                    {"label": "d", "text": "public trust and ethical accountability concerns"},
+                    {"label": "e", "text": "researchers continue to develop new technologies rapidly"},
                 ],
                 "errorLabel": "b",
                 "errorCategory": "syntax",
@@ -354,7 +356,7 @@ _MOCK_PAYLOADS: dict[str, dict] = {
         "summary": "各問1誤り・東大レベルの誤りとして成立。",
     },
     "Q4ATeacherPackResult": {
-        "modelAnswerSummary": "(21) b, (22) b, (23) b, (24) b, (25) b。",
+        "modelAnswerSummary": "(1) b, (2) b, (3) b, (4) b, (5) b。",
         "explanations": [
             {
                 "number": 1,

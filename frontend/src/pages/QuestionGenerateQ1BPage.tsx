@@ -127,8 +127,8 @@ export function QuestionGenerateQ1BPage() {
     <div>
       <LoadingOverlay visible={generating} message={loadingMessage} />
       <PageHeader
-        title="第1問(B)の生成（空所補充）"
-        description="東大第1問(B)形式で、500〜600語の英文に空所(ア)〜(オ)を5つ設け、選択肢 a)〜f)（ダミー1つ）と解答・解説を生成します。"
+        title="第1問(B)の生成（空所補充・語句並べ替え）"
+        description="東大第1問(B)形式で、小問（ア）500〜600語・空所(1)〜(5)・選択肢 a)〜f)（ダミー1つ）と、小問（イ）語句8〜12個の並べ替え問題・解答・解説を生成します。"
       />
       <div className="page-content space-y-6">
         <div className="flex flex-wrap gap-3">
@@ -157,7 +157,8 @@ export function QuestionGenerateQ1BPage() {
             <CardHeader className="p-0">
               <CardTitle className="font-ja text-base">基本設定</CardTitle>
               <CardDescription className="font-ja">
-                空所補充形式（段落整序ではありません）。各空所に a)〜f) から最適な英文を選ぶ東大標準の設問です。
+                小問（ア）500〜600語の英文に空所(1)〜(5)。各空所は a)〜f)（ダミー1つ）から1つ選び、同じ記号は使い回し不可。
+                小問（イ）は長文の空所（イ）に語句8〜12個を並べ替え（句・節が絡む箇所）。
               </CardDescription>
             </CardHeader>
             <div className="grid gap-4 md:grid-cols-2">
@@ -272,7 +273,7 @@ export function QuestionGenerateQ1BPage() {
 
           <Card className="border-blue-100 bg-blue-50/50 p-4">
             <p className="font-ja text-sm text-slate-700">
-              生成の流れ：①英文+空所(ア)〜(オ)+選択肢 → ②論理・ダミーの検証 → ③下書き保存
+              生成の流れ：①小問（ア）+（イ）と解答・解説 → ②論理・並べ替えの検証 → ③下書き保存
             </p>
           </Card>
 

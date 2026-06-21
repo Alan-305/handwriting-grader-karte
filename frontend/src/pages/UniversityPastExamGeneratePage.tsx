@@ -16,7 +16,7 @@ const PIPELINE_LABELS: Record<GenerationUnit["pipeline"], string> = {
   q1: "読解総合（問1〜5）",
   q2: "読解総合（問1〜6）",
   q1a: "英文要約",
-  q1b: "空所補充",
+  q1b: "空所補充・語句並べ替え",
   q2a: "自由英作文",
   q2b: "和文英訳",
   q4a: "誤り指摘",

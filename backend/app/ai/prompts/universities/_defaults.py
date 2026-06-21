@@ -103,12 +103,13 @@ def default_q4a_problem_system(university_name: str) -> str:
 東大レベルの誤り指摘問題を JSON で作成してください。
 
 要件:
-- 設問5つ（(21)〜(25) 相当）。各設問に (a)〜(e) の下線部5つ
-- 各設問で誤りはちょうど1つ（errorLabel）、残り4つは完全に正しい英語
+- 独立したパラグラフ5つ（(1)〜(5) 相当）。layout は five_paragraphs
+- 各パラグラフに (a)〜(e) の下線部5つ。各下線部は5〜10語
+- 各パラグラフで誤りはちょうど1つ（errorLabel）、残り4つは完全に正しい英語
 - 誤りは精読で気づくレベル（主語動詞の遠隔一致、冠詞、態、分詞・関係詞、文脈の語彙など）
 - 単なるスペルミス・初級文法ミスは禁止
 
-【下線記法】englishBlock 内の下線部5箇所はすべて *語句* で囲む（アプリで下線表示）。<u> や *語句(a)* は不可。
+【下線記法】englishBlock 内の下線5箇所は (a) *語句* 形式（記号は * の外側。各語句5〜10語）。<u> や *語句(a)* は不可。
 
 出力 JSON のみ（errorLabel は検証用）:
 {{
@@ -118,10 +119,10 @@ def default_q4a_problem_system(university_name: str) -> str:
   "items": [
     {{
       "number": 1,
-      "itemLabel": "(21)",
+      "itemLabel": "(1)",
       "instructionJa": "日本語の設問指示",
-      "englishBlock": "英文… *word* … *another phrase* …",
-      "parts": [{{"label": "a", "text": "word"}}],
+      "englishBlock": "英文… (a) *five to ten word phrase* … (b) *another phrase* …",
+      "parts": [{{"label": "a", "text": "five to ten word phrase"}}],
       "errorLabel": "c",
       "errorCategory": "syntax"
     }}
@@ -151,15 +152,17 @@ def default_q1a_validator_system(university_name: str) -> str:
 
 def default_q1b_generation_system(university_name: str) -> str:
     uni = university_name.strip() or "志望校"
-    return f"""あなたは{uni}の二次入試英語・第1問(B)（空所補充）の問題作成専門家です。
-500〜600語の英文に空所(ア)〜(オ)を5つ設け、選択肢 a)〜f)（ダミー1つ）と解答・解説を JSON で作成してください。
-論理・指示語・接続表現に基づく精読が必要な東大レベルの問題にすること。"""
+    return f"""あなたは{uni}の二次入試英語・第1問(B)の問題作成専門家です。
+小問（ア）500〜600語の英文に空所(1)〜(5)、選択肢 a)〜f)（ダミー1つ・正解記号の重複禁止）。
+小問（イ）長文の空所（イ）に語句8〜12個の並べ替え。
+問題・解答・解説を JSON（partA / partI）で作成してください。"""
 
 
 def default_q1b_validator_system(university_name: str) -> str:
     uni = university_name.strip() or "志望校"
-    return f"""あなたは{uni}二次英語・第1問(B)空所補充の検証者です。
-空所5・選択肢6（ダミー1）・論理整合を検証。passed は issues が空なら true。
+    return f"""あなたは{uni}二次英語・第1問(B)の検証者です。
+（ア）空所5・選択肢6（ダミー1）・正解記号重複なし。（イ）wordBank 8〜12・空所(イ)・構造理解型並べ替え。
+passed は issues が空なら true。
 出力 JSON のみ: {{"passed": true, "issues": [], "summary": "..."}}"""
 
 
