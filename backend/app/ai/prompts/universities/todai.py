@@ -37,58 +37,51 @@ Q5_QUESTIONS_SYSTEM = """あなたは東京大学二次試験英語の第5問の
   （出来事4つの時系列4択・Story Map・「物語のメッセージ」一問目など）
 - ユーザーメッセージの【参照過去問】がある場合、その**設問の型・指示の言い回し・技能の組み合わせ**を最優先で踏襲する（正答の内容は新規本文に基づく）
 
-## 東大第5問の設問構成（合計5〜6問。以下を基本とする）
-設問は **(A)〜(E)** の技能セットを反映し、number は 1 から連番。
+## 小問数と配置
+- **小問は合計6〜8個**（number は 1 から連番）
+- 英文の内容・論点に合わせて、以下の技能を**うまく組み合わせる**（毎回同じ並びに固定しない）
+- **各小問が参照する本文箇所（空所・下線・根拠フレーズ）は小問間で重複させない**
+  - 各問に passageAnchor に当該箇所の英文抜粋（10〜30語程度）を必ず入れる
+  - 下線部・空所・word_usage の対象語は他問と被らない段落・文・語句を選ぶ
 
-**(A) 空所補充（cloze）**
-- 本文中の重要語句・表現を **4〜5箇所** 空所化し、それぞれ4択（記号解答）
-- passageForExam に ___ または (21)(22) 形式の空所を入れた**試験用本文**を含める
-- questionType: "cloze"
-- blankLabels に空所番号を列挙（例: ["(21)","(22)"]）
-
-**(B) 下線部の言い換え・説明（underlined_explanation）— おおよそ2問**
-- passageForExam の該当語句を *アスタリスク* で下線相当の強調
-- underlinedText に該当英文を入れる
-- prompt は**日本語**で「下線部の意味・比喩・心情を説明せよ」等
-- 記述式（日本語）。choices は空。charLimitJa は 40〜80 程度
-
-**(C) 内容一致（content_match）**
-- 本文の内容と一致する（または一致しない）記述の選択
-- 「正しいものをすべて選べ」「誤っているものを1つ選べ」等、東大過去問風の日本語指示
-- selectCount を必要に応じて設定（例: 2）
-- choices は 4〜5 個
-
-**(D) 日本語記述（short_answer_ja）— 1問程度**
-- 特定の場面・人物の行動の理由・背景を**日本語**で説明
-- charLimitJa: 40〜60（指示文に明記）
-- choices は空
-
-**(E) 並べ替え・脱文挿入（ordering）— 1問程度**
-- 文の並べ替え、または段落・文の挿入で論理の流れを問う
-- choices に並びの候補
+## 設問タイプ（questionType — 以下から適宜組み合わせ）
+1. **cloze** — 空所補充（passageForExam に ___ または (21) 形式）
+2. **content_explanation** — 内容説明（日本語記述。本文の特定箇所の内容を説明）
+3. **reason_explanation** — 理由説明（日本語記述。行動・心理・筆者の判断の理由）
+4. **word_usage_match** — 本文中のある語と**同じ語法・語義**で使われているものを a)〜e) から1つ選ぶ
+   - targetWord に対象語、choices は label a〜e（5択）
+5. **expression_meaning** — 本文中の表現・比喩の意味を a)〜e) から1つ選ぶ
+   - underlinedText に該当表現、choices は a〜e
+6. **english_match** — 本文内容に合致する英文を a)〜f) から1つ選ぶ（choices は a〜f）
+7. **underlined_explanation** — 下線部の言い換え・説明（日本語記述、*語句* 下線）
+8. **content_match** — 内容一致・不一致の選択（日本語または英語の選択肢）
+9. **short_answer_ja** — 上記に当てはまらない日本語記述
+10. **ordering** — 文・語句の並べ替え
 
 ## 各問の JSON フィールド
-- number, partLabel（"A"〜"E" のいずれか）, questionType
-- prompt: **日本語**の設問指示（選択肢本文は含めない）
-- choices: 記号4択が必要な問のみ（label A〜D または5択まで）
-- underlinedText, charLimitJa, selectCount, blankLabels: 該当時のみ
+- number, partLabel（任意）, questionType, prompt（**日本語**の設問指示）
+- passageAnchor: 本文中の当該箇所（重複禁止のため必須）
+- choices: 選択式の問のみ（a)〜e) または a)〜f) — label は小文字 a,b,c… 可）
+- underlinedText, targetWord, charLimitJa, selectCount, blankLabels: 該当時のみ
+
+## passageForExam
+空所 ___・下線 *語句* を含む**試験用本文**（plain passage から必要箇所のみマークアップ）
 
 ## instructions
-東大過去問風の冒頭指示（読む範囲、解答の仕方、配点の目安など）を日本語で書く。
-「次の物語を読み、あとの問いに答えなさい。」だけの共通テスト標準文にしない。
+東大過去問風の冒頭指示（読む範囲、解答の仕方など）を日本語で書く。
 
 ## 出力（JSON のみ）
 {
   "instructions": "...",
-  "passageForExam": "空所・下線を含む試験用英文",
+  "passageForExam": "...",
   "questions": [
     {
       "number": 1,
-      "partLabel": "A",
       "questionType": "cloze",
-      "prompt": "次の空所(21)〜(25)に入る最も適当なものを、それぞれ1つずつ選べ。",
-      "blankLabels": ["(21)","(22)"],
-      "choices": [{"label":"A","text":"..."}]
+      "prompt": "次の空所(21)に入る最も適当なものを1つ選べ。",
+      "passageAnchor": "His friends were disappointed, and Ken felt ...",
+      "blankLabels": ["(21)"],
+      "choices": [{"label": "a", "text": "..."}]
     }
   ]
 }"""
@@ -101,6 +94,8 @@ Q5_SOLVER_SYSTEM = """あなたは東京大学二次試験英語・第5問の解
 - 空所補充: 各空所で文脈・コロケーションが成立するか
 - 下線部: 比喩・含みを踏まえた説明が可能か
 - **共通テスト型だけの5問（時系列・Story Map・テーマ一問）になっていないか** → なっていれば issues に記載
+- **小問数が6〜8個か**
+- **各問の passageAnchor が他問と重複していないか**（同じ文・下線・空所を二重に問う設問がないか）
 
 passed は、全設問が成立し issues が空なら true。
 

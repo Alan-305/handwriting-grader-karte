@@ -165,7 +165,8 @@ export function QuestionGenerateQ5Page() {
             <CardHeader className="p-0">
               <CardTitle className="font-ja text-base">基本設定</CardTitle>
               <CardDescription className="font-ja">
-                第5問は長文本文と設問をまとめて生成します（形式は参照過去問・東大二次に準拠）
+                東大第5問形式（物語・随筆／空所補充・内容説明・理由説明・語法一致・表現の意味・英文一致・下線部・並べ替えなど）。
+                小問6〜8個を英文に合わせて組み合わせ、各小問の本文参照箇所は重複させません。共通テスト定型にはしません。
               </CardDescription>
             </CardHeader>
             <div className="grid gap-4 md:grid-cols-2">
@@ -268,7 +269,7 @@ export function QuestionGenerateQ5Page() {
 
           <Card className="border-blue-100 bg-blue-50/50 p-4">
             <p className="font-ja text-sm text-slate-700">
-              生成の流れ：①物語本文 → ②設問5つ → ③解答の妥当性検証 → ④正答・解説・全訳
+              生成の流れ：①物語・随筆本文 → ②小問6〜8個（多技能） → ③妥当性検証 → ④正答・解説・全訳
             </p>
             <p className="mt-2 font-ja text-xs text-slate-500">
               完了まで1〜3分かかることがあります。チャットでの修正は次の段階で追加予定です。

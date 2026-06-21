@@ -61,6 +61,42 @@ def test_assemble_q5_model_answer_includes_translation():
     assert "物語の全訳です。" in text
 
 
+def test_structural_issues_count_and_overlap():
+    questions = Q5QuestionsResult(
+        questions=[
+            Q5SubQuestion(
+                number=i,
+                questionType="content_match",
+                prompt="test",
+                passageAnchor=f"segment{i} uniqueword{i} anotherunique{i} thirdunique{i}",
+                choices=[Q5ChoiceItem(label="a", text="x")],
+            )
+            for i in range(1, 7)
+        ]
+    )
+    assert QuestionQ5Service._structural_issues(questions) == []
+
+    overlap = Q5QuestionsResult(
+        questions=[
+            Q5SubQuestion(
+                number=1,
+                questionType="content_explanation",
+                prompt="a",
+                passageAnchor="Ken felt ashamed and disappointed deeply",
+            ),
+            Q5SubQuestion(
+                number=2,
+                questionType="reason_explanation",
+                prompt="b",
+                passageAnchor="Ken felt ashamed and disappointed deeply",
+            ),
+        ]
+    )
+    issues = QuestionQ5Service._structural_issues(overlap)
+    assert any("重複" in i for i in issues)
+    assert any("6" in i for i in issues)
+
+
 def test_run_pipeline_mock_without_api_key(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "")
     monkeypatch.setenv("HGK_GEMINI_API_KEY", "")

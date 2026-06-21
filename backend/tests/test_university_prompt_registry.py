@@ -33,6 +33,7 @@ def test_todai_has_custom_q5_prompts_not_defaults():
     assert "二次試験" in questions
     assert "cloze" in questions
     assert "underlined_explanation" in questions
+    assert "6" in questions or "6〜8" in questions
     assert "q5_solver_system" in status.configured_keys
     assert "q5_teacher_pack_system" in status.configured_keys
 
@@ -81,6 +82,7 @@ def test_unknown_slug_falls_back_to_defaults():
 
     q5 = build_q5_questions_system("unknown-uni-xyz", "テスト大学")
     assert "共通テスト" in q5
+    assert "6" in q5 or "8" in q5 or "6〜8" in q5
     assert "二次入試" in q5
 
 

@@ -79,11 +79,12 @@ def default_q5_questions_system(university_name: str) -> str:
 {ANTI_KYOTSU_Q5_BLOCK}
 
 【形式 — 東大型を基本】
-技能の組み合わせ例: 空所補充(cloze)・下線部説明(underlined_explanation)・内容一致(content_match)・日本語記述(short_answer_ja)・並べ替え(ordering)
+技能の組み合わせ例: 空所補充(cloze)・内容説明(content_explanation)・理由説明(reason_explanation)・語法一致(word_usage_match)・表現の意味(expression_meaning)・英文一致(english_match)・下線部説明(underlined_explanation)・内容一致(content_match)・日本語記述(short_answer_ja)・並べ替え(ordering)
 - 参照過去問がある場合: その形式を**最優先で踏襲**
-- 参照がない場合: 上記技能を **5〜6問** 含める（単純な4択5問だけにしない）
+- 参照がない場合: 上記技能を **6〜8小問** 含める（単純な4択5問・共通テスト定型にしない）
+- **各小問の passageAnchor（本文中の当該箇所）が小問間で重複しないこと**
 
-各問: number, partLabel（A〜E可）, questionType, prompt（日本語）, choices（必要な問のみ）, passageForExam（空所 ___・下線 *語句* を含む試験用本文）
+各問: number, questionType, prompt（日本語）, passageAnchor（必須）, choices（必要な問のみ）, passageForExam（空所 ___・下線 *語句* を含む試験用本文）
 
 instructions には{uni}の過去問に近い冒頭指示を日本語で書く。
 

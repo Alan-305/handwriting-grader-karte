@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -22,6 +23,8 @@ from app.ai.prompts.universities.registry import (
 )
 from app.services.university_context_service import UniversityContextService
 from app.ai.schemas.q5_generation import (
+    Q5_MAX_SUB_QUESTIONS,
+    Q5_MIN_SUB_QUESTIONS,
     Q5PassageResult,
     Q5QuestionsResult,
     Q5SolverResult,
@@ -37,6 +40,21 @@ logger = logging.getLogger(__name__)
 Q5_DEFAULT_POINTS = 20
 
 _KYOTSU_TYPES = frozenset({"chronology", "story_map", "theme", "fact"})
+_CHOICE_TYPES_5 = frozenset({"word_usage_match", "expression_meaning"})
+_CHOICE_TYPES_6 = frozenset({"english_match"})
+
+
+def _anchor_tokens(text: str) -> set[str]:
+    return {w.lower() for w in re.findall(r"[a-z0-9]+", text) if len(w) >= 3}
+
+
+def _question_anchor_tokens(q: Q5SubQuestion) -> set[str]:
+    parts = [q.passage_anchor, q.underlined_text, q.target_word]
+    tokens: set[str] = set()
+    for part in parts:
+        if part.strip():
+            tokens |= _anchor_tokens(part)
+    return tokens
 
 
 def _exam_passage(questions: Q5QuestionsResult, fallback: str) -> str:
@@ -54,6 +72,8 @@ def _format_sub_question(q: Q5SubQuestion) -> list[str]:
     lines.append(q.prompt.strip())
     if q.underlined_text.strip():
         lines.append(f"【下線部】 {q.underlined_text.strip()}")
+    if q.target_word.strip():
+        lines.append(f"【対象語】 {q.target_word.strip()}")
     if q.char_limit_ja:
         lines.append(f"（{q.char_limit_ja}字以内の日本語で答えよ）")
     if q.select_count:
@@ -115,6 +135,20 @@ def format_solver_answers_for_teacher(solver: Q5SolverResult) -> str:
         else:
             lines.append(f"問{a.number}: {a.choice.upper()} — {a.brief_reason}")
     return "\n".join(lines)
+
+
+def _anchors_overlap(a: Q5SubQuestion, b: Q5SubQuestion) -> bool:
+    text_a = a.passage_anchor.strip().lower()
+    text_b = b.passage_anchor.strip().lower()
+    if text_a and text_b and (text_a in text_b or text_b in text_a):
+        return True
+    tok_a = _question_anchor_tokens(a)
+    tok_b = _question_anchor_tokens(b)
+    if not tok_a or not tok_b:
+        return False
+    overlap = tok_a & tok_b
+    smaller = min(len(tok_a), len(tok_b))
+    return len(overlap) >= 4 and len(overlap) / smaller >= 0.6
 
 
 class QuestionQ5Service:
@@ -199,7 +233,7 @@ class QuestionQ5Service:
             "type": "english",
             "answerFormat": "composite",
             "notes": (
-                f"{uni_name} 第5問（東大型: 空所・下線・記述・並べ替え）。"
+                f"{uni_name} 第5問（東大型: 小問6〜8・多技能組合せ）。"
                 f" テーマ: {passage.theme_summary or '—'}"
             ),
             "referenceExamples": [],
@@ -256,11 +290,23 @@ class QuestionQ5Service:
             if kyotsu_hits:
                 fix_issues = (
                     f"共通テスト型の設問タイプ {kyotsu_hits} が含まれています。"
-                    "東大第5問形式（cloze, underlined_explanation, content_match, "
-                    "short_answer_ja, ordering）に作り直してください。"
+                    "東大第5問形式（cloze, content_explanation, reason_explanation, "
+                    "word_usage_match, expression_meaning, english_match, "
+                    "underlined_explanation, content_match, short_answer_ja, ordering）"
+                    "に作り直してください。"
                 )
                 retried = attempt < max_attempts - 1
                 if retried:
+                    continue
+
+            structural = self._structural_issues(questions)
+            if structural:
+                fix_issues = "; ".join(structural)
+                retried = attempt < max_attempts - 1
+                if retried:
+                    logger.info(
+                        "Q5 structural retry (attempt %s): %s", attempt + 1, fix_issues
+                    )
                     continue
 
             exam_body = _exam_passage(questions, passage)
@@ -274,9 +320,11 @@ class QuestionQ5Service:
                 response_schema=Q5SolverResult,
                 max_output_tokens=4096,
             )
-            if solver.passed and not solver.issues:
+            all_issues = list(solver.issues) + structural
+            if solver.passed and not all_issues:
+                solver.issues = []
                 return questions, solver, retried
-            fix_issues = "; ".join(solver.issues) or solver.summary
+            fix_issues = "; ".join(all_issues) or solver.summary
             retried = attempt < max_attempts - 1
             logger.info("Q5 solver requested retry (attempt %s): %s", attempt + 1, fix_issues)
 
@@ -284,10 +332,38 @@ class QuestionQ5Service:
         return questions, solver, retried
 
     @staticmethod
+    def _structural_issues(questions: Q5QuestionsResult) -> list[str]:
+        issues: list[str] = []
+        count = len(questions.questions)
+        if count < Q5_MIN_SUB_QUESTIONS or count > Q5_MAX_SUB_QUESTIONS:
+            issues.append(
+                f"小問数が {Q5_MIN_SUB_QUESTIONS}〜{Q5_MAX_SUB_QUESTIONS} ではない（{count}個）"
+            )
+
+        for q in questions.questions:
+            if not q.passage_anchor.strip():
+                issues.append(f"問{q.number}: passageAnchor が空")
+            qtype = q.question_type.lower()
+            if qtype in _CHOICE_TYPES_5 and len(q.choices) != 5:
+                issues.append(f"問{q.number}: {qtype} は選択肢5つ(a〜e)が必要")
+            if qtype in _CHOICE_TYPES_6 and len(q.choices) != 6:
+                issues.append(f"問{q.number}: {qtype} は選択肢6つ(a〜f)が必要")
+            if qtype == "word_usage_match" and not q.target_word.strip():
+                issues.append(f"問{q.number}: word_usage_match に targetWord が必要")
+
+        numbered = list(questions.questions)
+        for i, qa in enumerate(numbered):
+            for qb in numbered[i + 1 :]:
+                if _anchors_overlap(qa, qb):
+                    issues.append(f"問{qa.number}と問{qb.number}の本文参照箇所が重複")
+        return issues
+
+    @staticmethod
     def _default_anticipated_mistakes() -> list[str]:
         return [
             "空所補充で文脈・コロケーションを無視して語形だけで選ぶ",
-            "下線部の比喩・含みを読み取らず字面だけで答える",
+            "下線部・表現の比喩・含みを読み取らず字面だけで答える",
+            "語法一致・英文一致で本文の該当箇所を特定せずに選ぶ",
             "日本語記述で字数を超えたり、本文にない憶測を書く",
         ]
 

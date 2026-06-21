@@ -10,6 +10,23 @@ class Q5PassageResult(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+Q5_MIN_SUB_QUESTIONS = 6
+Q5_MAX_SUB_QUESTIONS = 8
+
+Q5_QUESTION_TYPES = (
+    "cloze",
+    "content_explanation",
+    "reason_explanation",
+    "word_usage_match",
+    "expression_meaning",
+    "english_match",
+    "underlined_explanation",
+    "content_match",
+    "short_answer_ja",
+    "ordering",
+)
+
+
 class Q5ChoiceItem(BaseModel):
     label: str
     text: str
@@ -21,11 +38,23 @@ class Q5SubQuestion(BaseModel):
     question_type: str = Field(
         alias="questionType",
         description=(
-            "cloze|underlined_explanation|content_match|short_answer_ja|ordering "
+            "cloze|content_explanation|reason_explanation|word_usage_match|"
+            "expression_meaning|english_match|underlined_explanation|content_match|"
+            "short_answer_ja|ordering "
             "（共通テスト型 chronology/story_map/theme は不可）"
         ),
     )
     prompt: str
+    passage_anchor: str = Field(
+        default="",
+        alias="passageAnchor",
+        description="本文中の当該箇所・根拠フレーズ（小問間で重複させない）",
+    )
+    target_word: str = Field(
+        default="",
+        alias="targetWord",
+        description="word_usage_match で問う語",
+    )
     choices: list[Q5ChoiceItem] = Field(default_factory=list)
     underlined_text: str = Field(default="", alias="underlinedText")
     char_limit_ja: int | None = Field(default=None, alias="charLimitJa")
