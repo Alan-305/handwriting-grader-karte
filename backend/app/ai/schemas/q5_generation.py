@@ -34,7 +34,11 @@ class Q5ChoiceItem(BaseModel):
 
 class Q5SubQuestion(BaseModel):
     number: int
-    part_label: str = Field(default="", alias="partLabel")
+    part_label: str = Field(
+        default="",
+        alias="partLabel",
+        description="小問記号 A, B, C …（表示は (A)(B)(C)）",
+    )
     question_type: str = Field(
         alias="questionType",
         description=(
@@ -66,7 +70,7 @@ class Q5SubQuestion(BaseModel):
     blank_labels: list[str] = Field(
         default_factory=list,
         alias="blankLabels",
-        description="空所補充で (21)(22) 等のラベル",
+        description="空所補充の小問ラベル（(A)(B) 形式。試験番号 (21) は使わない）",
     )
 
     model_config = {"populate_by_name": True}

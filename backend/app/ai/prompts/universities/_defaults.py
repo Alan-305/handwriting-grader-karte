@@ -83,17 +83,19 @@ def default_q5_questions_system(university_name: str) -> str:
 - 参照過去問がある場合: その形式を**最優先で踏襲**
 - 参照がない場合: 上記技能を **6〜8小問** 含める（単純な4択5問・共通テスト定型にしない）
 - **各小問の passageAnchor（本文中の当該箇所）が小問間で重複しないこと**
+- 小問記号は **(A)(B)(C)…** を用い、(21)(22) 等は使わない
 
-各問: number, questionType, prompt（日本語）, passageAnchor（必須）, choices（必要な問のみ）, passageForExam（空所 ___・下線 *語句* を含む試験用本文）
+各問: number, partLabel（A〜H）, questionType, prompt（日本語）, passageAnchor（必須）, choices（必要な問のみ）
+passageForExam は必ず空文字。下線は underlinedText、空所は blankLabels に (A) 形式。
 
 instructions には{uni}の過去問に近い冒頭指示を日本語で書く。
 
 出力 JSON のみ:
 {{
   "instructions": "...",
-  "passageForExam": "...",
+  "passageForExam": "",
   "questions": [
-    {{"number": 1, "partLabel": "A", "questionType": "cloze", "prompt": "...", "choices": []}}
+    {{"number": 1, "partLabel": "A", "questionType": "cloze", "prompt": "...", "blankLabels": ["(A)"], "choices": []}}
   ]
 }}"""
 

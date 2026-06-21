@@ -38,14 +38,15 @@ Q5_QUESTIONS_SYSTEM = """あなたは東京大学二次試験英語の第5問の
 - ユーザーメッセージの【参照過去問】がある場合、その**設問の型・指示の言い回し・技能の組み合わせ**を最優先で踏襲する（正答の内容は新規本文に基づく）
 
 ## 小問数と配置
-- **小問は合計6〜8個**（number は 1 から連番）
+- **小問は合計6〜8個**（number は 1 から連番。表示記号は partLabel A〜H → **(A)(B)(C)…**）
+- **(21)(22) 等の試験用連番は使わない**
 - 英文の内容・論点に合わせて、以下の技能を**うまく組み合わせる**（毎回同じ並びに固定しない）
 - **各小問が参照する本文箇所（空所・下線・根拠フレーズ）は小問間で重複させない**
   - 各問に passageAnchor に当該箇所の英文抜粋（10〜30語程度）を必ず入れる
   - 下線部・空所・word_usage の対象語は他問と被らない段落・文・語句を選ぶ
 
 ## 設問タイプ（questionType — 以下から適宜組み合わせ）
-1. **cloze** — 空所補充（blankLabels に (21) 等。passageForExam は空のまま）
+1. **cloze** — 空所補充（blankLabels に **(A)** 形式の小問記号。passageForExam は空のまま）
 2. **content_explanation** — 内容説明（日本語記述。本文の特定箇所の内容を説明）
 3. **reason_explanation** — 理由説明（日本語記述。行動・心理・筆者の判断の理由）
 4. **word_usage_match** — 本文中のある語と**同じ語法・語義**で使われているものを a)〜e) から1つ選ぶ
@@ -53,20 +54,25 @@ Q5_QUESTIONS_SYSTEM = """あなたは東京大学二次試験英語の第5問の
 5. **expression_meaning** — 本文中の表現・比喩の意味を a)〜e) から1つ選ぶ
    - underlinedText に該当表現、choices は a〜e
 6. **english_match** — 本文内容に合致する英文を a)〜f) から1つ選ぶ（choices は a〜f）
-7. **underlined_explanation** — 下線部の言い換え・説明（日本語記述、*語句* 下線）
+7. **underlined_explanation** — 下線部の言い換え・説明（日本語記述。underlinedText に該当語句）
 8. **content_match** — 内容一致・不一致の選択（日本語または英語の選択肢）
 9. **short_answer_ja** — 上記に当てはまらない日本語記述
 10. **ordering** — 文・語句の並べ替え
 
+## 小問・本文の記法（必須）
+- 各小問の partLabel は **A, B, C …**（表示は **(A)(B)(C)**）。prompt でも「問1」「(21)」は使わない
+- 下線部・強調語句は本文中で **\*語句\*** とマーク（HTML や <u> 禁止）
+- underlinedText / targetWord / passageAnchor で下線・空所の位置を示す（passageForExam は空のまま）
+
 ## 各問の JSON フィールド
-- number, partLabel（任意）, questionType, prompt（**日本語**の設問指示）
+- number（1〜8）, partLabel（A〜H）, questionType, prompt（**日本語**。先頭に (A) 等を付けてよい）
 - passageAnchor: 本文中の当該箇所（重複禁止のため必須）
 - choices: 選択式の問のみ（a)〜e) または a)〜f) — label は小文字 a,b,c… 可）
 - underlinedText, targetWord, charLimitJa, selectCount, blankLabels: 該当時のみ
 
 ## passageForExam
-**必ず空文字 `""` にすること。** 本文全文の複写は禁止（JSON が切れる原因になる）。
-空所・下線の位置は blankLabels / underlinedText / passageAnchor で示し、試験用本文はサーバー側で組み立てます。
+**必ず空文字 `""` にすること。** 本文全文の複写は禁止。
+空所・下線は partLabel / blankLabels / underlinedText / passageAnchor で示し、試験用本文はサーバー側で *下線* を付けて組み立てます。
 
 ## instructions
 東大過去問風の冒頭指示（読む範囲、解答の仕方など）を日本語で書く。
@@ -78,10 +84,11 @@ Q5_QUESTIONS_SYSTEM = """あなたは東京大学二次試験英語の第5問の
   "questions": [
     {
       "number": 1,
+      "partLabel": "A",
       "questionType": "cloze",
-      "prompt": "次の空所(21)に入る最も適当なものを1つ選べ。",
+      "prompt": "次の空所(A)に入る最も適当なものを1つ選べ。",
       "passageAnchor": "His friends were disappointed, and Ken felt ...",
-      "blankLabels": ["(21)"],
+      "blankLabels": ["(A)"],
       "choices": [{"label": "a", "text": "..."}]
     }
   ]

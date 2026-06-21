@@ -573,7 +573,7 @@ class QuestionDesignService:
             if mapped in ("english", "japanese", "symbol"):
                 grading_type = mapped
 
-        return {
+        data = {
             "order": order,
             "type": grading_type,
             "prompt": draft.get("prompt", ""),
@@ -583,6 +583,63 @@ class QuestionDesignService:
             "createdAt": datetime.now(timezone.utc),
             "updatedAt": datetime.now(timezone.utc),
         }
+        pipeline = draft.get("generationPipeline")
+        if pipeline:
+            data["generationPipeline"] = pipeline
+        if pipeline == "q5":
+            data = self._enrich_q5_draft_question(data, draft, order)
+        return data
+
+    @staticmethod
+    def _q5_sub_answer_format(question_type: str) -> str:
+        if question_type.lower() in {
+            "content_explanation",
+            "reason_explanation",
+            "underlined_explanation",
+            "short_answer_ja",
+        }:
+            return "japanese_grid"
+        return "short"
+
+    def _enrich_q5_draft_question(self, base: dict, draft: dict, order: int) -> dict:
+        sub_questions = (draft.get("generationArtifacts") or {}).get("subQuestions") or []
+        if not sub_questions:
+            return base
+
+        parts: list[dict] = []
+        base_y = 50 + (order - 1) * 140
+        for i, sq in enumerate(sorted(sub_questions, key=lambda x: int(x.get("number") or 0))):
+            letter = str(sq.get("partLabel") or chr(65 + i)).upper().strip("()")
+            label = f"({letter})"
+            fmt = self._q5_sub_answer_format(str(sq.get("questionType") or ""))
+            part: dict = {
+                "label": label,
+                "answerFormat": fmt,
+                "modelAnswer": "",
+                "cropRegion": {
+                    "x": 50,
+                    "y": base_y + i * 90,
+                    "width": 400,
+                    "height": 100,
+                },
+            }
+            if fmt == "short":
+                part["formatOptions"] = {
+                    "symbolTableCount": 5,
+                    "symbolTableHeader": "alpha",
+                }
+            elif fmt == "japanese_grid":
+                part["formatOptions"] = {
+                    "gridRows": 5,
+                    "gridCols": 20,
+                    "charLimit": int(sq.get("charLimitJa") or 80),
+                }
+            parts.append(part)
+
+        base["answerFormat"] = "composite"
+        base["partLabelScheme"] = "alpha"
+        base["answerParts"] = parts
+        return base
 
     def _mark_draft_promoted(
         self,

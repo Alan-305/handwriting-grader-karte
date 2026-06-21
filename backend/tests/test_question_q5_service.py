@@ -22,13 +22,14 @@ def test_assemble_q5_prompt_includes_passage_and_questions():
     )
     questions = Q5QuestionsResult(
         instructions="次の英文を読み、答えよ。",
-        passageForExam="Exam passage with *ashamed*.",
+        passageForExam="",
         questions=[
             Q5SubQuestion(
                 number=1,
                 partLabel="C",
                 questionType="content_match",
                 prompt="内容と一致するものを1つ選べ。",
+                passageAnchor="unique anchor phrase here",
                 choices=[
                     Q5ChoiceItem(label="A", text="Cancelled"),
                     Q5ChoiceItem(label="B", text="Won"),
@@ -38,13 +39,18 @@ def test_assemble_q5_prompt_includes_passage_and_questions():
             ),
         ],
     )
+    from app.services.q5_prompt_markup import normalize_q5_questions
+
+    normalize_q5_questions(questions)
     prompt = assemble_q5_prompt(
         instructions=questions.instructions,
         passage=passage.passage,
         questions=questions,
     )
-    assert "Exam passage with" in prompt
-    assert "問1" in prompt
+    assert "Story body here." in prompt
+    assert "(A)" in prompt
+    assert "問1" not in prompt
+    assert "(21)" not in prompt
     assert "A. Cancelled" in prompt
 
 

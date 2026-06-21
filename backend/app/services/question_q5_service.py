@@ -33,6 +33,11 @@ from app.ai.schemas.q5_generation import (
 )
 from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.question_design_service import QuestionDesignService, format_type_label
+from app.services.q5_prompt_markup import (
+    apply_q5_passage_markup,
+    normalize_q5_questions,
+    q5_display_label,
+)
 from app.services.question_prompt_markup import normalize_prompt_markup
 
 logger = logging.getLogger(__name__)
@@ -67,27 +72,22 @@ def _normalize_questions_result(questions: Q5QuestionsResult, source_passage: st
 
 def _exam_passage(questions: Q5QuestionsResult, fallback: str) -> str:
     if questions.passage_for_exam.strip():
-        return questions.passage_for_exam.strip()
-    return fallback.strip()
+        return normalize_prompt_markup(questions.passage_for_exam.strip())
+    return apply_q5_passage_markup(fallback.strip(), questions.questions)
 
 
 def _format_sub_question(q: Q5SubQuestion) -> list[str]:
     lines: list[str] = []
-    label = f"問{q.number}"
-    if q.part_label.strip():
-        label += f"（{q.part_label.strip()}）"
-    lines.append(label)
+    lines.append(q5_display_label(q))
     lines.append(q.prompt.strip())
     if q.underlined_text.strip():
-        lines.append(f"【下線部】 {q.underlined_text.strip()}")
+        lines.append(f"【下線部】*{q.underlined_text.strip()}*")
     if q.target_word.strip():
         lines.append(f"【対象語】 {q.target_word.strip()}")
     if q.char_limit_ja:
         lines.append(f"（{q.char_limit_ja}字以内の日本語で答えよ）")
     if q.select_count:
         lines.append(f"（{q.select_count}個選べ）")
-    if q.blank_labels:
-        lines.append("空所: " + ", ".join(q.blank_labels))
     for ch in q.choices:
         lines.append(f"  {ch.label}. {ch.text.strip()}")
     return lines
@@ -116,14 +116,21 @@ def assemble_q5_prompt(
     return normalize_prompt_markup(f"{header}\n\n{body}\n\n{qs}")
 
 
+def _q5_answer_label(number: int) -> str:
+    if 1 <= number <= 26:
+        return f"({chr(64 + number)})"
+    return f"({number})"
+
+
 def assemble_q5_model_answer(pack: Q5TeacherPackResult) -> str:
     parts: list[str] = [pack.model_answer_summary.strip(), ""]
     for ex in sorted(pack.explanations, key=lambda x: x.number):
+        label = _q5_answer_label(ex.number)
         ans = ex.correct_choice.strip().upper()
         if ex.answer_text.strip():
-            parts.append(f"問{ex.number} {ex.answer_text.strip()}")
+            parts.append(f"{label} {ex.answer_text.strip()}")
         elif ans:
-            parts.append(f"問{ex.number} {ans}")
+            parts.append(f"{label} {ans}")
         parts.append(ex.explanation_ja.strip())
         parts.append("")
     if pack.vocabulary_list:
@@ -138,10 +145,11 @@ def assemble_q5_model_answer(pack: Q5TeacherPackResult) -> str:
 def format_solver_answers_for_teacher(solver: Q5SolverResult) -> str:
     lines = []
     for a in sorted(solver.answers, key=lambda x: x.number):
+        label = _q5_answer_label(a.number)
         if a.answer_text.strip():
-            lines.append(f"問{a.number}: {a.answer_text.strip()} — {a.brief_reason}")
+            lines.append(f"{label}: {a.answer_text.strip()} — {a.brief_reason}")
         else:
-            lines.append(f"問{a.number}: {a.choice.upper()} — {a.brief_reason}")
+            lines.append(f"{label}: {a.choice.upper()} — {a.brief_reason}")
     return "\n".join(lines)
 
 
@@ -291,6 +299,7 @@ class QuestionQ5Service:
                 max_output_tokens=16384,
             )
             _normalize_questions_result(questions, passage)
+            normalize_q5_questions(questions)
             kyotsu_hits = [
                 q.question_type.lower()
                 for q in questions.questions
