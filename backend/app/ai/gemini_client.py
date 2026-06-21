@@ -9,6 +9,7 @@ from google.generativeai.types import GenerationConfig, HarmBlockThreshold, Harm
 from PIL import Image
 from pydantic import BaseModel
 
+from app.ai.gemini_schema import gemini_response_schema
 from app.ai.retry import parse_json_response, with_retry
 from app.utils.image_encoding import prepare_image_for_gemini
 
@@ -513,13 +514,21 @@ class GeminiAnalysisClient:
             return self._mock_response(response_schema)
 
         prompt = f"{system}\n\n{user_text}\n\nRespond with valid JSON only."
+        schema_dict = gemini_response_schema(response_schema)
         gen_cfg = GenerationConfig(
             temperature=0.1,
             max_output_tokens=max_output_tokens,
+            response_mime_type="application/json",
+            response_schema=schema_dict,
         )
         active_model = self._model_for(
             normalize_gemini_model(model_name or self.model_name),
             system_instruction=system,
+        )
+
+        plain_cfg = GenerationConfig(
+            temperature=0.1,
+            max_output_tokens=max_output_tokens,
         )
 
         def call():
@@ -534,11 +543,26 @@ class GeminiAnalysisClient:
                 for raw in images_jpeg:
                     prepared = prepare_image_for_gemini(raw)
                     parts.append(Image.open(BytesIO(prepared)))
-            response = self._generate_content(
-                parts,
-                model=active_model,
-                generation_config=gen_cfg,
-            )
+            try:
+                response = self._generate_content(
+                    parts,
+                    model=active_model,
+                    generation_config=gen_cfg,
+                )
+            except Exception as exc:
+                msg = str(exc).lower()
+                if "response_schema" in msg or "response_mime_type" in msg:
+                    logger.warning(
+                        "Gemini JSON schema mode failed, falling back to plain JSON prompt: %s",
+                        exc,
+                    )
+                    response = self._generate_content(
+                        parts,
+                        model=active_model,
+                        generation_config=plain_cfg,
+                    )
+                else:
+                    raise
             text = _extract_response_text(response) or "{}"
             logger.info(
                 "Gemini analysis completed (model=%s)",

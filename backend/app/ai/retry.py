@@ -70,13 +70,27 @@ def extract_json_payload(text: str) -> str:
     return cleaned
 
 
+def repair_json_payload(payload: str) -> str:
+    """LLM が返しがちな軽微な JSON 構文エラーを修復する。"""
+    cleaned = payload.strip()
+    cleaned = re.sub(r",(\s*[}\]])", r"\1", cleaned)
+    return cleaned
+
+
 def parse_json_response(text: str, schema: type[T]) -> T:
     payload = extract_json_payload(text)
-    try:
-        data: dict[str, Any] = json.loads(payload)
-    except json.JSONDecodeError as exc:
-        logger.warning("JSON parse failed: %s | raw=%r", exc, text[:500])
-        raise ValueError(f"AI 応答の JSON が不正です: {exc}") from exc
+    last_exc: json.JSONDecodeError | None = None
+    for candidate in (payload, repair_json_payload(payload)):
+        try:
+            data: dict[str, Any] = json.loads(candidate)
+            break
+        except json.JSONDecodeError as exc:
+            last_exc = exc
+            data = None
+    else:
+        assert last_exc is not None
+        logger.warning("JSON parse failed: %s | raw=%r", last_exc, text[:500])
+        raise ValueError(f"AI 応答の JSON が不正です: {last_exc}") from last_exc
 
     try:
         return schema.model_validate(data)
