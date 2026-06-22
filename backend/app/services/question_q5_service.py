@@ -32,7 +32,11 @@ from app.ai.schemas.q5_generation import (
     Q5SubQuestion,
     Q5TeacherPackResult,
 )
-from app.ai.schemas.q5_generation_claude import Q5QuestionsClaudeResult, Q5TeacherPackClaudeResult
+from app.ai.schemas.q5_generation_claude import (
+    Q5PassageClaudeResult,
+    Q5QuestionsClaudeResult,
+    Q5TeacherPackClaudeResult,
+)
 from app.services.q5_scoring import (
     Q5_JA_EXPLANATION_TYPES,
     choice_design_issues,
@@ -57,6 +61,39 @@ from app.services.question_prompt_markup import normalize_prompt_markup
 logger = logging.getLogger(__name__)
 
 Q5_DEFAULT_POINTS = 20
+Q5_PASSAGE_WORD_MIN = 650
+Q5_PASSAGE_WORD_MAX = 950
+_PASSAGE_END_RE = re.compile(r'[.!?]["\']?\s*$')
+
+
+def english_word_count(text: str) -> int:
+    return len(re.findall(r"[A-Za-z]+(?:'[A-Za-z]+)?", text))
+
+
+def passage_completeness_issues(passage: str) -> list[str]:
+    """本文が途中で切れていないか・語数が東大第5問水準かを検査。"""
+    body = (passage or "").strip()
+    issues: list[str] = []
+    if not body:
+        return ["本文が空"]
+    words = english_word_count(body)
+    if words < Q5_PASSAGE_WORD_MIN:
+        issues.append(f"語数不足（{words}語 < 目安{Q5_PASSAGE_WORD_MIN}語）")
+    if words > Q5_PASSAGE_WORD_MAX:
+        issues.append(f"語数超過（{words}語 > 目安{Q5_PASSAGE_WORD_MAX}語）")
+    if not _PASSAGE_END_RE.search(body):
+        issues.append("文末が完結していない（句点で終わる完全な最終文が必要）")
+    return issues
+
+
+def passage_from_claude(raw: Q5PassageClaudeResult) -> Q5PassageResult:
+    text = raw.passage.strip()
+    return Q5PassageResult(
+        title="",
+        passage=text,
+        wordCount=english_word_count(text),
+        themeSummary=raw.theme_summary.strip(),
+    )
 
 _KYOTSU_TYPES = frozenset({"chronology", "story_map", "theme", "fact"})
 _CHOICE_TYPES_5 = frozenset({"word_usage_match", "expression_meaning"})
@@ -242,6 +279,58 @@ class QuestionQ5Service:
     def _drafts_collection(self, teacher_id: str):
         return self.design._drafts_collection(teacher_id)
 
+    def _generate_passage(
+        self,
+        *,
+        university_slug: str,
+        uni_name: str,
+        topic: str,
+        difficulty: str,
+        reference_context: str,
+        max_attempts: int = 3,
+    ) -> Q5PassageResult:
+        fix_hint = ""
+        last_issues: list[str] = []
+
+        for attempt in range(max_attempts):
+            user_text = build_q5_passage_user_prompt(
+                topic_hint=topic,
+                difficulty=difficulty,
+                university_name=uni_name,
+                reference_context=reference_context,
+            )
+            if fix_hint:
+                user_text = f"{user_text}\n\n【前回不合格 — 必ず修正】\n{fix_hint}"
+
+            raw: Q5PassageClaudeResult = self.llm.complete_structured(
+                system=build_q5_passage_system(university_slug, uni_name),
+                user_text=user_text,
+                response_schema=Q5PassageClaudeResult,
+                max_output_tokens=GEMINI_MAX_OUTPUT_STANDARD,
+            )
+            passage = passage_from_claude(raw)
+            issues = passage_completeness_issues(passage.passage)
+            if not issues:
+                return passage
+
+            last_issues = issues
+            fix_hint = (
+                "英文本文は **700〜900語** の完結した物語・随筆にすること。"
+                "最後は必ず句点（. ! ?）で終わる**完全な最終文**まで書き切ること。"
+                f"（不合格理由: {'; '.join(issues)}）"
+            )
+            logger.info(
+                "Q5 passage retry (attempt %s): %s",
+                attempt + 1,
+                "; ".join(issues),
+            )
+
+        detail = "; ".join(last_issues) or "本文が未完成"
+        raise RuntimeError(
+            f"第5問の英文本文が完成しませんでした（{detail}）。"
+            " もう一度生成してください。"
+        )
+
     def run_pipeline(
         self,
         *,
@@ -263,16 +352,12 @@ class QuestionQ5Service:
         )
         topic = topic_hint.strip()
 
-        passage: Q5PassageResult = self.llm.complete_structured(
-            system=build_q5_passage_system(university_slug, uni_name),
-            user_text=build_q5_passage_user_prompt(
-                topic_hint=topic,
-                difficulty=difficulty,
-                university_name=uni_name,
-                reference_context=ref_context,
-            ),
-            response_schema=Q5PassageResult,
-            max_output_tokens=8192,
+        passage = self._generate_passage(
+            university_slug=university_slug,
+            uni_name=uni_name,
+            topic=topic,
+            difficulty=difficulty,
+            reference_context=ref_context,
         )
 
         questions, solver, retried = self._questions_with_evaluation(

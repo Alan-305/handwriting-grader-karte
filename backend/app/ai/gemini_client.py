@@ -241,6 +241,11 @@ _MOCK_PAYLOADS: dict[str, dict] = {
         "violations": [],
         "fabricationRisk": [],
     },
+    "Q5PassageClaudeResult": {
+        "passage": ("When Ken joined the volunteer club he learned from failure and kept trying. " * 65).strip()
+        + " He finally understood what the experience had meant for him.",
+        "themeSummary": "成長と内省",
+    },
     "Q5PassageResult": {
         "title": "A Second Chance",
         "passage": (

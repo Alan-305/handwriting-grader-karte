@@ -11,7 +11,22 @@ from app.services.question_q5_service import (
     QuestionQ5Service,
     assemble_q5_model_answer,
     assemble_q5_prompt,
+    passage_completeness_issues,
 )
+
+
+def test_passage_completeness_issues_detects_truncation():
+    truncated = "He filed his piece. It was well received. The editors praised his"
+    issues = passage_completeness_issues(truncated)
+    assert any("文末" in i for i in issues)
+    assert any("語数" in i for i in issues)
+
+
+def test_passage_completeness_issues_accepts_complete_passage():
+    words = "word " * 720
+    complete = f"{words.strip()}. He finally understood what the bowl had meant."
+    issues = passage_completeness_issues(complete)
+    assert issues == []
 
 
 def test_assemble_q5_prompt_includes_passage_and_questions():

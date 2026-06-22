@@ -11,6 +11,15 @@ def _coerce_str_list(value: object) -> list[str]:
     return []
 
 
+class Q5PassageClaudeResult(BaseModel):
+    """本文のみ（メタデータ最小化で出力トークンを本文に集中）。"""
+
+    passage: str
+    theme_summary: str = Field(default="", alias="themeSummary")
+
+    model_config = {"populate_by_name": True}
+
+
 class Q5SubQuestionClaude(BaseModel):
     """設問1件。choices は \"a: 英文\" 形式の文字列配列（オブジェクト配列にしない）。"""
 
