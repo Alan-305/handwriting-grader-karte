@@ -106,6 +106,12 @@ class GenerationStructuredClient:
                         continue
 
                     if self._gemini.model and _should_fallback_to_gemini(exc):
+                        if _is_schema_too_complex(exc):
+                            raise RuntimeError(
+                                "Claude の structured output スキーマが複雑すぎるため生成できません。"
+                                " 軽量スキーマへの切り替えが必要です。"
+                                f"（{exc}）"
+                            ) from exc
                         logger.warning(
                             "Anthropic generation failed (%s); falling back to Gemini",
                             exc,

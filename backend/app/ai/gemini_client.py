@@ -343,6 +343,33 @@ _MOCK_PAYLOADS: dict[str, dict] = {
         "passage": _KEN_Q5_PASSAGE_MOCK.strip(),
         "themeSummary": "成長と内省",
     },
+    "Q2BProblemClaudeResult": {
+        "theme": "異文化理解",
+        "genre": "エッセイ調",
+        "instructionJa": "以下の日本文の下線部を英訳せよ。",
+        "japanesePassage": (
+            "私は初めて海外に行ったとき、*言葉の壁*を越えるのが想像以上に難しいと感じた。"
+            "しかし*身振り手振り*で伝え合ううちに、相手の笑顔が少しずつ心をほぐしてくれた。"
+        ),
+        "underlinedSegmentsJa": ["言葉の壁", "身振り手振り"],
+        "sampleAnswers": [
+            "standard|解答例1（構文・熟語を活かした標準的な訳）|I felt that overcoming the language barrier was harder than I had imagined.",
+            "paraphrase|解答例2（より平易な単語でパラフレーズした柔軟な訳）|I found it more difficult than expected to get past the barrier of language.",
+        ],
+        "sourceNote": "mock",
+    },
+    "Q2BTeacherPackClaudeResult": {
+        "wakuyakuProcessJa": "日本語の比喩を英語の自然な表現に置き換え、主語・述語の対応を確認する。",
+        "grammarEssentialsJa": ["overcome O", "barrier は可算名詞"],
+        "segmentExplanations": [
+            "言葉の壁|「壁」を wall と直訳しがち|language barrier が自然",
+            "身振り手振り|body language と訳すと不自然|gestures and facial expressions",
+        ],
+        "badLiteralTranslations": [
+            "I crossed the wall of words.|wall は物理的な壁のイメージ|overcome the language barrier",
+        ],
+        "commonMistakesJa": ["barrier の冠詞忘れ", "比喩を逐語訳する"],
+    },
     "Q5PassageResult": {
         "title": "A Second Chance",
         "passage": (

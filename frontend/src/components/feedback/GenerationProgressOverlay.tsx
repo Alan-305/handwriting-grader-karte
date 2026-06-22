@@ -8,16 +8,25 @@ export type GenerationProgressState = {
   attempt?: number;
   maxAttempts?: number;
   issues?: string[];
+  provider?: string;
   log: string[];
 };
 
 const STAGE_LABELS: Record<string, string> = {
   pipeline: "準備",
+  problem: "問題文",
   passage: "英文本文",
   questions: "設問",
   solver: "妥当性検証",
   teacher_pack: "解答・解説",
+  validation: "検証",
   save: "下書き保存",
+};
+
+const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: "Claude",
+  gemini: "Gemini",
+  mock: "開発",
 };
 
 export function GenerationProgressOverlay({
@@ -30,6 +39,9 @@ export function GenerationProgressOverlay({
   if (!visible) return null;
 
   const stageLabel = progress.stage ? STAGE_LABELS[progress.stage] ?? progress.stage : null;
+  const providerLabel = progress.provider
+    ? PROVIDER_LABELS[progress.provider] ?? progress.provider
+    : null;
   const isRetry = progress.status === "retry";
   const showAttempt =
     progress.attempt != null &&
@@ -59,6 +71,11 @@ export function GenerationProgressOverlay({
               {showAttempt && (
                 <span className="font-ja text-xs text-slate-500">
                   {progress.attempt}/{progress.maxAttempts}回目
+                </span>
+              )}
+              {providerLabel && (
+                <span className="rounded-full bg-slate-100 px-3 py-1 font-ja text-xs text-slate-600">
+                  {providerLabel}
                 </span>
               )}
             </div>

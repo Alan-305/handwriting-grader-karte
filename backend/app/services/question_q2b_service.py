@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 
 from app.ai.generation_structured_client import GenerationStructuredClient
 from app.ai.prompts.question_generation_q2b import (
-    build_q2b_generation_user_prompt,
+    build_q2b_problem_user_prompt,
+    build_q2b_teacher_pack_user_prompt,
     build_q2b_validator_user_prompt,
 )
 from app.ai.prompts.universities.registry import (
@@ -17,10 +18,13 @@ from app.ai.prompts.universities.registry import (
     build_q2b_validator_system,
 )
 from app.ai.schemas.q2b_generation import Q2BGenerationResult, Q2BValidatorResult
+from app.ai.schemas.q2b_generation_claude import Q2BProblemClaudeResult, Q2BTeacherPackClaudeResult
 from app.generation_limits import (
-    GEMINI_MAX_OUTPUT_COMPREHENSIVE,
+    GEMINI_MAX_OUTPUT_STANDARD,
     GEMINI_MAX_OUTPUT_VALIDATOR,
 )
+from app.services.generation_progress import ProgressCallback, emit_progress, format_retry_message
+from app.services.q2b_claude_convert import merge_teacher_pack, problem_from_claude
 from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.question_design_service import QuestionDesignService
 from app.services.question_prompt_markup import has_underline_markup, normalize_prompt_markup
@@ -31,6 +35,13 @@ logger = logging.getLogger(__name__)
 
 Q2B_DEFAULT_POINTS = 20
 Q2B_PART_LABEL = "(B)"
+Q2B_GENERATION_MAX_ATTEMPTS = 3
+
+_PROVIDER_LABELS = {
+    "anthropic": "Claude (Sonnet)",
+    "gemini": "Gemini",
+    "mock": "開発モード",
+}
 
 _UNDERLINE_SEGMENT_RE = re.compile(r"\*([^*\n]+)\*")
 
@@ -134,6 +145,7 @@ class QuestionQ2BService:
         difficulty: str = "standard",
         university_slug: str = "todai",
         reference_years: list[int] | None = None,
+        on_progress: ProgressCallback | None = None,
     ) -> dict:
         uni_name = self.university_ctx.university_name(university_slug)
         ref_context = self.university_ctx.build_reference_context_for_major(
@@ -162,7 +174,8 @@ class QuestionQ2BService:
             university_slug=university_slug,
             university_name=uni_name,
             reference_context=ref_context,
-            max_attempts=3,
+            max_attempts=Q2B_GENERATION_MAX_ATTEMPTS,
+            on_progress=on_progress,
         )
 
         prompt = assemble_q2b_prompt(result=result)
@@ -216,29 +229,116 @@ class QuestionQ2BService:
         university_name: str,
         reference_context: str,
         max_attempts: int,
+        on_progress: ProgressCallback | None = None,
     ) -> tuple[Q2BGenerationResult, Q2BValidatorResult, bool]:
         retried = False
         validator: Q2BValidatorResult | None = None
         current: Q2BGenerationResult | None = None
         fix_hint = ""
+        provider = _PROVIDER_LABELS.get(self.llm.primary_provider, self.llm.primary_provider)
+
+        emit_progress(
+            on_progress,
+            {
+                "stage": "pipeline",
+                "status": "working",
+                "message": f"第2問(B)和文英訳の生成を開始します（{provider}）",
+                "provider": self.llm.primary_provider,
+            },
+        )
 
         for attempt in range(max_attempts):
-            user_text = build_q2b_generation_user_prompt(
-                topic_hint=topic_hint,
-                difficulty=difficulty,
-                university_name=university_name,
-                reference_context=reference_context,
+            emit_progress(
+                on_progress,
+                {
+                    "stage": "problem",
+                    "status": "working" if attempt == 0 else "retry",
+                    "message": (
+                        f"和文英訳の問題文を作成しています…（{provider}）"
+                        if attempt == 0
+                        else format_retry_message(
+                            stage="problem",
+                            attempt=attempt + 1,
+                            max_attempts=max_attempts,
+                            issues=[fix_hint] if fix_hint else [],
+                            stage_labels={"problem": "問題文"},
+                        )
+                    ),
+                    "attempt": attempt + 1,
+                    "max_attempts": max_attempts,
+                    "provider": self.llm.primary_provider,
+                },
             )
-            if fix_hint:
-                user_text += f"\n\n【前回の検証で指摘された点を必ず修正】\n{fix_hint}"
 
-            current = self.llm.complete_structured(
+            problem_raw: Q2BProblemClaudeResult = self.llm.complete_structured(
                 system=build_q2b_generation_system(university_slug, university_name),
-                user_text=user_text,
-                response_schema=Q2BGenerationResult,
-                max_output_tokens=GEMINI_MAX_OUTPUT_COMPREHENSIVE,
+                user_text=build_q2b_problem_user_prompt(
+                    topic_hint=topic_hint,
+                    difficulty=difficulty,
+                    university_name=university_name,
+                    reference_context=reference_context,
+                    fix_hint=fix_hint,
+                ),
+                response_schema=Q2BProblemClaudeResult,
+                max_output_tokens=GEMINI_MAX_OUTPUT_STANDARD,
             )
-            current.japanese_passage = normalize_prompt_markup(current.japanese_passage)
+            partial = problem_from_claude(problem_raw)
+            partial.japanese_passage = normalize_prompt_markup(partial.japanese_passage)
+
+            problem_issues = self._problem_only_issues(partial)
+            if problem_issues:
+                fix_hint = "; ".join(problem_issues)
+                retried = True
+                if attempt < max_attempts - 1:
+                    emit_progress(
+                        on_progress,
+                        {
+                            "stage": "problem",
+                            "status": "retry",
+                            "message": format_retry_message(
+                                stage="problem",
+                                attempt=attempt + 1,
+                                max_attempts=max_attempts,
+                                issues=problem_issues,
+                                stage_labels={"problem": "問題文"},
+                            ),
+                            "issues": problem_issues,
+                            "attempt": attempt + 1,
+                            "max_attempts": max_attempts,
+                        },
+                    )
+                    continue
+
+            emit_progress(
+                on_progress,
+                {
+                    "stage": "teacher_pack",
+                    "status": "working",
+                    "message": f"模範解答・解説を作成しています…（{provider}）",
+                    "provider": self.llm.primary_provider,
+                },
+            )
+
+            problem_block = format_q2b_for_validator(partial)
+            pack_raw: Q2BTeacherPackClaudeResult = self.llm.complete_structured(
+                system=build_q2b_generation_system(university_slug, university_name),
+                user_text=build_q2b_teacher_pack_user_prompt(
+                    problem_block=problem_block,
+                    fix_hint=fix_hint if not problem_issues else "",
+                ),
+                response_schema=Q2BTeacherPackClaudeResult,
+                max_output_tokens=GEMINI_MAX_OUTPUT_STANDARD,
+            )
+            current = merge_teacher_pack(partial, pack_raw)
+
+            emit_progress(
+                on_progress,
+                {
+                    "stage": "validation",
+                    "status": "working",
+                    "message": "ベテラン講師が妥当性を検証しています…",
+                },
+            )
 
             block = format_q2b_for_validator(current)
             validator = self.llm.complete_structured(
@@ -252,6 +352,14 @@ class QuestionQ2BService:
             all_issues = list(validator.issues) + structural
             if validator.passed and not structural:
                 validator.issues = []
+                emit_progress(
+                    on_progress,
+                    {
+                        "stage": "validation",
+                        "status": "complete",
+                        "message": "検証に合格しました",
+                    },
+                )
                 return current, validator, retried
 
             if attempt >= max_attempts - 1:
@@ -261,10 +369,42 @@ class QuestionQ2BService:
 
             fix_hint = "; ".join(all_issues) or validator.summary
             retried = True
+            emit_progress(
+                on_progress,
+                {
+                    "stage": "validation",
+                    "status": "retry",
+                    "message": format_retry_message(
+                        stage="validation",
+                        attempt=attempt + 1,
+                        max_attempts=max_attempts,
+                        issues=all_issues,
+                        stage_labels={"validation": "妥当性検証"},
+                    ),
+                    "issues": all_issues,
+                    "attempt": attempt + 1,
+                    "max_attempts": max_attempts,
+                },
+            )
             logger.info("Q2B validator retry (attempt %s): %s", attempt + 1, fix_hint)
 
         assert current is not None and validator is not None
         return current, validator, retried
+
+    @staticmethod
+    def _problem_only_issues(result: Q2BGenerationResult) -> list[str]:
+        issues: list[str] = []
+        passage = result.japanese_passage.strip()
+        if not passage:
+            issues.append("japanesePassage が空")
+        if not has_underline_markup(passage):
+            issues.append("japanesePassage に *...* 下線記法がない")
+        if len(result.sample_answers) != 2:
+            issues.append(f"解答例が2つではない（{len(result.sample_answers)}件）")
+        for i, ans in enumerate(result.sample_answers, start=1):
+            if not ans.english.strip():
+                issues.append(f"解答例{i}の english が空")
+        return issues
 
     @staticmethod
     def _structural_issues(result: Q2BGenerationResult) -> list[str]:
@@ -324,6 +464,7 @@ class QuestionQ2BService:
         topic_hint: str = "",
         difficulty: str = "standard",
         reference_years: list[int] | None = None,
+        on_progress: ProgressCallback | None = None,
     ) -> dict:
         slug, _meta = self.university_ctx.resolve_for_teacher(
             teacher_id=teacher_id,
@@ -331,12 +472,19 @@ class QuestionQ2BService:
             student_id=student_id,
             require=True,
         )
+
+        emit_progress(
+            on_progress,
+            {"stage": "save", "status": "working", "message": "下書きを保存しています…"},
+        )
+
         data = self.run_pipeline(
             teacher_id=teacher_id,
             topic_hint=topic_hint,
             difficulty=difficulty,
             university_slug=slug or "todai",
             reference_years=reference_years,
+            on_progress=on_progress,
         )
 
         batch_id = uuid.uuid4().hex[:12]
@@ -355,4 +503,9 @@ class QuestionQ2BService:
             "updatedAt": now,
         }
         _, ref = self._drafts_collection(teacher_id).add(doc)
-        return {**data, "id": ref.id, "batchId": batch_id}
+        result = {**data, "id": ref.id, "batchId": batch_id}
+        emit_progress(
+            on_progress,
+            {"stage": "save", "status": "complete", "message": "第2問(B)の生成が完了しました"},
+        )
+        return result

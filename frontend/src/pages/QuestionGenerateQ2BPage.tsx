@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
-import { LoadingOverlay } from "@/components/feedback/LoadingOverlay";
+import {
+  GenerationProgressOverlay,
+  type GenerationProgressState,
+} from "@/components/feedback/GenerationProgressOverlay";
 import { SafeForm } from "@/components/forms/SafeForm";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -11,14 +14,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePastExamUniversities } from "@/hooks/usePastExamUniversities";
 import { useStudents } from "@/hooks/useStudent";
 import { apiClient } from "@/lib/api-client";
+import { generateQ2BWithProgress } from "@/lib/generation-stream";
 import { primaryPastExamSlug } from "@/lib/resolve-university";
 import type { ExamYearSummary } from "@/types/api";
 
-const PIPELINE_STEPS = [
-  "和文英訳問題を作成中",
-  "妥当性を検証中",
-  "下書きを保存中",
-] as const;
+const INITIAL_PROGRESS: GenerationProgressState = {
+  message: "第2問(B)の生成を準備しています…",
+  log: [],
+};
 
 export function QuestionGenerateQ2BPage() {
   const { getIdToken } = useAuth();
@@ -35,7 +38,7 @@ export function QuestionGenerateQ2BPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [loadingYears, setLoadingYears] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [pipelineStep, setPipelineStep] = useState(0);
+  const [progress, setProgress] = useState<GenerationProgressState>(INITIAL_PROGRESS);
   const [error, setError] = useState<string | null>(null);
 
   const loadYears = useCallback(async () => {
@@ -89,41 +92,54 @@ export function QuestionGenerateQ2BPage() {
   const handleGenerate = async () => {
     setGenerating(true);
     setError(null);
-    setPipelineStep(0);
-
-    const stepTimer = window.setInterval(() => {
-      setPipelineStep((s) => Math.min(s + 1, PIPELINE_STEPS.length - 1));
-    }, 12000);
+    setProgress({
+      message: "第2問(B)の生成を開始しました…",
+      stage: "pipeline",
+      status: "start",
+      log: ["生成を開始しました"],
+    });
 
     const token = await getIdToken();
     if (!token) {
       setError("ログインが必要です");
       setGenerating(false);
-      window.clearInterval(stepTimer);
       return;
     }
 
     try {
-      const { draft } = await apiClient.generateQ2B(token, slug, {
-        referenceYears: selectedYears.length > 0 ? selectedYears : undefined,
-        difficulty,
-        topicHint: topicHint.trim(),
-        studentId: studentId || undefined,
-      });
+      const draft = await generateQ2BWithProgress(
+        token,
+        slug,
+        {
+          referenceYears: selectedYears.length > 0 ? selectedYears : undefined,
+          difficulty,
+          topicHint: topicHint.trim(),
+          studentId: studentId || undefined,
+        },
+        (event) => {
+          setProgress((prev) => ({
+            message: event.message,
+            stage: event.stage,
+            status: event.status,
+            attempt: event.attempt,
+            maxAttempts: event.maxAttempts,
+            issues: event.issues,
+            provider: event.provider,
+            log: [...prev.log, event.message].slice(-8),
+          }));
+        },
+      );
       navigate(draft.id ? `/question-drafts?focus=${draft.id}` : "/question-drafts");
     } catch (err) {
       setError(err instanceof Error ? err.message : "第2問(B)の生成に失敗しました");
     } finally {
-      window.clearInterval(stepTimer);
       setGenerating(false);
     }
   };
 
-  const loadingMessage = PIPELINE_STEPS[pipelineStep] ?? "考えてます";
-
   return (
     <div>
-      <LoadingOverlay visible={generating} message={loadingMessage} />
+      <GenerationProgressOverlay visible={generating} progress={progress} />
       <PageHeader
         title="第2問(B)の生成（和文英訳）"
         description="東大第2問(B)形式で、日本語短文の下線部（2〜3文）を英訳する問題と、標準訳・パラフレーズ訳・NG直訳解説を生成します。"
@@ -258,7 +274,7 @@ export function QuestionGenerateQ2BPage() {
 
           <Card className="border-blue-100 bg-blue-50/50 p-4">
             <p className="font-ja text-sm text-slate-700">
-              生成の流れ：①日本語+下線部+解答例2つ → ②直訳の罠・記法の検証 → ③下書き保存
+              生成の流れ：①日本語+下線部+解答例2つ → ②解説・NG直訳 → ③妥当性検証 → ④下書き保存（進捗はリアルタイム表示）
             </p>
           </Card>
 

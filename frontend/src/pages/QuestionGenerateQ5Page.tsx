@@ -15,7 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePastExamUniversities } from "@/hooks/usePastExamUniversities";
 import { useStudents } from "@/hooks/useStudent";
 import { apiClient } from "@/lib/api-client";
-import { generateQ5WithProgress } from "@/lib/q5-generation-stream";
+import { generateDraftWithProgress } from "@/lib/generation-stream";
 import { primaryPastExamSlug } from "@/lib/resolve-university";
 import type { ExamYearSummary } from "@/types/api";
 
@@ -111,9 +111,9 @@ export function QuestionGenerateQ5Page() {
     try {
       let draft;
       try {
-        draft = await generateQ5WithProgress(
+        draft = await generateDraftWithProgress(
           token,
-          slug,
+          `/api/universities/${slug}/generate-q5-stream`,
           {
             referenceYears: selectedYears.length > 0 ? selectedYears : undefined,
             difficulty,
@@ -128,9 +128,11 @@ export function QuestionGenerateQ5Page() {
               attempt: event.attempt,
               maxAttempts: event.maxAttempts,
               issues: event.issues,
+              provider: event.provider,
               log: [...prev.log, event.message].slice(-8),
             }));
           },
+          "第5問の生成",
         );
       } catch (streamErr) {
         const msg = streamErr instanceof Error ? streamErr.message : "";

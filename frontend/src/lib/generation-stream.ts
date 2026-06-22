@@ -10,7 +10,7 @@ function resolveApiUrl(path: string): string {
   return `${base}${normalizedPath}`;
 }
 
-export type Q5StreamProgressEvent = {
+export type GenerationStreamProgressEvent = {
   type: "progress";
   stage: string;
   status: string;
@@ -18,32 +18,40 @@ export type Q5StreamProgressEvent = {
   attempt?: number;
   maxAttempts?: number;
   issues?: string[];
+  provider?: string;
 };
 
-type Q5StreamCompleteEvent = {
+type GenerationStreamCompleteEvent = {
   type: "complete";
   draft: GeneratedQuestionDraft;
 };
 
-type Q5StreamErrorEvent = {
+type GenerationStreamErrorEvent = {
   type: "error";
   error: string;
 };
 
-type Q5StreamEvent = Q5StreamProgressEvent | Q5StreamCompleteEvent | Q5StreamErrorEvent;
+type GenerationStreamEvent =
+  | GenerationStreamProgressEvent
+  | GenerationStreamCompleteEvent
+  | GenerationStreamErrorEvent;
 
-export async function generateQ5WithProgress(
+export type GenerationStreamBody = {
+  referenceYears?: number[];
+  difficulty?: string;
+  topicHint?: string;
+  studentId?: string;
+  sourcePassage?: string;
+};
+
+export async function generateDraftWithProgress(
   token: string,
-  slug: string,
-  body: {
-    referenceYears?: number[];
-    difficulty?: string;
-    topicHint?: string;
-    studentId?: string;
-  },
-  onProgress: (event: Q5StreamProgressEvent) => void,
+  streamPath: string,
+  body: GenerationStreamBody,
+  onProgress: (event: GenerationStreamProgressEvent) => void,
+  errorFallbackLabel = "問題の生成",
 ): Promise<GeneratedQuestionDraft> {
-  const url = resolveApiUrl(`/api/universities/${slug}/generate-q5-stream`);
+  const url = resolveApiUrl(streamPath);
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -51,17 +59,12 @@ export async function generateQ5WithProgress(
       "Content-Type": "application/json",
       Accept: "application/x-ndjson",
     },
-    body: JSON.stringify({
-      referenceYears: body.referenceYears,
-      difficulty: body.difficulty,
-      topicHint: body.topicHint,
-      studentId: body.studentId,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    let message = `生成に失敗しました（${res.status}）`;
+    let message = `${errorFallbackLabel}に失敗しました（${res.status}）`;
     try {
       const parsed = JSON.parse(text) as { error?: string };
       if (parsed.error) message = parsed.error;
@@ -90,7 +93,7 @@ export async function generateQ5WithProgress(
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      const event = JSON.parse(trimmed) as Q5StreamEvent;
+      const event = JSON.parse(trimmed) as GenerationStreamEvent;
       if (event.type === "progress") {
         onProgress(event);
         continue;
@@ -100,7 +103,7 @@ export async function generateQ5WithProgress(
         continue;
       }
       if (event.type === "error") {
-        throw new Error(event.error || "第5問の生成に失敗しました");
+        throw new Error(event.error || `${errorFallbackLabel}に失敗しました`);
       }
     }
   }
@@ -109,4 +112,35 @@ export async function generateQ5WithProgress(
     throw new Error("生成は完了しましたが、下書きデータを受信できませんでした。");
   }
   return draft;
+}
+
+/** @deprecated use generateDraftWithProgress */
+export async function generateQ5WithProgress(
+  token: string,
+  slug: string,
+  body: GenerationStreamBody,
+  onProgress: (event: GenerationStreamProgressEvent) => void,
+): Promise<GeneratedQuestionDraft> {
+  return generateDraftWithProgress(
+    token,
+    `/api/universities/${slug}/generate-q5-stream`,
+    body,
+    onProgress,
+    "第5問の生成",
+  );
+}
+
+export async function generateQ2BWithProgress(
+  token: string,
+  slug: string,
+  body: GenerationStreamBody,
+  onProgress: (event: GenerationStreamProgressEvent) => void,
+): Promise<GeneratedQuestionDraft> {
+  return generateDraftWithProgress(
+    token,
+    `/api/universities/${slug}/generate-q2b-stream`,
+    body,
+    onProgress,
+    "第2問(B)の生成",
+  );
 }

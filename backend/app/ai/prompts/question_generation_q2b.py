@@ -10,6 +10,43 @@ from app.ai.prompts.universities.registry import (
 difficulty_label = _defaults.difficulty_label
 
 
+def build_q2b_problem_user_prompt(
+    *,
+    topic_hint: str,
+    difficulty: str,
+    university_name: str = "",
+    reference_context: str = "",
+    fix_hint: str = "",
+) -> str:
+    base = build_q2b_generation_user_prompt(
+        topic_hint=topic_hint,
+        difficulty=difficulty,
+        university_name=university_name,
+        reference_context=reference_context,
+    )
+    extra = (
+        "\n\n【第1段階 — 問題のみ】\n"
+        "和文問題・下線部・解答例2つだけを JSON で返してください。"
+        " 解説（wakuyakuProcessJa / segmentExplanations / badLiteralTranslations 等）は空にしてください。\n"
+        "- sampleAnswers は **\"standard|解答例1（標準）|英文\"** と **\"paraphrase|解答例2（平易）|英文\"** 形式の文字列2件\n"
+        "- japanesePassage 内の英訳対象は *アスタリスク* で囲む"
+    )
+    fix = f"\n\n【前回不合格 — 必ず修正】\n{fix_hint}" if fix_hint.strip() else ""
+    return f"{base}{extra}{fix}"
+
+
+def build_q2b_teacher_pack_user_prompt(*, problem_block: str, fix_hint: str = "") -> str:
+    fix = f"\n\n【前回不合格 — 必ず修正】\n{fix_hint}" if fix_hint.strip() else ""
+    return f"""【確定した和文英訳問題】
+{problem_block}
+
+上記問題に対する教師用解説を JSON で作成してください。
+- segmentExplanations: **\"下線部|直訳の罠|英語的発想\"** 形式の文字列配列
+- badLiteralTranslations: **\"NG英文|不自然な理由|言い換えの目安\"** 形式の文字列配列（2件以上）
+- grammarEssentialsJa / commonMistakesJa は日本語文字列の配列
+- wakuyakuProcessJa は和文和訳の全体プロセス（日本語・簡潔）{fix}"""
+
+
 def build_q2b_generation_user_prompt(
     *,
     topic_hint: str,
