@@ -7,7 +7,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from app.ai.gemini_client import GeminiAnalysisClient
+from app.ai.generation_structured_client import GenerationStructuredClient
 from app.ai.prompts.question_generation_q2b import (
     build_q2b_generation_user_prompt,
     build_q2b_validator_user_prompt,
@@ -17,6 +17,10 @@ from app.ai.prompts.universities.registry import (
     build_q2b_validator_system,
 )
 from app.ai.schemas.q2b_generation import Q2BGenerationResult, Q2BValidatorResult
+from app.generation_limits import (
+    GEMINI_MAX_OUTPUT_COMPREHENSIVE,
+    GEMINI_MAX_OUTPUT_VALIDATOR,
+)
 from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.question_design_service import QuestionDesignService
 from app.services.question_prompt_markup import has_underline_markup, normalize_prompt_markup
@@ -117,7 +121,7 @@ class QuestionQ2BService:
         self.firebase = FirebaseAdminService()
         self.design = QuestionDesignService()
         self.university_ctx = UniversityContextService()
-        self.gemini = GeminiAnalysisClient()
+        self.llm = GenerationStructuredClient()
 
     def _drafts_collection(self, teacher_id: str):
         return self.design._drafts_collection(teacher_id)
@@ -158,7 +162,7 @@ class QuestionQ2BService:
             university_slug=university_slug,
             university_name=uni_name,
             reference_context=ref_context,
-            max_attempts=2,
+            max_attempts=3,
         )
 
         prompt = assemble_q2b_prompt(result=result)
@@ -228,20 +232,20 @@ class QuestionQ2BService:
             if fix_hint:
                 user_text += f"\n\n【前回の検証で指摘された点を必ず修正】\n{fix_hint}"
 
-            current = self.gemini.complete_structured(
+            current = self.llm.complete_structured(
                 system=build_q2b_generation_system(university_slug, university_name),
                 user_text=user_text,
                 response_schema=Q2BGenerationResult,
-                max_output_tokens=16384,
+                max_output_tokens=GEMINI_MAX_OUTPUT_COMPREHENSIVE,
             )
             current.japanese_passage = normalize_prompt_markup(current.japanese_passage)
 
             block = format_q2b_for_validator(current)
-            validator = self.gemini.complete_structured(
+            validator = self.llm.complete_structured(
                 system=build_q2b_validator_system(university_slug, ""),
                 user_text=build_q2b_validator_user_prompt(problem_block=block),
                 response_schema=Q2BValidatorResult,
-                max_output_tokens=4096,
+                max_output_tokens=GEMINI_MAX_OUTPUT_VALIDATOR,
             )
 
             structural = self._structural_issues(current)
