@@ -1,6 +1,9 @@
+import json
 import logging
+import queue
+import threading
 
-from flask import Blueprint, g, jsonify, request
+from flask import Blueprint, Response, g, jsonify, request, stream_with_context
 from pydantic import BaseModel, Field, ValidationError
 
 from app.services.passage_translation_service import PassageTranslationService
@@ -430,6 +433,94 @@ def generate_q5(slug: str):
         return jsonify({"error": str(exc)}), 400
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 503
+
+
+def _q5_progress_json(event: dict) -> str:
+    payload = {
+        "type": "progress",
+        "stage": event.get("stage", ""),
+        "status": event.get("status", ""),
+        "message": event.get("message", ""),
+        "attempt": event.get("attempt"),
+        "maxAttempts": event.get("max_attempts"),
+        "issues": event.get("issues") or [],
+    }
+    return json.dumps(payload, ensure_ascii=False) + "\n"
+
+
+@question_design_bp.post("/universities/<slug>/generate-q5-stream")
+@require_auth
+def generate_q5_stream(slug: str):
+    """第5問生成の進捗を NDJSON でストリーム返却（検証リトライの可視化用）。"""
+    slug_error = _validate_slug(slug)
+    if slug_error:
+        return slug_error
+
+    try:
+        body = GenerateQ5Body.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"error": exc.errors()}), 400
+
+    teacher_id = g.teacher_id
+    event_queue: queue.SimpleQueue = queue.SimpleQueue()
+    holder: dict = {}
+
+    def on_progress(event: dict) -> None:
+        event_queue.put(event)
+
+    def worker() -> None:
+        service = QuestionQ5Service()
+        try:
+            holder["draft"] = service.generate_and_save_draft(
+                teacher_id=teacher_id,
+                university_slug=slug,
+                student_id=body.student_id,
+                topic_hint=body.topic_hint,
+                difficulty=body.difficulty,
+                reference_years=body.reference_years,
+                on_progress=on_progress,
+            )
+        except Exception as exc:
+            holder["error"] = exc
+        finally:
+            event_queue.put(None)
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    def stream():
+        yield _q5_progress_json(
+            {
+                "stage": "pipeline",
+                "status": "start",
+                "message": "第5問の生成を開始しました。完了まで1〜3分かかることがあります。",
+            }
+        )
+        while True:
+            item = event_queue.get()
+            if item is None:
+                break
+            yield _q5_progress_json(item)
+
+        if holder.get("error"):
+            err = holder["error"]
+            yield json.dumps(
+                {"type": "error", "error": str(err)},
+                ensure_ascii=False,
+            ) + "\n"
+        else:
+            yield json.dumps(
+                {"type": "complete", "draft": holder["draft"]},
+                ensure_ascii=False,
+            ) + "\n"
+
+    return Response(
+        stream_with_context(stream()),
+        mimetype="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @question_design_bp.get("/universities/<slug>/question-types")

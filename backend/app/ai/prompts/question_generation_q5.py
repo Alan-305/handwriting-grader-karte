@@ -114,14 +114,45 @@ def build_q5_teacher_pack_user_prompt(
 日本語記述問には必ず requiredPoints（2〜4個）と directionCriterionJa を付けてください。"""
 
 
+def build_q5_revision_coaching_block(*, attempt: int, max_attempts: int) -> str:
+    """検証リトライ回数に応じて、ベテラン講師としての作り直し指示を強める。"""
+    if attempt < 3:
+        return ""
+    if attempt < max_attempts - 2:
+        return (
+            "\n\n【ベテラン講師としての修正】\n"
+            "指摘された小問は**丸ごと差し替えてよい**。技能・参照箇所・問いの切り口を変え、"
+            "本番入試で「正解が一意に定まる」設問だけに仕上げること。"
+        )
+    return (
+        "\n\n【最終作り直し — ベテラン講師として根底から再設計】\n"
+        "検証不合格の小問は**すべて捨て**、本文を読み直し、技能構成ごと作り直すこと。\n"
+        "- 本文にない語・存在しない下線部への言及は禁止\n"
+        "- 記述問には requiredPoints（2〜4個）と directionCriterionJa を必ず付ける\n"
+        "- 空所・選択式は正解が複数ありうる問いを作らない\n"
+        "完成品としてそのまま本番に出せる品質まで仕上げること。"
+    )
+
+
 def build_q5_questions_user_prompt(
     *,
     passage: str,
     fix_issues: str = "",
     reference_context: str = "",
     university_name: str = "",
+    revision_attempt: int = 0,
+    max_attempts: int = 8,
 ) -> str:
-    fix = f"\n\n【前回の検証で指摘された点を必ず修正】\n{fix_issues}" if fix_issues.strip() else ""
+    coaching = build_q5_revision_coaching_block(
+        attempt=revision_attempt,
+        max_attempts=max_attempts,
+    )
+    fix = ""
+    if fix_issues.strip():
+        fix = (
+            f"\n\n【前回の検証不合格 — 以下をすべて踏まえて作り直す】\n{fix_issues.strip()}"
+            f"{coaching}"
+        )
     ref_block = format_reference_block(
         university_name=university_name,
         reference_context=reference_context,

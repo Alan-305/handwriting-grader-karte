@@ -12,6 +12,7 @@ from app.services.question_q5_service import (
     assemble_q5_model_answer,
     assemble_q5_prompt,
     passage_completeness_issues,
+    passage_integrity_issues,
 )
 
 
@@ -26,6 +27,45 @@ def test_passage_completeness_issues_accepts_complete_passage():
     words = "word " * 720
     complete = f"{words.strip()}. He finally understood what the bowl had meant."
     issues = passage_completeness_issues(complete)
+    assert issues == []
+
+
+def test_passage_integrity_issues_detects_missing_reference_word():
+    questions = Q5QuestionsResult(
+        questions=[
+            Q5SubQuestion(
+                number=5,
+                questionType="cloze",
+                prompt="本文中のstimulusに入る語を選べ。",
+                passageAnchor="He walked to the market every morning",
+                choices=[Q5ChoiceItem(label="a", text="one")],
+            ),
+        ]
+    )
+    passage = "He walked to the market every morning without hurry."
+    issues = passage_integrity_issues(questions, passage)
+    assert any("stimulus" in i for i in issues)
+
+
+def test_passage_integrity_issues_accepts_valid_anchor():
+    passage = "Marcus kept the bowl on his desk for many days."
+    questions = Q5QuestionsResult(
+        questions=[
+            Q5SubQuestion(
+                number=1,
+                questionType="content_explanation",
+                prompt="Marcusがbowlを捨てられなかった理由を説明せよ。",
+                passageAnchor="Marcus kept the bowl on his desk",
+                charLimitJa=80,
+                scoringPoints=[
+                    Q5ScoringPoint(pointJa="bowlへの愛着"),
+                    Q5ScoringPoint(pointJa="Yusufとの思い出"),
+                ],
+                directionCriterionJa="本文の心理描写に沿えば可",
+            ),
+        ]
+    )
+    issues = passage_integrity_issues(questions, passage)
     assert issues == []
 
 

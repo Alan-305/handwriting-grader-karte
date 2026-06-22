@@ -46,6 +46,10 @@ from app.services.q5_scoring import (
     questions_from_claude,
     teacher_pack_from_claude,
 )
+from app.services.q5_generation_progress import (
+    ProgressCallback,
+    format_retry_message,
+)
 from app.services.firebase_admin_service import FirebaseAdminService
 from app.services.question_design_service import QuestionDesignService, format_type_label
 from app.services.q5_prompt_markup import (
@@ -63,7 +67,13 @@ logger = logging.getLogger(__name__)
 Q5_DEFAULT_POINTS = 20
 Q5_PASSAGE_WORD_MIN = 650
 Q5_PASSAGE_WORD_MAX = 950
+Q5_QUESTIONS_MAX_ATTEMPTS = 8
+Q5_TEACHER_PACK_MAX_ATTEMPTS = 4
 _PASSAGE_END_RE = re.compile(r'[.!?]["\']?\s*$')
+_PROMPT_REF_WORD_RE = re.compile(
+    r'本文中の[`"\']?([A-Za-z][A-Za-z\'\-]+)[`"\']?|[「"]([A-Za-z][A-Za-z\'\-]+)[」"]',
+    re.I,
+)
 
 
 def english_word_count(text: str) -> int:
@@ -83,6 +93,56 @@ def passage_completeness_issues(passage: str) -> list[str]:
         issues.append(f"語数超過（{words}語 > 目安{Q5_PASSAGE_WORD_MAX}語）")
     if not _PASSAGE_END_RE.search(body):
         issues.append("文末が完結していない（句点で終わる完全な最終文が必要）")
+    return issues
+
+
+def _anchor_in_passage(anchor: str, passage: str) -> bool:
+    anchor_norm = re.sub(r"\s+", " ", anchor.lower().strip())
+    passage_norm = re.sub(r"\s+", " ", passage.lower())
+    if len(anchor_norm) >= 12 and anchor_norm in passage_norm:
+        return True
+    a_tokens = _anchor_tokens(anchor)
+    if not a_tokens:
+        return True
+    p_tokens = _anchor_tokens(passage)
+    if not p_tokens:
+        return False
+    overlap = len(a_tokens & p_tokens) / len(a_tokens)
+    return overlap >= 0.6
+
+
+def _word_in_passage(word: str, passage: str) -> bool:
+    w = word.strip()
+    if not w:
+        return True
+    if w.lower() in passage.lower():
+        return True
+    return bool(re.search(rf"\b{re.escape(w)}\b", passage, re.I))
+
+
+def passage_integrity_issues(questions: Q5QuestionsResult, passage: str) -> list[str]:
+    """設問が本文に存在しない語句を参照していないか検査。"""
+    issues: list[str] = []
+    body = passage or ""
+
+    for q in questions.questions:
+        n = q.number
+        anchor = q.passage_anchor.strip()
+        if anchor and not _anchor_in_passage(anchor, body):
+            issues.append(f"問{n}: passageAnchor が本文に存在しない（「{anchor[:48]}…」）")
+
+        if q.target_word.strip() and not _word_in_passage(q.target_word, body):
+            issues.append(f"問{n}: targetWord「{q.target_word}」が本文にない")
+
+        underline = q.underlined_text.strip()
+        if underline and len(underline) >= 6 and not _anchor_in_passage(underline, body):
+            issues.append(f"問{n}: underlinedText が本文に存在しない")
+
+        for match in _PROMPT_REF_WORD_RE.finditer(q.prompt):
+            ref = (match.group(1) or match.group(2) or "").strip()
+            if ref and not _word_in_passage(ref, body):
+                issues.append(f"問{n}: 設問が参照する「{ref}」が本文にない")
+
     return issues
 
 
@@ -288,11 +348,33 @@ class QuestionQ5Service:
         difficulty: str,
         reference_context: str,
         max_attempts: int = 3,
+        on_progress: ProgressCallback | None = None,
     ) -> Q5PassageResult:
         fix_hint = ""
         last_issues: list[str] = []
 
         for attempt in range(max_attempts):
+            if on_progress:
+                on_progress(
+                    {
+                        "stage": "passage",
+                        "status": "working" if attempt == 0 else "retry",
+                        "message": (
+                            "英文本文を作成しています…"
+                            if attempt == 0
+                            else format_retry_message(
+                                stage="passage",
+                                attempt=attempt + 1,
+                                max_attempts=max_attempts,
+                                issues=last_issues,
+                            )
+                        ),
+                        "attempt": attempt + 1,
+                        "max_attempts": max_attempts,
+                        "issues": last_issues,
+                    }
+                )
+
             user_text = build_q5_passage_user_prompt(
                 topic_hint=topic,
                 difficulty=difficulty,
@@ -311,6 +393,14 @@ class QuestionQ5Service:
             passage = passage_from_claude(raw)
             issues = passage_completeness_issues(passage.passage)
             if not issues:
+                if on_progress:
+                    on_progress(
+                        {
+                            "stage": "passage",
+                            "status": "complete",
+                            "message": f"英文本文が完成しました（約{passage.word_count}語）",
+                        }
+                    )
                 return passage
 
             last_issues = issues
@@ -339,6 +429,7 @@ class QuestionQ5Service:
         difficulty: str = "standard",
         university_slug: str = "todai",
         reference_years: list[int] | None = None,
+        on_progress: ProgressCallback | None = None,
     ) -> dict:
         """本文 → 設問 → Solver → 教師用 Pack を実行し、正規化 dict を返す。"""
         uni_name = self.university_ctx.university_name(university_slug)
@@ -352,25 +443,46 @@ class QuestionQ5Service:
         )
         topic = topic_hint.strip()
 
+        if on_progress:
+            on_progress(
+                {
+                    "stage": "passage",
+                    "status": "start",
+                    "message": "第5問の英文本文を作成しています…",
+                }
+            )
+
         passage = self._generate_passage(
             university_slug=university_slug,
             uni_name=uni_name,
             topic=topic,
             difficulty=difficulty,
             reference_context=ref_context,
+            on_progress=on_progress,
         )
+
+        if on_progress:
+            on_progress(
+                {
+                    "stage": "questions",
+                    "status": "start",
+                    "message": "設問を作成しています…",
+                }
+            )
 
         questions, solver, retried = self._questions_with_evaluation(
             passage=passage.passage,
             university_slug=university_slug,
             university_name=uni_name,
             reference_context=ref_context,
+            on_progress=on_progress,
         )
 
         if not solver.passed or solver.issues:
             detail = "; ".join(solver.issues[:8]) or solver.summary or "設問の曖昧さ"
             raise RuntimeError(
-                "設問の自動検証に合格しませんでした。"
+                "設問の自動検証に合格しませんでした（"
+                f"{Q5_QUESTIONS_MAX_ATTEMPTS}回の自律的な作り直し後）。"
                 "あいまいな設問が含まれる可能性があります。"
                 f"（{detail}）"
             )
@@ -379,17 +491,23 @@ class QuestionQ5Service:
         solver_line = format_solver_answers_for_teacher(solver)
         questions_block = format_q5_questions_block(questions)
 
-        pack_raw: Q5TeacherPackClaudeResult = self.llm.complete_structured(
-            system=build_q5_teacher_pack_system(university_slug, Q5_TEACHER_PACK_SYSTEM),
-            user_text=build_q5_teacher_pack_user_prompt(
-                passage=exam_body,
-                questions_block=questions_block,
-                solver_answers=solver_line,
-            ),
-            response_schema=Q5TeacherPackClaudeResult,
-            max_output_tokens=GEMINI_MAX_OUTPUT_STANDARD,
+        if on_progress:
+            on_progress(
+                {
+                    "stage": "teacher_pack",
+                    "status": "start",
+                    "message": "模範解答・解説を作成しています…",
+                }
+            )
+
+        pack = self._generate_teacher_pack(
+            university_slug=university_slug,
+            exam_body=exam_body,
+            questions_block=questions_block,
+            solver_line=solver_line,
+            questions=questions,
+            on_progress=on_progress,
         )
-        pack = teacher_pack_from_claude(pack_raw, questions)
 
         prompt = assemble_q5_prompt(
             instructions=questions.instructions,
@@ -401,7 +519,8 @@ class QuestionQ5Service:
         pack_issues = self._teacher_pack_clarity_issues(questions, pack)
         if pack_issues:
             raise RuntimeError(
-                "教師用資料の採点ポイントが不足しています。"
+                "教師用資料の採点ポイントが不足しています（"
+                f"{Q5_TEACHER_PACK_MAX_ATTEMPTS}回の自律的な作り直し後）。"
                 f"（{'; '.join(pack_issues[:6])}）"
             )
 
@@ -438,6 +557,84 @@ class QuestionQ5Service:
             },
         }
 
+    def _generate_teacher_pack(
+        self,
+        *,
+        university_slug: str,
+        exam_body: str,
+        questions_block: str,
+        solver_line: str,
+        questions: Q5QuestionsResult,
+        on_progress: ProgressCallback | None = None,
+    ) -> Q5TeacherPackResult:
+        fix_hint = ""
+        last_issues: list[str] = []
+        pack: Q5TeacherPackResult | None = None
+
+        for attempt in range(Q5_TEACHER_PACK_MAX_ATTEMPTS):
+            if on_progress:
+                on_progress(
+                    {
+                        "stage": "teacher_pack",
+                        "status": "working" if attempt == 0 else "retry",
+                        "message": (
+                            "模範解答・解説を作成しています…"
+                            if attempt == 0
+                            else format_retry_message(
+                                stage="teacher_pack",
+                                attempt=attempt + 1,
+                                max_attempts=Q5_TEACHER_PACK_MAX_ATTEMPTS,
+                                issues=last_issues,
+                            )
+                        ),
+                        "attempt": attempt + 1,
+                        "max_attempts": Q5_TEACHER_PACK_MAX_ATTEMPTS,
+                        "issues": last_issues,
+                    }
+                )
+
+            user_text = build_q5_teacher_pack_user_prompt(
+                passage=exam_body,
+                questions_block=questions_block,
+                solver_answers=solver_line,
+            )
+            if fix_hint:
+                user_text = (
+                    f"{user_text}\n\n"
+                    "【前回不合格 — ベテラン講師として採点基準を補完して作り直す】\n"
+                    f"{fix_hint}"
+                )
+
+            pack_raw: Q5TeacherPackClaudeResult = self.llm.complete_structured(
+                system=build_q5_teacher_pack_system(university_slug, Q5_TEACHER_PACK_SYSTEM),
+                user_text=user_text,
+                response_schema=Q5TeacherPackClaudeResult,
+                max_output_tokens=GEMINI_MAX_OUTPUT_STANDARD,
+            )
+            pack = teacher_pack_from_claude(pack_raw, questions)
+            issues = self._teacher_pack_clarity_issues(questions, pack)
+            if not issues:
+                if on_progress:
+                    on_progress(
+                        {
+                            "stage": "teacher_pack",
+                            "status": "complete",
+                            "message": "模範解答・解説が完成しました",
+                        }
+                    )
+                return pack
+
+            last_issues = issues
+            fix_hint = "; ".join(issues)
+            logger.info(
+                "Q5 teacher pack retry (attempt %s): %s",
+                attempt + 1,
+                fix_hint,
+            )
+
+        assert pack is not None
+        return pack
+
     def _questions_with_evaluation(
         self,
         *,
@@ -445,14 +642,56 @@ class QuestionQ5Service:
         university_slug: str = "",
         university_name: str = "",
         reference_context: str = "",
-        max_attempts: int = 4,
+        max_attempts: int = Q5_QUESTIONS_MAX_ATTEMPTS,
+        on_progress: ProgressCallback | None = None,
     ) -> tuple[Q5QuestionsResult, Q5SolverResult, bool]:
         fix_issues = ""
         retried = False
         questions: Q5QuestionsResult | None = None
         solver: Q5SolverResult | None = None
+        last_all_issues: list[str] = []
+
+        def emit_retry(stage: str, issues: list[str], attempt: int) -> None:
+            if not on_progress:
+                return
+            on_progress(
+                {
+                    "stage": stage,
+                    "status": "retry",
+                    "message": format_retry_message(
+                        stage=stage,
+                        attempt=attempt,
+                        max_attempts=max_attempts,
+                        issues=issues,
+                    ),
+                    "attempt": attempt,
+                    "max_attempts": max_attempts,
+                    "issues": issues,
+                }
+            )
 
         for attempt in range(max_attempts):
+            if on_progress:
+                on_progress(
+                    {
+                        "stage": "questions",
+                        "status": "working" if attempt == 0 else "retry",
+                        "message": (
+                            "設問を作成しています…"
+                            if attempt == 0
+                            else format_retry_message(
+                                stage="questions",
+                                attempt=attempt + 1,
+                                max_attempts=max_attempts,
+                                issues=last_all_issues,
+                            )
+                        ),
+                        "attempt": attempt + 1,
+                        "max_attempts": max_attempts,
+                        "issues": last_all_issues,
+                    }
+                )
+
             questions_raw: Q5QuestionsClaudeResult = self.llm.complete_structured(
                 system=build_q5_questions_system(university_slug, university_name),
                 user_text=build_q5_questions_user_prompt(
@@ -460,6 +699,8 @@ class QuestionQ5Service:
                     fix_issues=fix_issues,
                     reference_context=reference_context,
                     university_name=university_name,
+                    revision_attempt=attempt,
+                    max_attempts=max_attempts,
                 ),
                 response_schema=Q5QuestionsClaudeResult,
                 max_output_tokens=16384,
@@ -473,8 +714,10 @@ class QuestionQ5Service:
                     f"同一の下線部・設問が {removed_dupes} 件重複していた。"
                     "各小問は技能・参照箇所・問いの内容がすべて異なる6〜8問に作り直すこと。"
                 )
-                retried = attempt < max_attempts - 1
-                if retried:
+                retried = True
+                last_all_issues = [fix_issues]
+                if attempt < max_attempts - 1:
+                    emit_retry("questions", last_all_issues, attempt + 1)
                     logger.info("Q5 duplicate retry (attempt %s): removed %s", attempt + 1, removed_dupes)
                     continue
             kyotsu_hits = [
@@ -490,23 +733,42 @@ class QuestionQ5Service:
                     "underlined_explanation, content_match, short_answer_ja, ordering）"
                     "に作り直してください。"
                 )
-                retried = attempt < max_attempts - 1
-                if retried:
+                retried = True
+                last_all_issues = [fix_issues]
+                if attempt < max_attempts - 1:
+                    emit_retry("questions", last_all_issues, attempt + 1)
                     continue
 
             structural = (
                 self._structural_issues(questions)
                 + self._clarity_issues(questions)
+                + passage_integrity_issues(questions, passage)
                 + choice_design_issues(questions, passage)
             )
             if structural:
-                fix_issues = "; ".join(structural)
-                retried = attempt < max_attempts - 1
-                if retried:
+                fix_issues = (
+                    "【検証不合格 — 以下をすべて修正して作り直す】\n"
+                    + "; ".join(structural)
+                )
+                retried = True
+                last_all_issues = structural
+                if attempt < max_attempts - 1:
+                    emit_retry("questions", structural, attempt + 1)
                     logger.info(
                         "Q5 structural retry (attempt %s): %s", attempt + 1, fix_issues
                     )
                     continue
+
+            if on_progress:
+                on_progress(
+                    {
+                        "stage": "solver",
+                        "status": "working",
+                        "message": "ベテラン講師が解答の妥当性を検証しています…",
+                        "attempt": attempt + 1,
+                        "max_attempts": max_attempts,
+                    }
+                )
 
             exam_body = _exam_passage(questions, passage)
             questions_block = format_q5_questions_block(questions)
@@ -524,15 +786,28 @@ class QuestionQ5Service:
                 solver.passed = False
             if solver.passed and not all_issues:
                 solver.issues = []
+                if on_progress:
+                    on_progress(
+                        {
+                            "stage": "questions",
+                            "status": "complete",
+                            "message": "設問の検証に合格しました",
+                        }
+                    )
                 return questions, solver, retried
             fix_issues = (
                 "【検証不合格 — 以下をすべて修正して作り直す】\n"
                 + ("; ".join(all_issues) if all_issues else solver.summary)
             )
-            retried = attempt < max_attempts - 1
+            retried = True
+            last_all_issues = all_issues or [solver.summary or "設問の曖昧さ"]
+            emit_retry("solver", last_all_issues, attempt + 1)
             logger.info("Q5 solver requested retry (attempt %s): %s", attempt + 1, fix_issues)
 
         assert questions is not None and solver is not None
+        if last_all_issues:
+            solver.issues = last_all_issues
+            solver.passed = False
         return questions, solver, retried
 
     @staticmethod
@@ -650,6 +925,7 @@ class QuestionQ5Service:
         topic_hint: str = "",
         difficulty: str = "standard",
         reference_years: list[int] | None = None,
+        on_progress: ProgressCallback | None = None,
     ) -> dict:
         slug, _meta = self.university_ctx.resolve_for_teacher(
             teacher_id=teacher_id,
@@ -663,7 +939,17 @@ class QuestionQ5Service:
             difficulty=difficulty,
             university_slug=slug or "todai",
             reference_years=reference_years,
+            on_progress=on_progress,
         )
+
+        if on_progress:
+            on_progress(
+                {
+                    "stage": "save",
+                    "status": "working",
+                    "message": "下書きを保存しています…",
+                }
+            )
 
         batch_id = uuid.uuid4().hex[:12]
         now = datetime.now(timezone.utc)
@@ -681,4 +967,13 @@ class QuestionQ5Service:
             "updatedAt": now,
         }
         _, ref = self._drafts_collection(teacher_id).add(doc)
-        return {**data, "id": ref.id, "batchId": batch_id}
+        result = {**data, "id": ref.id, "batchId": batch_id}
+        if on_progress:
+            on_progress(
+                {
+                    "stage": "save",
+                    "status": "complete",
+                    "message": "第5問の生成が完了しました",
+                }
+            )
+        return result

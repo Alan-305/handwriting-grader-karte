@@ -173,6 +173,104 @@ def _extract_response_text(response) -> str:
     )
 
 
+
+_KEN_Q5_PASSAGE_CORE = (
+    "When Ken joined the volunteer club, he did not expect to fail so publicly. "
+    "On the first weekend, he forgot the supplies and the event was cancelled. "
+    "His friends were disappointed, and Ken felt ashamed. "
+    "The following week, he apologized and made a checklist. "
+    "He arrived early, prepared snacks, and guided new members. "
+    "By spring, the club welcomed more students than ever. "
+    "Ken realized that growth begins when we face mistakes honestly."
+)
+_KEN_Q5_PASSAGE_MOCK = (" " + _KEN_Q5_PASSAGE_CORE) * 10
+
+
+def _ken_q5_questions_claude_mock() -> list[dict]:
+    return [
+        {
+            "number": 1,
+            "partLabel": "A",
+            "questionType": "cloze",
+            "prompt": "次の空所(A)に入る最も適当なものを1つ選べ。",
+            "passageAnchor": "forgot the supplies and the event was cancelled",
+            "choices": [
+                "a: cancelled",
+                "b: celebrated",
+                "c: postponed",
+                "d: ignored",
+            ],
+        },
+        {
+            "number": 2,
+            "partLabel": "B",
+            "questionType": "content_explanation",
+            "prompt": "ケンが最初の週末に感じたことを40字以内の日本語で説明せよ。",
+            "passageAnchor": "Ken felt ashamed after the failed event",
+            "charLimitJa": 40,
+            "requiredPoints": ["失敗を恥じた心情", "イベント失敗の状況"],
+            "directionCriterionJa": "失敗後の心情を本文に沿って述べていれば可",
+            "choices": [],
+        },
+        {
+            "number": 3,
+            "partLabel": "C",
+            "questionType": "reason_explanation",
+            "prompt": "翌週ケンがチェックリストを作った理由を50字以内の日本語で述べよ。",
+            "passageAnchor": "he apologized and made a checklist",
+            "charLimitJa": 50,
+            "requiredPoints": ["同じ失敗を防ぐため", "謝罪と改善の姿勢"],
+            "directionCriterionJa": "チェックリスト作成の理由を因果で述べていれば可",
+            "choices": [],
+        },
+        {
+            "number": 4,
+            "partLabel": "D",
+            "questionType": "word_usage_match",
+            "prompt": "本文中の grow と同じ語法で使われているものを a)〜e) から1つ選べ。",
+            "passageAnchor": "the club welcomed more students than ever",
+            "targetWord": "grow",
+            "choices": [
+                "a: welcomed",
+                "b: welcoming",
+                "c: welcome",
+                "d: welcomes",
+                "e: welcomedly",
+            ],
+        },
+        {
+            "number": 5,
+            "partLabel": "E",
+            "questionType": "expression_meaning",
+            "prompt": "下線部の意味として最も適当なものを a)〜e) から1つ選べ。",
+            "passageAnchor": "growth begins when we face mistakes honestly",
+            "underlinedText": "face mistakes honestly",
+            "choices": [
+                "a: 誤りを正直に認める",
+                "b: 失敗を隠す",
+                "c: 他人を責める",
+                "d: 活動をやめる",
+                "e: 賞を求める",
+            ],
+        },
+        {
+            "number": 6,
+            "partLabel": "F",
+            "questionType": "english_match",
+            "prompt": "本文の内容と最も合致する英文を a)〜f) から1つ選べ。",
+            "passageAnchor": "He arrived early, prepared snacks, and guided new members",
+            "choices": [
+                "a: Ken quit immediately.",
+                "b: The club grew by spring.",
+                "c: No one joined the club.",
+                "d: Ken never apologized.",
+                "e: The first event was perfect.",
+                "f: Ken became club president on day one.",
+            ],
+        },
+    ]
+
+
 # API キー未設定（開発・モック）時の各スキーマ向けダミー応答
 _MOCK_PAYLOADS: dict[str, dict] = {
     "KarteAdviceResponse": {
@@ -242,8 +340,7 @@ _MOCK_PAYLOADS: dict[str, dict] = {
         "fabricationRisk": [],
     },
     "Q5PassageClaudeResult": {
-        "passage": ("When Ken joined the volunteer club he learned from failure and kept trying. " * 65).strip()
-        + " He finally understood what the experience had meant for him.",
+        "passage": _KEN_Q5_PASSAGE_MOCK.strip(),
         "themeSummary": "成長と内省",
     },
     "Q5PassageResult": {
@@ -383,17 +480,7 @@ _MOCK_PAYLOADS: dict[str, dict] = {
     "Q5QuestionsClaudeResult": {
         "instructions": "次の英文を読み、(A)〜(G)の問いに答えなさい。",
         "passageForExam": "",
-        "questions": [
-            {
-                "number": 1,
-                "partLabel": "A",
-                "questionType": "word_usage_match",
-                "prompt": "語法一致",
-                "passageAnchor": "anchor phrase here",
-                "targetWord": "accumulation",
-                "choices": ["a: choice one", "b: choice two"],
-            }
-        ],
+        "questions": _ken_q5_questions_claude_mock(),
     },
     "Q5TeacherPackClaudeResult": {
         "modelAnswerSummary": "1 a, 2 失敗を恥じた心情, 3 同じ失敗を防ぐため, 4 a, 5 a, 6 b。",

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
-import { LoadingOverlay } from "@/components/feedback/LoadingOverlay";
+import {
+  GenerationProgressOverlay,
+  type GenerationProgressState,
+} from "@/components/feedback/GenerationProgressOverlay";
 import { SafeForm } from "@/components/forms/SafeForm";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -12,16 +15,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePastExamUniversities } from "@/hooks/usePastExamUniversities";
 import { useStudents } from "@/hooks/useStudent";
 import { apiClient } from "@/lib/api-client";
+import { generateQ5WithProgress } from "@/lib/q5-generation-stream";
 import { primaryPastExamSlug } from "@/lib/resolve-university";
 import type { ExamYearSummary } from "@/types/api";
 
-const PIPELINE_STEPS = [
-  "物語本文を作成中",
-  "設問を作成中",
-  "解答の妥当性を検証中",
-  "解答・解説を作成中",
-  "下書きを保存中",
-] as const;
+const INITIAL_PROGRESS: GenerationProgressState = {
+  message: "第5問の生成を準備しています…",
+  log: [],
+};
 
 export function QuestionGenerateQ5Page() {
   const { getIdToken } = useAuth();
@@ -38,7 +39,7 @@ export function QuestionGenerateQ5Page() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [loadingYears, setLoadingYears] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [pipelineStep, setPipelineStep] = useState(0);
+  const [progress, setProgress] = useState<GenerationProgressState>(INITIAL_PROGRESS);
   const [error, setError] = useState<string | null>(null);
 
   const loadYears = useCallback(async () => {
@@ -93,41 +94,75 @@ export function QuestionGenerateQ5Page() {
   const handleGenerate = async () => {
     setGenerating(true);
     setError(null);
-    setPipelineStep(0);
-
-    const stepTimer = window.setInterval(() => {
-      setPipelineStep((s) => Math.min(s + 1, PIPELINE_STEPS.length - 1));
-    }, 12000);
+    setProgress({
+      message: "第5問の生成を開始しました…",
+      stage: "pipeline",
+      status: "start",
+      log: ["生成を開始しました"],
+    });
 
     const token = await getIdToken();
     if (!token) {
       setError("ログインが必要です");
       setGenerating(false);
-      window.clearInterval(stepTimer);
       return;
     }
 
     try {
-      const { draft } = await apiClient.generateQ5(token, slug, {
-        referenceYears: selectedYears.length > 0 ? selectedYears : undefined,
-        difficulty,
-        topicHint: topicHint.trim(),
-        studentId: studentId || undefined,
-      });
+      let draft;
+      try {
+        draft = await generateQ5WithProgress(
+          token,
+          slug,
+          {
+            referenceYears: selectedYears.length > 0 ? selectedYears : undefined,
+            difficulty,
+            topicHint: topicHint.trim(),
+            studentId: studentId || undefined,
+          },
+          (event) => {
+            setProgress((prev) => ({
+              message: event.message,
+              stage: event.stage,
+              status: event.status,
+              attempt: event.attempt,
+              maxAttempts: event.maxAttempts,
+              issues: event.issues,
+              log: [...prev.log, event.message].slice(-8),
+            }));
+          },
+        );
+      } catch (streamErr) {
+        const msg = streamErr instanceof Error ? streamErr.message : "";
+        const canFallback =
+          msg.includes("進捗を受信できませんでした") ||
+          msg.includes("接続できません") ||
+          msg.includes("不正な応答") ||
+          msg.includes("生成に失敗しました（404）");
+        if (!canFallback) throw streamErr;
+        setProgress((prev) => ({
+          ...prev,
+          message: "進捗表示に接続できなかったため、通常モードで生成しています…",
+          log: [...prev.log, "ストリーム接続に失敗 — 通常モードで継続"],
+        }));
+        ({ draft } = await apiClient.generateQ5(token, slug, {
+          referenceYears: selectedYears.length > 0 ? selectedYears : undefined,
+          difficulty,
+          topicHint: topicHint.trim(),
+          studentId: studentId || undefined,
+        }));
+      }
       navigate(draft.id ? `/question-drafts?focus=${draft.id}` : "/question-drafts");
     } catch (err) {
       setError(err instanceof Error ? err.message : "第5問の生成に失敗しました");
     } finally {
-      window.clearInterval(stepTimer);
       setGenerating(false);
     }
   };
 
-  const loadingMessage = PIPELINE_STEPS[pipelineStep] ?? "考えてます";
-
   return (
     <div>
-      <LoadingOverlay visible={generating} message={loadingMessage} />
+      <GenerationProgressOverlay visible={generating} progress={progress} />
       <PageHeader
         title="第5問の生成（二次入試）"
         description="東大第5問形式（物語・随筆／空所補充・下線部・内容一致・日本語記述・並べ替え）で生成します。共通テストの第5問定型にはしません。参照年度で過去問を手本にします。"
@@ -272,7 +307,7 @@ export function QuestionGenerateQ5Page() {
               生成の流れ：①物語・随筆本文 → ②小問6〜8個（多技能） → ③妥当性検証 → ④正答・解説（全訳は答案用紙画面で後から生成）
             </p>
             <p className="mt-2 font-ja text-xs text-slate-500">
-              完了まで1〜3分かかることがあります。チャットでの修正は次の段階で追加予定です。
+              検証で課題が見つかった場合は、画面に内容を表示しながら自動で作り直します。完了まで1〜3分かかることがあります。
             </p>
           </Card>
 
