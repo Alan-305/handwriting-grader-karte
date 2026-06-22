@@ -31,6 +31,25 @@ Q5_MCQ_PARAPHRASE_TYPES = frozenset({
     "content_match",
 })
 
+_DEFAULT_DIRECTION_CRITERION: dict[str, str] = {
+    "content_explanation": "本文の該当箇所の内容を中心に述べていれば可",
+    "reason_explanation": "本文の因果関係に沿って理由を述べていれば可",
+    "underlined_explanation": "下線部の意味・含みを本文に沿って説明していれば可",
+    "short_answer_ja": "問いの趣旨に沿い本文根拠で答えていれば可",
+}
+
+
+def default_direction_criterion_ja(question_type: str) -> str:
+    return _DEFAULT_DIRECTION_CRITERION.get(question_type.lower().strip(), "")
+
+
+def resolve_direction_criterion_ja(question_type: str, value: str) -> str:
+    """AI が directionCriterionJa を省略した記述問に、技能別の標準判定文を補う。"""
+    stripped = value.strip()
+    if stripped:
+        return stripped
+    return default_direction_criterion_ja(question_type)
+
 _WORD_TOKEN = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?|[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]+")
 
 
@@ -148,7 +167,10 @@ def questions_from_claude(raw: Q5QuestionsClaudeResult) -> Q5QuestionsResult:
                     q.required_points,
                     passage_basis=basis,
                 ),
-                directionCriterionJa=q.direction_criterion_ja,
+                directionCriterionJa=resolve_direction_criterion_ja(
+                    q.question_type,
+                    q.direction_criterion_ja,
+                ),
             )
         )
     return Q5QuestionsResult(
@@ -197,9 +219,11 @@ def teacher_pack_from_claude(
             )
         if not points and inherited:
             points = inherited
-        direction = ex.direction_criterion_ja.strip()
-        if not direction and sub:
-            direction = sub.direction_criterion_ja.strip()
+        direction = resolve_direction_criterion_ja(
+            sub.question_type if sub else "",
+            ex.direction_criterion_ja.strip()
+            or (sub.direction_criterion_ja.strip() if sub else ""),
+        )
         explanations.append(
             Q5QuestionExplanation(
                 number=ex.number,

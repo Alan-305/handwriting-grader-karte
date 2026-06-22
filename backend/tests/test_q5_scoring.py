@@ -144,6 +144,26 @@ def test_questions_from_claude_converts_choices_and_points():
     assert result.questions[1].scoring_points[0].passage_basis == "theatrical hospitality scene"
 
 
+def test_questions_from_claude_fills_missing_direction_criterion():
+    raw = Q5QuestionsClaudeResult(
+        instructions="読んで答えよ",
+        questions=[
+            Q5SubQuestionClaude(
+                number=2,
+                questionType="content_explanation",
+                prompt="筆者の心情を40字以内で説明せよ。",
+                passageAnchor="Ken felt ashamed",
+                charLimitJa=40,
+                requiredPoints=["失敗を恥じた心情", "落胆した様子"],
+            ),
+        ],
+    )
+    result = questions_from_claude(raw)
+    assert result.questions[0].direction_criterion_ja == (
+        "本文の該当箇所の内容を中心に述べていれば可"
+    )
+
+
 def test_teacher_pack_from_claude_merges_inherited_basis():
     questions = Q5QuestionsResult(
         questions=[
