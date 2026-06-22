@@ -114,9 +114,15 @@ def _is_structured_output_unsupported(exc: Exception) -> bool:
     )
 
 
-def _format_grading_failure(last_error: Exception | None, models_tried: list[str]) -> str:
+def _format_grading_failure(
+    last_error: Exception | None,
+    models_tried: list[str],
+    *,
+    for_generation: bool = False,
+) -> str:
     detail = str(last_error).strip() if last_error else "不明"
     models = ", ".join(models_tried)
+    label = "問題生成AI" if for_generation else "添削AI"
 
     if last_error and _is_auth_error(last_error):
         return (
@@ -125,21 +131,28 @@ def _format_grading_failure(last_error: Exception | None, models_tried: list[str
         )
 
     lowered = detail.lower()
+    if "streaming is required" in lowered or "longer than 10 minutes" in lowered:
+        return (
+            f"{label}の応答が長くなる見込みのため、非ストリーミング呼び出しが拒否されました。"
+            " システム側でストリーミングに切り替え済みです。再試行してください。"
+            f"（{detail[:120]}）"
+        )
+
     if "json" in lowered or "空の応答" in detail or "max_tokens" in lowered:
         return (
-            f"添削AIの応答が途中で切れたか、JSON形式になりませんでした（{detail[:160]}）。"
+            f"{label}の応答が途中で切れたか、JSON形式になりませんでした（{detail[:160]}）。"
             " しばらく待って再試行してください。繰り返す場合は API の混雑や応答上限の可能性があります。"
         )
 
     if last_error and _is_model_unavailable_error(last_error):
         return (
-            f"指定の添削モデルが API で利用できません（試行: {models}）。"
+            f"指定の{'生成' if for_generation else '添削'}モデルが API で利用できません（試行: {models}）。"
             " .env / Cloud Run の ANTHROPIC_MODEL を claude-sonnet-4-6 に設定し、"
             " API キーが Sonnet 4.6 を使えるプランか確認してください。"
         )
 
     return (
-        f"添削AIの呼び出しに失敗しました（試行: {models}）。"
+        f"{label}の呼び出しに失敗しました（試行: {models}）。"
         f" 詳細: {detail[:200]}"
     )
 
@@ -202,13 +215,14 @@ class AnthropicVisionClient:
         response_schema: type[BaseModel],
         for_generation: bool = False,
     ) -> BaseModel:
-        response = self.client.messages.parse(
+        with self.client.messages.stream(
             model=model,
             max_tokens=max_tokens,
             system=self._system_with_suffix(system, for_generation=for_generation),
             messages=[{"role": "user", "content": content}],
             output_format=response_schema,
-        )
+        ) as stream:
+            response = stream.get_final_message()
         self._check_stop_reason(response)
         parsed = getattr(response, "parsed_output", None)
         if parsed is not None:
@@ -231,12 +245,13 @@ class AnthropicVisionClient:
         response_schema: type[BaseModel],
         for_generation: bool = False,
     ) -> BaseModel:
-        response = self.client.messages.create(
+        with self.client.messages.stream(
             model=model,
             max_tokens=max_tokens,
             system=self._system_with_suffix(system, for_generation=for_generation),
             messages=[{"role": "user", "content": content}],
-        )
+        ) as stream:
+            response = stream.get_final_message()
         text = self._extract_response_text(response)
         if not text:
             stop = getattr(response, "stop_reason", None)
@@ -338,12 +353,18 @@ class AnthropicVisionClient:
                     exc_info=logger.isEnabledFor(logging.DEBUG),
                 )
                 if _is_auth_error(exc):
-                    raise RuntimeError(_format_grading_failure(exc, models_tried)) from exc
+                    raise RuntimeError(
+                        _format_grading_failure(exc, models_tried, for_generation=for_generation)
+                    ) from exc
                 if _is_model_unavailable_error(exc):
                     continue
-                raise RuntimeError(_format_grading_failure(exc, models_tried)) from exc
+                raise RuntimeError(
+                    _format_grading_failure(exc, models_tried, for_generation=for_generation)
+                ) from exc
 
-        raise RuntimeError(_format_grading_failure(last_error, models_tried)) from last_error
+        raise RuntimeError(
+            _format_grading_failure(last_error, models_tried, for_generation=for_generation)
+        ) from last_error
 
     def _mock_response(self, schema: type[BaseModel]) -> BaseModel:
         from app.ai.gemini_client import _MOCK_PAYLOADS
