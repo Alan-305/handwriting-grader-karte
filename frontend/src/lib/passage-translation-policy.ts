@@ -46,19 +46,13 @@ export function toPassageTranslationQuestionLike(
   };
 }
 
-/** AI 全訳生成を推奨するか（問題セット内の番号は見ない） */
-export function isAiPassageTranslationRecommended(
-  source: PassageTranslationQuestionLike,
-): boolean {
-  const pipeline = (source.generationPipeline ?? "").toLowerCase();
-  if (PIPELINE_NO_AI_PASSAGE_TRANSLATION.has(pipeline)) return false;
-
+/** AI 全訳生成 API が受け付けそうか（ボタンは全訳欄があれば常に表示） */
+export function isPassageTranslationTarget(source: PassageTranslationQuestionLike): boolean {
   const prompt = source.prompt ?? "";
-  const answerFormat = source.answerFormat ?? "";
-
-  if (promptIsComposition(prompt, answerFormat)) return false;
   if (promptIsWabunEibun(prompt)) return false;
-  if (pipeline === "q4b" || promptIsEnglishUnderlineToJa(prompt)) return false;
+
+  const latin = (prompt.match(/[a-zA-Z]/g) || []).length;
+  if (latin >= 40 && source.type === "english") return true;
 
   const questionLike: Question = {
     id: "check",
@@ -72,6 +66,13 @@ export function isAiPassageTranslationRecommended(
   return questionHasEnglishPassage(questionLike);
 }
 
+/** @deprecated use isPassageTranslationTarget */
+export function isAiPassageTranslationRecommended(
+  source: PassageTranslationQuestionLike,
+): boolean {
+  return isPassageTranslationTarget(source);
+}
+
 /** @deprecated use isAiPassageTranslationRecommended */
 export function supportsPassageTranslation(
   source: Question | GeneratedQuestionDraft,
@@ -79,11 +80,11 @@ export function supportsPassageTranslation(
   return isAiPassageTranslationRecommended(toPassageTranslationQuestionLike(source));
 }
 
-/** 下書き・解答解説画面で全訳欄を出すか（既存入力 or AI推奨） */
+/** 下書き画面で全訳欄を出すか（既存入力 or 英語本文あり） */
 export function shouldShowPassageTranslationSection(
   source: Question | GeneratedQuestionDraft,
   existingTranslation = "",
 ): boolean {
   if (existingTranslation.trim()) return true;
-  return isAiPassageTranslationRecommended(toPassageTranslationQuestionLike(source));
+  return isPassageTranslationTarget(toPassageTranslationQuestionLike(source));
 }

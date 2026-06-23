@@ -6,7 +6,7 @@ import {
   splitModelAnswerSections,
 } from "@/lib/model-answer-sections";
 import {
-  isAiPassageTranslationRecommended,
+  isPassageTranslationTarget,
   shouldShowPassageTranslationSection,
   toPassageTranslationQuestionLike,
 } from "@/lib/passage-translation-policy";
@@ -218,7 +218,7 @@ export function questionNeedsAiPassageTranslation(
   passageText: string,
 ): boolean {
   return (
-    isAiPassageTranslationRecommended(toPassageTranslationQuestionLike(question)) &&
+    isPassageTranslationTarget(toPassageTranslationQuestionLike(question)) &&
     !passageText.trim()
   );
 }

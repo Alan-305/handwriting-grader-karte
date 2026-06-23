@@ -7,12 +7,12 @@ from app.services.passage_translation_policy import (
 _LONG_EN = "Read the following passage.\n\n" + ("word " * 60)
 
 
-def test_q2b_pipeline_excluded_regardless_of_set_order():
+def test_q2b_japanese_prompt_excluded():
     q = {
         "generationPipeline": "q2b",
         "order": 1,
         "type": "english",
-        "prompt": _LONG_EN,
+        "prompt": "以下の日本文の下線部を英訳せよ。\n\n彼は*勇気*を出して話しかけた。",
     }
     assert not is_ai_passage_translation_recommended(q)
 
@@ -55,7 +55,8 @@ def test_wabun_eibun_prompt_excluded_without_pipeline():
     assert not is_ai_passage_translation_recommended(q)
 
 
-def test_composition_excluded():
+def test_short_composition_prompt_may_allow_api():
+    """英作文のみで短い場合は抽出不能だが、ボタンは UI 側で常に表示する。"""
     q = {
         "generationPipeline": "q2a",
         "order": 1,
@@ -63,7 +64,8 @@ def test_composition_excluded():
         "prompt": "Write an essay of about 80 words.",
         "answerFormat": "english_composition",
     }
-    assert not is_ai_passage_translation_recommended(q)
+    # ラテン文字が一定数あるため API 受付対象になりうる（実生成は本文抽出で失敗）
+    assert is_passage_translation_target(q)
 
 
 def test_question_has_english_passage():

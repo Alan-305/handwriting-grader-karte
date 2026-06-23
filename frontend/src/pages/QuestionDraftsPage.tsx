@@ -12,11 +12,7 @@ import { apiClient } from "@/lib/api-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getDb } from "@/lib/firebase";
 import { splitModelAnswerSections, translationBody, answerBodyWithoutPassageTranslation } from "@/lib/model-answer-sections";
-import {
-  isAiPassageTranslationRecommended,
-  shouldShowPassageTranslationSection,
-  toPassageTranslationQuestionLike,
-} from "@/lib/passage-translation-policy";
+import { shouldShowPassageTranslationSection } from "@/lib/passage-translation-policy";
 import type { Test } from "@/types/firestore";
 import { QUESTION_TEXT_HINT, QuestionPromptBlock } from "@/lib/question-text-format";
 import type { GeneratedQuestionDraft } from "@/types/question-design";
@@ -226,9 +222,6 @@ export function QuestionDraftsPage() {
                 draft,
                 passageTranslation,
               );
-              const aiRecommended = isAiPassageTranslationRecommended(
-                toPassageTranslationQuestionLike(draft),
-              );
               const isTranslating = translatingDraftId === draftId;
               return (
                 <Card
@@ -287,29 +280,27 @@ export function QuestionDraftsPage() {
                             長文読解・要約・誤り指摘など英語本文がある型向けです。問題セット内の第何問かは関係しません。不要なら空欄のままで構いません。
                           </p>
                         </div>
-                        {aiRecommended ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="min-h-11 gap-2"
-                            disabled={isTranslating || isBusy}
-                            onClick={() =>
-                              draftId &&
-                              void handleGeneratePassageTranslation(
-                                draftId,
-                                !aiRecommended || Boolean(passageTranslation.trim()),
-                              )
-                            }
-                          >
-                            <Sparkles className="h-4 w-4" />
-                            {isTranslating
-                              ? "生成中…"
-                              : passageTranslation.trim()
-                                ? "AIで全訳を再生成"
-                                : "AIで全訳を生成"}
-                          </Button>
-                        ) : null}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="min-h-11 gap-2"
+                          disabled={isTranslating || isBusy}
+                          onClick={() =>
+                            draftId &&
+                            void handleGeneratePassageTranslation(
+                              draftId,
+                              Boolean(passageTranslation.trim()),
+                            )
+                          }
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          {isTranslating
+                            ? "生成中…"
+                            : passageTranslation.trim()
+                              ? "AIで全訳を再生成"
+                              : "AIで全訳を生成"}
+                        </Button>
                       </div>
                       {isTranslating ? (
                         <InlineLoading message="本文の全訳をAIが生成しています…" />

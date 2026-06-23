@@ -43,10 +43,6 @@ import {
   type AnswerKeyDraftState,
 } from "@/lib/test-answer-key";
 import { exportElementToPdf, printElement } from "@/lib/pdf-export";
-import {
-  isAiPassageTranslationRecommended,
-  toPassageTranslationQuestionLike,
-} from "@/lib/passage-translation-policy";
 import type { Question, Test } from "@/types/firestore";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -304,9 +300,6 @@ export function PrintTestAnswerKeyPage() {
       {questions.map((q, qi) => {
         const qUnits = draftUnits.filter((u) => u.questionId === q.id);
         const passage = draft.passageByQuestion[q.id] ?? "";
-        const aiRecommended = isAiPassageTranslationRecommended(
-          toPassageTranslationQuestionLike(q),
-        );
 
         return (
           <CollapsiblePanel
@@ -344,26 +337,24 @@ export function PrintTestAnswerKeyPage() {
                     本文の全訳
                   </label>
                   <p className="mt-1 font-ja text-xs text-slate-500">
-                    第{q.order}問のいちばん最後に印刷される別枠です。長文読解・要約・誤り指摘など向け（大学別の大問番号とは無関係）。
+                    第{q.order}問のいちばん最後に印刷される別枠です。
                   </p>
                 </div>
-                {aiRecommended ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="min-h-11 gap-2"
-                    disabled={generateState === "generating"}
-                    onClick={() => void runPassageTranslation([q.id], Boolean(passage.trim()))}
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    {generatingQuestionIds.includes(q.id)
-                      ? "生成中…"
-                      : passage.trim()
-                        ? "AIで再生成"
-                        : "AIで生成"}
-                  </Button>
-                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-11 gap-2"
+                  disabled={generateState === "generating"}
+                  onClick={() => void runPassageTranslation([q.id], Boolean(passage.trim()))}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {generatingQuestionIds.includes(q.id)
+                    ? "生成中…"
+                    : passage.trim()
+                      ? "AIで全訳を再生成"
+                      : "AIで全訳を生成"}
+                </Button>
               </div>
               <Textarea
                 value={passage}
@@ -373,9 +364,7 @@ export function PrintTestAnswerKeyPage() {
                 placeholder={
                   generatingQuestionIds.includes(q.id)
                     ? "AIが本文の全訳を生成しています…"
-                    : aiRecommended
-                      ? "「AIで生成」ボタンで作成できます（手入力も可）"
-                      : "この問題型では通常不要です（手入力も可）"
+                    : "「AIで全訳を生成」ボタンで作成できます（手入力も可）"
                 }
                 readOnly={generatingQuestionIds.includes(q.id)}
                 data-preview-anchor={questionPassageAnchor(q.id)}

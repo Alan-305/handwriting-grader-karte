@@ -1,9 +1,9 @@
-from app.services.passage_translation_policy import question_has_english_passage
-from app.services.passage_translation_service import (
+from app.services.passage_text_utils import (
     extract_english_passage_from_prompt,
     format_translation_with_markers,
     split_source_paragraphs,
 )
+from app.services.passage_translation_policy import question_has_english_passage
 
 
 def test_question_has_english_passage():
