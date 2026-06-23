@@ -9,7 +9,7 @@ import {
 import { questionAnchor, questionOrderAnchor } from "@/lib/preview-anchor";
 import { DEFAULT_OPTIONS } from "@/lib/answer-format";
 import { AnswerField } from "@/components/print/AnswerField";
-import { PrintFixedCornerMarks, PrintFlowDocument } from "@/components/print/PrintA4Page";
+import { PrintFlowDocument } from "@/components/print/PrintA4Page";
 import type { AnswerFormatOptions } from "@/types/firestore";
 
 const ANSWER_SHEET_LINE = "#334155";
@@ -145,8 +145,6 @@ export function AnswerSheetPrintLayout({
       data-page-margin={settings.pageMargin}
       style={printLayoutDocumentStyle(settings)}
     >
-      <PrintFixedCornerMarks />
-
       <header className="print-doc-header border-b border-slate-300 pb-5 text-center print:border-black">
         <h1 className="font-ja text-xl font-semibold">{testTitle}</h1>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 font-ja text-sm text-slate-700">

@@ -71,9 +71,6 @@ function buildPrintStyles(): string {
     .print-flow-document.print-layout-document[data-page-margin="wide"] {
       padding: 26mm 32mm !important;
     }
-    .print-flow-document--answer-sheet .print-corner-mark {
-      position: absolute !important;
-    }
   }
 
   @media print {
@@ -203,18 +200,6 @@ function buildPrintStyles(): string {
     .answer-sheet-field { border-width: 1pt !important; }
     .answer-sheet-symbol-table th,
     .answer-sheet-symbol-table td { border-width: 0.5pt !important; }
-    .print-corner-mark {
-      position: fixed;
-      z-index: 9999;
-      width: 3mm;
-      height: 3mm;
-      box-sizing: border-box;
-      border: 1px solid #000;
-    }
-    .print-corner-tl { top: 0; left: 0; }
-    .print-corner-tr { top: 0; right: 0; }
-    .print-corner-bl { bottom: 0; left: 0; }
-    .print-corner-br { bottom: 0; right: 0; }
   }
 `;
 }

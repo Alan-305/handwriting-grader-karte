@@ -22,7 +22,7 @@ export function PrintFlowDocument({
   );
 }
 
-/** A4 1枚分の固定ページ（解答用紙などトンボ付きページ向け） */
+/** A4 1枚分の固定ページ */
 export function PrintA4Page({
   children,
   className = "",
@@ -36,48 +36,6 @@ export function PrintA4Page({
     >
       {children}
     </div>
-  );
-}
-
-/** 解答用紙：印刷時は各ページ四隅に固定表示されるトンボ */
-export function PrintFixedCornerMarks() {
-  const corners = [
-    "print-corner-tl",
-    "print-corner-tr",
-    "print-corner-bl",
-    "print-corner-br",
-  ] as const;
-
-  return (
-    <>
-      {corners.map((corner) => (
-        <div
-          key={corner}
-          aria-hidden
-          className={`print-corner-mark ${corner} border border-slate-800 print:border-black`}
-        />
-      ))}
-    </>
-  );
-}
-
-/** 解答用紙四隅のトンボ（固定ページコンテナ内） */
-export function PrintCornerMarks() {
-  return (
-    <>
-      {[
-        { top: 4, left: 4 },
-        { top: 4, right: 4 },
-        { bottom: 4, left: 4 },
-        { bottom: 4, right: 4 },
-      ].map((pos, i) => (
-        <div
-          key={i}
-          className="absolute h-3 w-3 border border-slate-800 print:border-black"
-          style={pos}
-        />
-      ))}
-    </>
   );
 }
 
