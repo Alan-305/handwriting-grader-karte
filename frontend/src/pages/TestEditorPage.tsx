@@ -65,14 +65,14 @@ import {
   translationBody,
 } from "@/lib/model-answer-sections";
 import {
-  supportsPassageTranslation,
+  isAiPassageTranslationRecommended,
+  toPassageTranslationQuestionLike,
 } from "@/lib/passage-translation-policy";
 import { QUESTION_TEXT_HINT } from "@/lib/question-text-format";
 import {
   expandAnswerKeyUnits,
   mergePassageTranslationsIntoQuestions,
   questionNeedsAiPassageTranslation,
-  questionShowsPassageTranslationField,
   stripPassageTranslationsFromQuestions,
 } from "@/lib/test-answer-key";
 import { usePrintLayoutSettings } from "@/hooks/usePrintLayoutSettings";
@@ -826,57 +826,56 @@ export function TestEditorPage() {
                   )}
                 </div>
               )}
-              {(questionShowsPassageTranslationField(
-                q,
-                draftTranslations[q.id] ?? "",
-              ) ||
-                (draftTranslations[q.id] ?? "").trim()) && (
-                <div className="rounded-lg border-2 border-slate-200 bg-slate-50/70 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <label className="font-ja text-sm font-semibold text-slate-800">
-                      全訳（第{q.order}問のいちばん最後に印刷されます）
-                    </label>
-                    {supportsPassageTranslation(q) ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="min-h-11 gap-2"
-                        disabled={translatingQuestionId === q.id}
-                        onClick={() =>
-                          void handleGeneratePassageTranslation(
-                            q.id,
-                            !questionNeedsAiPassageTranslation(q, draftTranslations[q.id] ?? ""),
-                          )
-                        }
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        {translatingQuestionId === q.id
-                          ? "生成中…"
-                          : questionNeedsAiPassageTranslation(q, draftTranslations[q.id] ?? "")
-                            ? "AIで全訳を生成"
-                            : "AIで全訳を再生成"}
-                      </Button>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 font-ja text-xs leading-relaxed text-slate-500">
-                    本文の全訳は問題生成後に手動で作成します（第2問(A)(B)・第3問は対象外）。模範解答内の【全訳】は自動でこの欄に移動します。
-                  </p>
-                  <Textarea
-                    value={draftTranslations[q.id] ?? ""}
-                    onChange={(e) => updateDraftTranslation(q.id, e.target.value)}
-                    className="mt-2 font-ja"
-                    rows={5}
-                    placeholder={
-                      translatingQuestionId === q.id
-                        ? "AIが本文の全訳を生成しています…"
-                        : "必要なとき「AIで全訳を生成」を押してください（手入力も可）"
-                    }
-                    readOnly={translatingQuestionId === q.id}
-                    data-preview-anchor={questionPassageAnchor(q.id)}
-                  />
+              <div className="rounded-lg border-2 border-slate-200 bg-slate-50/70 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="font-ja text-sm font-semibold text-slate-800">
+                    全訳（第{q.order}問のいちばん最後に印刷されます）
+                  </label>
+                  {isAiPassageTranslationRecommended(toPassageTranslationQuestionLike(q)) ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-11 gap-2"
+                      disabled={translatingQuestionId === q.id}
+                      onClick={() =>
+                        void handleGeneratePassageTranslation(
+                          q.id,
+                          Boolean((draftTranslations[q.id] ?? "").trim()),
+                        )
+                      }
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      {translatingQuestionId === q.id
+                        ? "生成中…"
+                        : questionNeedsAiPassageTranslation(q, draftTranslations[q.id] ?? "")
+                          ? "AIで全訳を生成"
+                          : "AIで全訳を再生成"}
+                    </Button>
+                  ) : null}
                 </div>
-              )}
+                <p className="mt-1 font-ja text-xs leading-relaxed text-slate-500">
+                  長文読解・要約・誤り指摘などではAI生成をご利用ください。和文英訳・英作文などでは空欄のままで構いません。模範解答内の【全訳】は自動でこの欄に移動します。
+                </p>
+                {translationError && translatingQuestionId === null ? (
+                  <p className="mt-1 font-ja text-xs text-red-600">{translationError}</p>
+                ) : null}
+                <Textarea
+                  value={draftTranslations[q.id] ?? ""}
+                  onChange={(e) => updateDraftTranslation(q.id, e.target.value)}
+                  className="mt-2 font-ja"
+                  rows={5}
+                  placeholder={
+                    translatingQuestionId === q.id
+                      ? "AIが本文の全訳を生成しています…"
+                      : isAiPassageTranslationRecommended(toPassageTranslationQuestionLike(q))
+                        ? "必要なとき「AIで全訳を生成」を押してください（手入力も可）"
+                        : "この問題型では通常不要です（手入力も可）"
+                  }
+                  readOnly={translatingQuestionId === q.id}
+                  data-preview-anchor={questionPassageAnchor(q.id)}
+                />
+              </div>
               </div>
             </CollapsiblePanel>
           ))}

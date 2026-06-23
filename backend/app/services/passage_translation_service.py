@@ -108,7 +108,8 @@ class PassageTranslationService:
     def generate_translation_for_question(self, question: dict) -> str:
         if not is_passage_translation_target(question):
             raise ValueError(
-                "この設問は本文全訳の自動生成対象外です（第2問(A)(B)・第3問、または英語長文なし）"
+                "この設問は本文全訳の自動生成の対象外です"
+                "（和文英訳・下線部和訳・空所補充/並べ替え・英作文など、または英語長文なし）"
             )
 
         passage_en = extract_english_passage_from_prompt(question.get("prompt") or "")
@@ -205,7 +206,8 @@ class PassageTranslationService:
 
         if not is_passage_translation_target(question_like):
             raise ValueError(
-                "この問題タイプは本文全訳の自動生成対象外です（第2問(A)(B)・第3問、または英語長文なし）"
+                "この問題は本文全訳の自動生成の対象外です"
+                "（和文英訳・下線部和訳・空所補充/並べ替え・英作文など、または英語長文なし）"
             )
 
         existing = _question_existing_translation(question_like)

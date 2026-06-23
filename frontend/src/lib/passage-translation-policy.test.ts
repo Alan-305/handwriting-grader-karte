@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
-  isExcludedFromPassageTranslation,
-  supportsPassageTranslation,
+  isAiPassageTranslationRecommended,
+  shouldShowPassageTranslationSection,
 } from "@/lib/passage-translation-policy";
 import type { Question } from "@/types/firestore";
+
+const LONG_EN = `次の英文を読みなさい。\n\n${"word ".repeat(60)}`;
 
 function englishQuestion(overrides: Partial<Question> = {}): Question {
   return {
     id: "q1",
     order: 1,
     type: "english",
-    prompt: `次の英文を読みなさい。\n\n${"word ".repeat(60)}`,
+    prompt: LONG_EN,
     modelAnswer: "",
     points: 10,
     cropRegion: { x: 0, y: 0, width: 0, height: 0 },
@@ -19,33 +21,54 @@ function englishQuestion(overrides: Partial<Question> = {}): Question {
 }
 
 describe("passage-translation-policy", () => {
-  it("excludes Q2A/Q2B pipelines", () => {
+  it("recommends Q5 content at set order 3", () => {
     expect(
-      isExcludedFromPassageTranslation({ generationPipeline: "q2a", majorOrder: 2 }),
-    ).toBe(true);
-    expect(
-      isExcludedFromPassageTranslation({ generationPipeline: "q2b", majorOrder: 2 }),
-    ).toBe(true);
-  });
-
-  it("excludes major order 3", () => {
-    expect(isExcludedFromPassageTranslation({ order: 3 })).toBe(true);
-  });
-
-  it("supports Q5 english passage", () => {
-    expect(
-      supportsPassageTranslation({
-        majorOrder: 5,
+      isAiPassageTranslationRecommended({
         generationPipeline: "q5",
         type: "english",
-        prompt: englishQuestion().prompt,
-        modelAnswer: "",
-        points: 20,
+        prompt: LONG_EN,
       }),
     ).toBe(true);
   });
 
-  it("does not support Q3 even with english passage", () => {
-    expect(supportsPassageTranslation(englishQuestion({ order: 3 }))).toBe(false);
+  it("recommends Q4A content at set order 1", () => {
+    expect(
+      isAiPassageTranslationRecommended({
+        generationPipeline: "q4a",
+        type: "english",
+        prompt: LONG_EN,
+      }),
+    ).toBe(true);
+  });
+
+  it("excludes q2b pipeline regardless of order", () => {
+    expect(
+      isAiPassageTranslationRecommended({
+        generationPipeline: "q2b",
+        type: "english",
+        prompt: LONG_EN,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not use set order alone to exclude summary reading", () => {
+    expect(
+      isAiPassageTranslationRecommended(
+        englishQuestion({
+          order: 3,
+          generationPipeline: undefined,
+          prompt: `次の英文を読み、80字以内で要約せよ。\n\n${"word ".repeat(60)}`,
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("shows section when translation already exists", () => {
+    expect(
+      shouldShowPassageTranslationSection(
+        englishQuestion({ generationPipeline: "q2a" }),
+        "既存の全訳",
+      ),
+    ).toBe(true);
   });
 });

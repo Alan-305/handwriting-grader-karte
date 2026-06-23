@@ -12,7 +12,11 @@ import { apiClient } from "@/lib/api-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getDb } from "@/lib/firebase";
 import { splitModelAnswerSections, translationBody, answerBodyWithoutPassageTranslation } from "@/lib/model-answer-sections";
-import { supportsPassageTranslation } from "@/lib/passage-translation-policy";
+import {
+  isAiPassageTranslationRecommended,
+  shouldShowPassageTranslationSection,
+  toPassageTranslationQuestionLike,
+} from "@/lib/passage-translation-policy";
 import type { Test } from "@/types/firestore";
 import { QUESTION_TEXT_HINT, QuestionPromptBlock } from "@/lib/question-text-format";
 import type { GeneratedQuestionDraft } from "@/types/question-design";
@@ -218,10 +222,13 @@ export function QuestionDraftsPage() {
               const passageTranslation = translationBody(
                 splitModelAnswerSections(draft.modelAnswer).translation,
               );
-              const showPassageTranslation =
-                supportsPassageTranslation(draft) || Boolean(passageTranslation.trim());
-              const needsPassageTranslation =
-                supportsPassageTranslation(draft) && !passageTranslation.trim();
+              const showPassageTranslation = shouldShowPassageTranslationSection(
+                draft,
+                passageTranslation,
+              );
+              const aiRecommended = isAiPassageTranslationRecommended(
+                toPassageTranslationQuestionLike(draft),
+              );
               const isTranslating = translatingDraftId === draftId;
               return (
                 <Card
@@ -277,10 +284,10 @@ export function QuestionDraftsPage() {
                         <div>
                           <p className="font-ja text-sm font-semibold text-slate-800">本文の全訳</p>
                           <p className="mt-1 font-ja text-xs leading-relaxed text-slate-500">
-                            問題生成とは別工程です。第2問(A)(B)・第3問を除く英語長文向け。必要なときだけAIで生成してください。
+                            長文読解・要約・誤り指摘など英語本文がある型向けです。問題セット内の第何問かは関係しません。不要なら空欄のままで構いません。
                           </p>
                         </div>
-                        {supportsPassageTranslation(draft) ? (
+                        {aiRecommended ? (
                           <Button
                             type="button"
                             variant="outline"
@@ -289,15 +296,18 @@ export function QuestionDraftsPage() {
                             disabled={isTranslating || isBusy}
                             onClick={() =>
                               draftId &&
-                              void handleGeneratePassageTranslation(draftId, !needsPassageTranslation)
+                              void handleGeneratePassageTranslation(
+                                draftId,
+                                !aiRecommended || Boolean(passageTranslation.trim()),
+                              )
                             }
                           >
                             <Sparkles className="h-4 w-4" />
                             {isTranslating
                               ? "生成中…"
-                              : needsPassageTranslation
-                                ? "AIで全訳を生成"
-                                : "AIで全訳を再生成"}
+                              : passageTranslation.trim()
+                                ? "AIで全訳を再生成"
+                                : "AIで全訳を生成"}
                           </Button>
                         ) : null}
                       </div>

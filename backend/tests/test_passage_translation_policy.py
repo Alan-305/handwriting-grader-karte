@@ -1,37 +1,70 @@
 from app.services.passage_translation_policy import (
-    is_excluded_from_passage_translation,
+    is_ai_passage_translation_recommended,
     is_passage_translation_target,
+    question_has_english_passage,
 )
 
-
-def test_excludes_q2a_q2b_pipelines():
-    assert is_excluded_from_passage_translation({"generationPipeline": "q2a", "order": 2})
-    assert is_excluded_from_passage_translation({"generationPipeline": "q2b", "order": 2})
+_LONG_EN = "Read the following passage.\n\n" + ("word " * 60)
 
 
-def test_excludes_major_order_3():
-    assert is_excluded_from_passage_translation({"order": 3, "type": "english"})
-
-
-def test_excludes_q2_part_a_b_without_pipeline():
-    assert is_excluded_from_passage_translation({"order": 2, "partLabel": "(A)"})
-    assert is_excluded_from_passage_translation({"order": 2, "partLabel": "(B)"})
-
-
-def test_includes_q5_with_english_passage():
-    prompt = "Read the passage.\n\n" + ("word " * 60)
-    question = {
-        "generationPipeline": "q5",
-        "order": 5,
+def test_q2b_pipeline_excluded_regardless_of_set_order():
+    q = {
+        "generationPipeline": "q2b",
+        "order": 1,
         "type": "english",
-        "prompt": prompt,
+        "prompt": _LONG_EN,
     }
-    assert not is_excluded_from_passage_translation(question)
-    assert is_passage_translation_target(question)
+    assert not is_ai_passage_translation_recommended(q)
 
 
-def test_excludes_q3_even_with_english_passage():
-    prompt = "Read the passage.\n\n" + ("word " * 60)
-    question = {"order": 3, "type": "english", "prompt": prompt}
-    assert is_excluded_from_passage_translation(question)
-    assert not is_passage_translation_target(question)
+def test_q5_at_set_order_3_is_recommended():
+    q = {
+        "generationPipeline": "q5",
+        "order": 3,
+        "type": "english",
+        "prompt": _LONG_EN,
+    }
+    assert is_passage_translation_target(q)
+
+
+def test_q4a_at_set_order_1_is_recommended():
+    q = {
+        "generationPipeline": "q4a",
+        "order": 1,
+        "type": "english",
+        "prompt": _LONG_EN,
+    }
+    assert is_ai_passage_translation_recommended(q)
+
+
+def test_summary_style_with_english_passage_at_any_order():
+    q = {
+        "order": 2,
+        "type": "english",
+        "prompt": f"次の英文を読み、80字以内の日本語で要約せよ。\n\n{_LONG_EN}",
+    }
+    assert is_ai_passage_translation_recommended(q)
+
+
+def test_wabun_eibun_prompt_excluded_without_pipeline():
+    q = {
+        "order": 4,
+        "type": "english",
+        "prompt": "以下の日本文の下線部を英訳せよ。\n\n私は*勇気*を出して話しかけた。",
+    }
+    assert not is_ai_passage_translation_recommended(q)
+
+
+def test_composition_excluded():
+    q = {
+        "generationPipeline": "q2a",
+        "order": 1,
+        "type": "english",
+        "prompt": "Write an essay of about 80 words.",
+        "answerFormat": "english_composition",
+    }
+    assert not is_ai_passage_translation_recommended(q)
+
+
+def test_question_has_english_passage():
+    assert question_has_english_passage({"type": "english", "prompt": _LONG_EN})

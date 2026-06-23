@@ -2,72 +2,88 @@ import { questionHasEnglishPassage } from "@/lib/model-answer-sections";
 import type { Question } from "@/types/firestore";
 import type { GeneratedQuestionDraft } from "@/types/question-design";
 
-const EXCLUDED_PIPELINES = new Set(["q2a", "q2b"]);
-const EXCLUDED_MAJOR_ORDERS = new Set([3]);
+/** 大学別生成パイプライン上、本文全訳が通常不要な型 */
+const PIPELINE_NO_AI_PASSAGE_TRANSLATION = new Set(["q1b", "q2a", "q2b", "q4b"]);
 
-export type PassageTranslationTarget = {
-  order?: number;
-  majorOrder?: number;
-  partLabel?: string | null;
+export type PassageTranslationQuestionLike = {
+  type?: string;
+  prompt?: string;
+  answerFormat?: string | null;
   generationPipeline?: string | null;
 };
 
-function normalizePartLabel(partLabel?: string | null): string {
-  if (!partLabel) return "";
-  const match = partLabel.match(/[A-Za-zＡ-Ｚａ-ｚ]/);
-  return match ? match[0].toUpperCase() : "";
+function promptIsWabunEibun(prompt: string): boolean {
+  if (!prompt.trim()) return false;
+  if (!/下線部を英訳|和文.*下線|日本文.*下線|日本語文.*下線/.test(prompt)) return false;
+  const latin = (prompt.match(/[a-zA-Z]/g) || []).length;
+  const cjk = (prompt.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g) || []).length;
+  return cjk >= latin;
 }
 
-export function isExcludedFromPassageTranslation(
-  target: PassageTranslationTarget,
-): boolean {
-  const pipeline = (target.generationPipeline ?? "").toLowerCase();
-  if (EXCLUDED_PIPELINES.has(pipeline)) return true;
-
-  const order = target.order ?? target.majorOrder ?? 0;
-  if (EXCLUDED_MAJOR_ORDERS.has(order)) return true;
-
-  if (order === 2) {
-    const part = normalizePartLabel(target.partLabel);
-    if (part === "A" || part === "B") return true;
-  }
-
-  return false;
+function promptIsEnglishUnderlineToJa(prompt: string): boolean {
+  return (
+    /下線部.{0,24}日本語|日本語に訳|和訳せよ/.test(prompt) &&
+    !/誤り|不適切/.test(prompt)
+  );
 }
 
-export function toPassageTranslationTarget(
+function promptIsComposition(prompt: string, answerFormat?: string | null): boolean {
+  if (answerFormat === "english_composition") return true;
+  if (/英作文|自由英作/.test(prompt)) return true;
+  if (/\d+\s*語/.test(prompt) && /書きなさい|書け/.test(prompt)) return true;
+  const lowered = prompt.toLowerCase();
+  return lowered.includes("words") && (lowered.includes("write") || lowered.includes("compose"));
+}
+
+export function toPassageTranslationQuestionLike(
   source: Question | GeneratedQuestionDraft,
-): PassageTranslationTarget {
-  if ("majorOrder" in source && source.majorOrder != null) {
-    return {
-      majorOrder: source.majorOrder,
-      partLabel: source.partLabel,
-      generationPipeline: source.generationPipeline,
-    };
-  }
-  const question = source as Question;
+): PassageTranslationQuestionLike {
   return {
-    order: question.order,
-    partLabel: null,
-    generationPipeline: question.generationPipeline,
+    type: source.type,
+    prompt: source.prompt,
+    answerFormat: "answerFormat" in source ? source.answerFormat : undefined,
+    generationPipeline: source.generationPipeline,
   };
 }
 
-export function supportsPassageTranslation(
-  source: Question | GeneratedQuestionDraft,
+/** AI 全訳生成を推奨するか（問題セット内の番号は見ない） */
+export function isAiPassageTranslationRecommended(
+  source: PassageTranslationQuestionLike,
 ): boolean {
-  if (isExcludedFromPassageTranslation(toPassageTranslationTarget(source))) {
-    return false;
-  }
+  const pipeline = (source.generationPipeline ?? "").toLowerCase();
+  if (PIPELINE_NO_AI_PASSAGE_TRANSLATION.has(pipeline)) return false;
+
   const prompt = source.prompt ?? "";
+  const answerFormat = source.answerFormat ?? "";
+
+  if (promptIsComposition(prompt, answerFormat)) return false;
+  if (promptIsWabunEibun(prompt)) return false;
+  if (pipeline === "q4b" || promptIsEnglishUnderlineToJa(prompt)) return false;
+
   const questionLike: Question = {
-    id: "id" in source && source.id ? source.id : "draft",
-    order: "order" in source ? source.order : source.majorOrder,
-    type: source.type as Question["type"],
+    id: "check",
+    order: 1,
+    type: (source.type as Question["type"]) ?? "english",
     prompt,
-    modelAnswer: source.modelAnswer ?? "",
-    points: source.points,
+    modelAnswer: "",
+    points: 1,
     cropRegion: { x: 0, y: 0, width: 0, height: 0 },
   };
   return questionHasEnglishPassage(questionLike);
+}
+
+/** @deprecated use isAiPassageTranslationRecommended */
+export function supportsPassageTranslation(
+  source: Question | GeneratedQuestionDraft,
+): boolean {
+  return isAiPassageTranslationRecommended(toPassageTranslationQuestionLike(source));
+}
+
+/** 下書き・解答解説画面で全訳欄を出すか（既存入力 or AI推奨） */
+export function shouldShowPassageTranslationSection(
+  source: Question | GeneratedQuestionDraft,
+  existingTranslation = "",
+): boolean {
+  if (existingTranslation.trim()) return true;
+  return isAiPassageTranslationRecommended(toPassageTranslationQuestionLike(source));
 }

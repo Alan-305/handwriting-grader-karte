@@ -6,7 +6,9 @@ import {
   splitModelAnswerSections,
 } from "@/lib/model-answer-sections";
 import {
-  supportsPassageTranslation,
+  isAiPassageTranslationRecommended,
+  shouldShowPassageTranslationSection,
+  toPassageTranslationQuestionLike,
 } from "@/lib/passage-translation-policy";
 import type { AnswerPart, Question } from "@/types/firestore";
 
@@ -207,8 +209,7 @@ export function questionShowsPassageTranslationField(
   question: Question,
   passageText: string,
 ): boolean {
-  if (passageText.trim()) return true;
-  return supportsPassageTranslation(question);
+  return shouldShowPassageTranslationSection(question, passageText);
 }
 
 /** AI による本文全訳の生成が必要か */
@@ -216,5 +217,8 @@ export function questionNeedsAiPassageTranslation(
   question: Question,
   passageText: string,
 ): boolean {
-  return supportsPassageTranslation(question) && !passageText.trim();
+  return (
+    isAiPassageTranslationRecommended(toPassageTranslationQuestionLike(question)) &&
+    !passageText.trim()
+  );
 }

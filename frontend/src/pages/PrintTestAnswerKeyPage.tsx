@@ -40,12 +40,12 @@ import {
   applyAnswerKeyUnitsToQuestions,
   buildAnswerKeyUnitsFromDraft,
   initAnswerKeyDraftState,
-  questionShowsPassageTranslationField,
   type AnswerKeyDraftState,
 } from "@/lib/test-answer-key";
 import { exportElementToPdf, printElement } from "@/lib/pdf-export";
 import {
-  supportsPassageTranslation,
+  isAiPassageTranslationRecommended,
+  toPassageTranslationQuestionLike,
 } from "@/lib/passage-translation-policy";
 import type { Question, Test } from "@/types/firestore";
 
@@ -286,9 +286,8 @@ export function PrintTestAnswerKeyPage() {
         defaultOpen={false}
       >
         <p className="font-ja text-sm leading-relaxed text-slate-700">
-          英語長文がある設問（第1問・第4問・第5問など）の<strong>本文の全訳</strong>は、
-          問題生成とは別に、この画面から手動でAI生成できます。
-          全訳は各問の<strong>いちばん最後</strong>の別枠に印刷されます（第2問(A)(B)・第3問は対象外）。
+          英語長文がある設問（長文読解・要約・誤り指摘など）では、本文の全訳をこの画面から手動でAI生成できます。
+          問題セット内の第何問か・大学別の大問番号とは一致しなくても、問題の種類に応じて判定します。
         </p>
       </CollapsiblePanel>
 
@@ -305,7 +304,9 @@ export function PrintTestAnswerKeyPage() {
       {questions.map((q, qi) => {
         const qUnits = draftUnits.filter((u) => u.questionId === q.id);
         const passage = draft.passageByQuestion[q.id] ?? "";
-        const showPassage = questionShowsPassageTranslationField(q, passage);
+        const aiRecommended = isAiPassageTranslationRecommended(
+          toPassageTranslationQuestionLike(q),
+        );
 
         return (
           <CollapsiblePanel
@@ -336,48 +337,50 @@ export function PrintTestAnswerKeyPage() {
               </div>
             ))}
 
-            {showPassage ? (
-              <Card className="space-y-3 border-2 border-slate-200 bg-slate-50/70 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <label className="font-ja text-sm font-semibold text-slate-800">
-                      本文の全訳
-                    </label>
-                    <p className="mt-1 font-ja text-xs text-slate-500">
-                      問題生成後に手動で作成する全訳です。第{q.order}問のいちばん最後に印刷される別枠です。
-                    </p>
-                  </div>
-                  {supportsPassageTranslation(q) ? (
+            <Card className="space-y-3 border-2 border-slate-200 bg-slate-50/70 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <label className="font-ja text-sm font-semibold text-slate-800">
+                    本文の全訳
+                  </label>
+                  <p className="mt-1 font-ja text-xs text-slate-500">
+                    第{q.order}問のいちばん最後に印刷される別枠です。長文読解・要約・誤り指摘など向け（大学別の大問番号とは無関係）。
+                  </p>
+                </div>
+                {aiRecommended ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     className="min-h-11 gap-2"
                     disabled={generateState === "generating"}
-                    onClick={() => void runPassageTranslation([q.id], true)}
+                    onClick={() => void runPassageTranslation([q.id], Boolean(passage.trim()))}
                   >
                     <Sparkles className="h-4 w-4" />
-                    {generatingQuestionIds.includes(q.id) ? "生成中…" : "AIで生成"}
+                    {generatingQuestionIds.includes(q.id)
+                      ? "生成中…"
+                      : passage.trim()
+                        ? "AIで再生成"
+                        : "AIで生成"}
                   </Button>
-                  ) : null}
-                </div>
-                <Textarea
-                  value={passage}
-                  onChange={(e) => updatePassage(q.id, e.target.value)}
-                  className="min-h-[200px] border-slate-200 bg-white font-ja text-base leading-relaxed"
-                  rows={12}
-                  placeholder={
-                    generatingQuestionIds.includes(q.id)
-                      ? "AIが本文の全訳を生成しています…"
-                      : supportsPassageTranslation(q)
-                        ? "「AIで生成」ボタンで作成できます（手入力も可）"
-                        : "問題生成時に作成された全訳がここに表示されます"
-                  }
-                  readOnly={generatingQuestionIds.includes(q.id)}
-                  data-preview-anchor={questionPassageAnchor(q.id)}
-                />
-              </Card>
-            ) : null}
+                ) : null}
+              </div>
+              <Textarea
+                value={passage}
+                onChange={(e) => updatePassage(q.id, e.target.value)}
+                className="min-h-[200px] border-slate-200 bg-white font-ja text-base leading-relaxed"
+                rows={12}
+                placeholder={
+                  generatingQuestionIds.includes(q.id)
+                    ? "AIが本文の全訳を生成しています…"
+                    : aiRecommended
+                      ? "「AIで生成」ボタンで作成できます（手入力も可）"
+                      : "この問題型では通常不要です（手入力も可）"
+                }
+                readOnly={generatingQuestionIds.includes(q.id)}
+                data-preview-anchor={questionPassageAnchor(q.id)}
+              />
+            </Card>
             </div>
           </CollapsiblePanel>
         );
