@@ -87,6 +87,12 @@ class GeneratePassageTranslationsBody(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class GenerateDraftPassageTranslationBody(BaseModel):
+    force: bool = False
+
+    model_config = {"populate_by_name": True}
+
+
 class GenerateQ5Body(BaseModel):
     reference_years: list[int] | None = Field(alias="referenceYears", default=None)
     difficulty: str = "standard"
@@ -729,6 +735,30 @@ def delete_draft(draft_id: str):
         return jsonify({"status": "deleted"})
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 404
+
+
+@question_design_bp.post("/question-drafts/<draft_id>/generate-passage-translation")
+@require_auth
+def generate_draft_passage_translation(draft_id: str):
+    try:
+        body = GenerateDraftPassageTranslationBody.model_validate(
+            request.get_json(silent=True) or {}
+        )
+    except ValidationError as exc:
+        return jsonify({"error": exc.errors()}), 400
+
+    service = PassageTranslationService()
+    try:
+        payload = service.generate_for_draft(
+            teacher_id=g.teacher_id,
+            draft_id=draft_id,
+            force=body.force,
+        )
+        return jsonify(payload)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
 
 
 @question_design_bp.post("/question-drafts/<draft_id>/promote-new")

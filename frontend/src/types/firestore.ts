@@ -183,6 +183,8 @@ export interface Question {
   points: number;
   cropRegion: CropRegion;
   rubric?: string;
+  /** 問題生成パイプライン（下書き昇格時に保存） */
+  generationPipeline?: string;
 }
 
 export interface Test {

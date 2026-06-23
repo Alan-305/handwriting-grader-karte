@@ -44,6 +44,9 @@ import {
   type AnswerKeyDraftState,
 } from "@/lib/test-answer-key";
 import { exportElementToPdf, printElement } from "@/lib/pdf-export";
+import {
+  supportsPassageTranslation,
+} from "@/lib/passage-translation-policy";
 import type { Question, Test } from "@/types/firestore";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -67,7 +70,7 @@ function AnswerKeySectionsPanel({
     <CollapsiblePanel
       storageKey="answer-key-sections"
       title="印刷に含める項目"
-      description="英語の長文がある設問では、問題生成時に作成した「本文の全訳」を表示します。"
+      description="英語長文がある設問では、本文の全訳を後から手動で生成・編集できます（第2問(A)(B)・第3問は対象外）。"
       defaultOpen={false}
     >
       <div className="flex flex-wrap gap-x-5 gap-y-2">
@@ -283,9 +286,9 @@ export function PrintTestAnswerKeyPage() {
         defaultOpen={false}
       >
         <p className="font-ja text-sm leading-relaxed text-slate-700">
-          英語の長文が出題される設問（第1問・第3問など）の<strong>本文の全訳</strong>は、
-          問題生成時に模範解答へ含めて作成されます。この画面ではその内容を表示・編集できます。
-          全訳は常に各問の<strong>いちばん最後</strong>の別枠に印刷されます。不足している場合のみ「AIで生成」ボタンを使ってください。
+          英語長文がある設問（第1問・第4問・第5問など）の<strong>本文の全訳</strong>は、
+          問題生成とは別に、この画面から手動でAI生成できます。
+          全訳は各問の<strong>いちばん最後</strong>の別枠に印刷されます（第2問(A)(B)・第3問は対象外）。
         </p>
       </CollapsiblePanel>
 
@@ -341,9 +344,10 @@ export function PrintTestAnswerKeyPage() {
                       本文の全訳
                     </label>
                     <p className="mt-1 font-ja text-xs text-slate-500">
-                      問題生成時に作成した全訳です。第{q.order}問のいちばん最後に印刷される別枠です。
+                      問題生成後に手動で作成する全訳です。第{q.order}問のいちばん最後に印刷される別枠です。
                     </p>
                   </div>
+                  {supportsPassageTranslation(q) ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -355,6 +359,7 @@ export function PrintTestAnswerKeyPage() {
                     <Sparkles className="h-4 w-4" />
                     {generatingQuestionIds.includes(q.id) ? "生成中…" : "AIで生成"}
                   </Button>
+                  ) : null}
                 </div>
                 <Textarea
                   value={passage}
@@ -364,7 +369,9 @@ export function PrintTestAnswerKeyPage() {
                   placeholder={
                     generatingQuestionIds.includes(q.id)
                       ? "AIが本文の全訳を生成しています…"
-                      : "問題生成時に作成された全訳がここに表示されます"
+                      : supportsPassageTranslation(q)
+                        ? "「AIで生成」ボタンで作成できます（手入力も可）"
+                        : "問題生成時に作成された全訳がここに表示されます"
                   }
                   readOnly={generatingQuestionIds.includes(q.id)}
                   data-preview-anchor={questionPassageAnchor(q.id)}

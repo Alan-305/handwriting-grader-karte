@@ -13,7 +13,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { Check, FileText, Printer, Save } from "lucide-react";
+import { Check, FileText, Printer, Save, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/layout/AppShell";
 import { CollapsiblePanel } from "@/components/layout/CollapsiblePanel";
 import { PreviewScrollArea } from "@/components/layout/PreviewScrollRegisterContext";
@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { apiClient } from "@/lib/api-client";
 import { confirmDeleteTarget } from "@/lib/confirm-delete";
 import {
   questionAnchor,
@@ -63,10 +64,15 @@ import {
   splitModelAnswerSections,
   translationBody,
 } from "@/lib/model-answer-sections";
+import {
+  supportsPassageTranslation,
+} from "@/lib/passage-translation-policy";
 import { QUESTION_TEXT_HINT } from "@/lib/question-text-format";
 import {
   expandAnswerKeyUnits,
   mergePassageTranslationsIntoQuestions,
+  questionNeedsAiPassageTranslation,
+  questionShowsPassageTranslationField,
   stripPassageTranslationsFromQuestions,
 } from "@/lib/test-answer-key";
 import { usePrintLayoutSettings } from "@/hooks/usePrintLayoutSettings";
@@ -105,7 +111,7 @@ function questionPatchForFirestore(question: Question): Record<string, unknown> 
 
 export function TestEditorPage() {
   const { testId } = useParams<{ testId: string }>();
-  const { user } = useAuth();
+  const { user, getIdToken } = useAuth();
   const navigate = useNavigate();
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -121,6 +127,8 @@ export function TestEditorPage() {
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState("");
+  const [translatingQuestionId, setTranslatingQuestionId] = useState<string | null>(null);
+  const [translationError, setTranslationError] = useState("");
   const paperPrintSettings = usePrintLayoutSettings(testId);
   const answerKeyPrintSettings = usePrintLayoutSettings(
     testId ? `${testId}-answer-key` : undefined,
@@ -195,6 +203,38 @@ export function TestEditorPage() {
   const updateDraftTranslation = (questionId: string, value: string) => {
     setDraftTranslations((prev) => ({ ...prev, [questionId]: value }));
     setSaveState("idle");
+  };
+
+  const handleGeneratePassageTranslation = async (questionId: string, force = false) => {
+    if (!testId) return;
+    setTranslatingQuestionId(questionId);
+    setTranslationError("");
+    const token = await getIdToken();
+    if (!token) {
+      setTranslationError("ログインが必要です");
+      setTranslatingQuestionId(null);
+      return;
+    }
+    try {
+      const result = await apiClient.generatePassageTranslations(token, testId, {
+        questionIds: [questionId],
+        force,
+      });
+      const translation = result.translations[questionId];
+      if (translation) {
+        updateDraftTranslation(questionId, translation);
+      }
+      const errorMessage = result.errors[questionId];
+      if (errorMessage) {
+        setTranslationError(errorMessage);
+      }
+    } catch (err) {
+      setTranslationError(
+        err instanceof Error ? err.message : "本文全訳の生成に失敗しました",
+      );
+    } finally {
+      setTranslatingQuestionId(null);
+    }
   };
 
   const applyRevision = (questionOrder: number, field: string, value: string) => {
@@ -786,20 +826,53 @@ export function TestEditorPage() {
                   )}
                 </div>
               )}
-              {(q.type === "english" || (draftTranslations[q.id] ?? "").trim()) && (
+              {(questionShowsPassageTranslationField(
+                q,
+                draftTranslations[q.id] ?? "",
+              ) ||
+                (draftTranslations[q.id] ?? "").trim()) && (
                 <div className="rounded-lg border-2 border-slate-200 bg-slate-50/70 p-4">
-                  <label className="font-ja text-sm font-semibold text-slate-800">
-                    全訳（第{q.order}問のいちばん最後に印刷されます）
-                  </label>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="font-ja text-sm font-semibold text-slate-800">
+                      全訳（第{q.order}問のいちばん最後に印刷されます）
+                    </label>
+                    {supportsPassageTranslation(q) ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="min-h-11 gap-2"
+                        disabled={translatingQuestionId === q.id}
+                        onClick={() =>
+                          void handleGeneratePassageTranslation(
+                            q.id,
+                            !questionNeedsAiPassageTranslation(q, draftTranslations[q.id] ?? ""),
+                          )
+                        }
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        {translatingQuestionId === q.id
+                          ? "生成中…"
+                          : questionNeedsAiPassageTranslation(q, draftTranslations[q.id] ?? "")
+                            ? "AIで全訳を生成"
+                            : "AIで全訳を再生成"}
+                      </Button>
+                    ) : null}
+                  </div>
                   <p className="mt-1 font-ja text-xs leading-relaxed text-slate-500">
-                    本文の全訳はここに入力してください。模範解答の中に【全訳】と書いた場合も、自動でこの欄に移動します。
+                    本文の全訳は問題生成後に手動で作成します（第2問(A)(B)・第3問は対象外）。模範解答内の【全訳】は自動でこの欄に移動します。
                   </p>
                   <Textarea
                     value={draftTranslations[q.id] ?? ""}
                     onChange={(e) => updateDraftTranslation(q.id, e.target.value)}
                     className="mt-2 font-ja"
                     rows={5}
-                    placeholder="問題生成時に作成された全訳がここに表示されます（手入力も可）"
+                    placeholder={
+                      translatingQuestionId === q.id
+                        ? "AIが本文の全訳を生成しています…"
+                        : "必要なとき「AIで全訳を生成」を押してください（手入力も可）"
+                    }
+                    readOnly={translatingQuestionId === q.id}
                     data-preview-anchor={questionPassageAnchor(q.id)}
                   />
                 </div>

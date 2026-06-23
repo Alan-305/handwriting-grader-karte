@@ -11,22 +11,34 @@ from app.ai.prompts.passage_translation import (
     build_passage_translation_user_prompt,
 )
 from app.ai.schemas.passage_translation import PassageTranslationResponse
+from app.services.passage_translation_policy import (
+    is_passage_translation_target,
+    question_has_english_passage,
+)
 from app.services.question_design_service import QuestionDesignService
 
 logger = logging.getLogger(__name__)
 
+_TRANSLATION_MARKER_RE = re.compile(r"(【全訳】|【全文和訳】)")
+
+
+def strip_translation_from_model_answer(model_answer: str) -> str:
+    hit = _TRANSLATION_MARKER_RE.search(model_answer or "")
+    if hit:
+        return model_answer[: hit.start()].rstrip()
+    return (model_answer or "").rstrip()
+
+
+def append_translation_to_model_answer(model_answer: str, translation: str) -> str:
+    body = strip_translation_from_model_answer(model_answer)
+    trimmed = (translation or "").strip()
+    if not trimmed:
+        return body
+    parts = [body] if body else []
+    parts.extend(["【全訳】", trimmed])
+    return "\n".join(parts)
+
 _QUESTION_SECTION_RE = re.compile(r"^問\s*[\d０-９]", re.MULTILINE)
-
-
-def question_has_english_passage(question: dict) -> bool:
-    if question.get("type") != "english":
-        return False
-    prompt = question.get("prompt") or ""
-    latin = len(re.findall(r"[a-zA-Z]", prompt))
-    if latin < 40:
-        return False
-    cjk = len(re.findall(r"[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]", prompt))
-    return latin >= 80 or latin > cjk
 
 
 def extract_english_passage_from_prompt(prompt: str) -> str:
@@ -94,8 +106,10 @@ class PassageTranslationService:
         self.gemini = GeminiAnalysisClient()
 
     def generate_translation_for_question(self, question: dict) -> str:
-        if not question_has_english_passage(question):
-            raise ValueError("この設問には英語の長文本文がありません")
+        if not is_passage_translation_target(question):
+            raise ValueError(
+                "この設問は本文全訳の自動生成対象外です（第2問(A)(B)・第3問、または英語長文なし）"
+            )
 
         passage_en = extract_english_passage_from_prompt(question.get("prompt") or "")
         if not passage_en:
@@ -147,7 +161,7 @@ class PassageTranslationService:
             qid = question.get("id") or ""
             if not qid:
                 continue
-            if not question_has_english_passage(question):
+            if not is_passage_translation_target(question):
                 skipped.append(qid)
                 continue
 
@@ -167,3 +181,44 @@ class PassageTranslationService:
             "skippedQuestionIds": skipped,
             "errors": errors,
         }
+
+    def generate_for_draft(
+        self,
+        *,
+        teacher_id: str,
+        draft_id: str,
+        force: bool = False,
+    ) -> dict:
+        draft = self.design.get_draft(teacher_id, draft_id)
+        if not draft:
+            raise ValueError("下書きが見つかりません")
+
+        question_like = {
+            "type": draft.get("type") or "english",
+            "prompt": draft.get("prompt", ""),
+            "order": draft.get("majorOrder"),
+            "majorOrder": draft.get("majorOrder"),
+            "partLabel": draft.get("partLabel"),
+            "generationPipeline": draft.get("generationPipeline"),
+            "modelAnswer": draft.get("modelAnswer", ""),
+        }
+
+        if not is_passage_translation_target(question_like):
+            raise ValueError(
+                "この問題タイプは本文全訳の自動生成対象外です（第2問(A)(B)・第3問、または英語長文なし）"
+            )
+
+        existing = _question_existing_translation(question_like)
+        if existing and not force:
+            return {"translation": existing, "draft": draft, "generated": False}
+
+        translation = self.generate_translation_for_question(question_like)
+        model_answer = append_translation_to_model_answer(
+            str(draft.get("modelAnswer") or ""),
+            translation,
+        )
+        self.design._drafts_collection(teacher_id).document(draft_id).update(
+            {"modelAnswer": model_answer}
+        )
+        draft["modelAnswer"] = model_answer
+        return {"translation": translation, "draft": draft, "generated": True}

@@ -17,7 +17,7 @@ import type { ExamYearSummary } from "@/types/api";
 const PIPELINE_STEPS = [
   "誤り指摘問題を作成中",
   "妥当性を検証中",
-  "解答・解説・全訳を作成中",
+  "解答・解説を作成中",
   "下書きを保存中",
 ] as const;
 
@@ -277,7 +277,7 @@ export function QuestionGenerateQ4APage() {
 
           <Card className="border-blue-100 bg-blue-50/50 p-4">
             <p className="font-ja text-sm text-slate-700">
-              生成の流れ：①問題（5パラグラフ×5下線） → ②妥当性検証 → ③解答・解説・全訳
+              生成の流れ：①問題（5パラグラフ×5下線） → ②妥当性検証 → ③解答・解説 → ④下書き保存（全訳は下書き画面で後から手動生成）
             </p>
           </Card>
 

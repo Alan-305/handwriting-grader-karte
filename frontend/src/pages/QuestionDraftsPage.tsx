@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { ArrowLeft, Plus, Sparkles, Trash2 } from "lucide-react";
@@ -11,6 +11,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiClient } from "@/lib/api-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getDb } from "@/lib/firebase";
+import { splitModelAnswerSections, translationBody, answerBodyWithoutPassageTranslation } from "@/lib/model-answer-sections";
+import { supportsPassageTranslation } from "@/lib/passage-translation-policy";
 import type { Test } from "@/types/firestore";
 import { QUESTION_TEXT_HINT, QuestionPromptBlock } from "@/lib/question-text-format";
 import type { GeneratedQuestionDraft } from "@/types/question-design";
@@ -29,6 +31,7 @@ export function QuestionDraftsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyDraftId, setBusyDraftId] = useState<string | null>(null);
+  const [translatingDraftId, setTranslatingDraftId] = useState<string | null>(null);
   const [titleByDraft, setTitleByDraft] = useState<Record<string, string>>({});
   const [selectedTestByDraft, setSelectedTestByDraft] = useState<Record<string, string>>({});
 
@@ -110,6 +113,23 @@ export function QuestionDraftsPage() {
       setError(err instanceof Error ? err.message : "新規問題セットの作成に失敗しました");
     } finally {
       setBusyDraftId(null);
+    }
+  };
+
+  const handleGeneratePassageTranslation = async (draftId: string, force = false) => {
+    setTranslatingDraftId(draftId);
+    setError(null);
+    const token = await getIdToken();
+    if (!token) return;
+    try {
+      const result = await apiClient.generateDraftPassageTranslation(token, draftId, { force });
+      setDrafts((prev) =>
+        prev.map((d) => (d.id === draftId ? { ...d, ...result.draft } : d)),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "本文全訳の生成に失敗しました");
+    } finally {
+      setTranslatingDraftId(null);
     }
   };
 
@@ -195,6 +215,14 @@ export function QuestionDraftsPage() {
               const isQ2B = draft.generationPipeline === "q2b";
               const artifacts = draft.generationArtifacts;
               const isFocused = focusDraftId === draftId;
+              const passageTranslation = translationBody(
+                splitModelAnswerSections(draft.modelAnswer).translation,
+              );
+              const showPassageTranslation =
+                supportsPassageTranslation(draft) || Boolean(passageTranslation.trim());
+              const needsPassageTranslation =
+                supportsPassageTranslation(draft) && !passageTranslation.trim();
+              const isTranslating = translatingDraftId === draftId;
               return (
                 <Card
                   key={draftId}
@@ -237,9 +265,51 @@ export function QuestionDraftsPage() {
                   <div>
                     <p className="font-ja text-xs font-medium text-slate-500">模範解答</p>
                     <pre className="mt-1 whitespace-pre-wrap font-en text-sm leading-relaxed text-slate-800">
-                      {draft.modelAnswer}
+                      {showPassageTranslation
+                        ? answerBodyWithoutPassageTranslation(draft.modelAnswer)
+                        : draft.modelAnswer}
                     </pre>
                   </div>
+
+                  {showPassageTranslation ? (
+                    <div className="rounded-lg border-2 border-slate-200 bg-slate-50/70 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="font-ja text-sm font-semibold text-slate-800">本文の全訳</p>
+                          <p className="mt-1 font-ja text-xs leading-relaxed text-slate-500">
+                            問題生成とは別工程です。第2問(A)(B)・第3問を除く英語長文向け。必要なときだけAIで生成してください。
+                          </p>
+                        </div>
+                        {supportsPassageTranslation(draft) ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="min-h-11 gap-2"
+                            disabled={isTranslating || isBusy}
+                            onClick={() =>
+                              draftId &&
+                              void handleGeneratePassageTranslation(draftId, !needsPassageTranslation)
+                            }
+                          >
+                            <Sparkles className="h-4 w-4" />
+                            {isTranslating
+                              ? "生成中…"
+                              : needsPassageTranslation
+                                ? "AIで全訳を生成"
+                                : "AIで全訳を再生成"}
+                          </Button>
+                        ) : null}
+                      </div>
+                      {isTranslating ? (
+                        <InlineLoading message="本文の全訳をAIが生成しています…" />
+                      ) : (
+                        <pre className="mt-3 whitespace-pre-wrap font-ja text-sm leading-relaxed text-slate-800">
+                          {passageTranslation || "（未生成）"}
+                        </pre>
+                      )}
+                    </div>
+                  ) : null}
 
                   <div className="space-y-4 border-t border-slate-100 pt-4">
                     <div className="rounded-lg border border-blue-100 bg-blue-50/40 p-4">

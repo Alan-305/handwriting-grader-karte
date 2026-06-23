@@ -563,6 +563,22 @@ export const apiClient = {
       token,
     }),
 
+  generateDraftPassageTranslation: (
+    token: string,
+    draftId: string,
+    body?: { force?: boolean },
+  ) =>
+    request<{
+      translation: string;
+      draft: GeneratedQuestionDraft;
+      generated: boolean;
+    }>(`/api/question-drafts/${draftId}/generate-passage-translation`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+      token,
+    }),
+
   generateQuestions: (
     token: string,
     slug: string,

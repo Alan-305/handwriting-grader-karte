@@ -73,8 +73,6 @@ def _teacher_pack_issues(pack: Q4ATeacherPackResult, *, item_count: int) -> list
         missing = sorted(expected - numbers)
         if missing:
             issues.append(f"解説の number が不足: {missing}")
-    if not pack.full_translation_ja.strip():
-        issues.append("fullTranslationJa（(1)〜(5) の本文全訳）が空")
     return issues
 
 
@@ -126,9 +124,6 @@ def assemble_q4a_model_answer(pack: Q4ATeacherPackResult) -> str:
         if ex.correction_en.strip():
             parts.append(f"修正例: {ex.correction_en.strip()}")
         parts.append("")
-    if pack.full_translation_ja.strip():
-        parts.append("【全訳】")
-        parts.append(pack.full_translation_ja.strip())
     return "\n".join(parts).strip()
 
 
@@ -233,7 +228,6 @@ class QuestionQ4AService:
                 "layout": problem.layout,
                 "sourceNote": problem.source_note,
                 "items": [item.model_dump(by_alias=True) for item in problem.items],
-                "fullTranslationJa": pack.full_translation_ja,
                 "evaluatorPassed": validator.passed,
                 "evaluatorIssues": validator.issues,
                 "evaluatorSummary": validator.summary,

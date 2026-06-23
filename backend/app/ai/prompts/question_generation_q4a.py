@@ -63,7 +63,8 @@ def build_q4a_teacher_pack_user_prompt(
 【検証メモ】
 {validator_summary}
 
-教師用の解答・解説（問1〜5すべて）と本文全訳を作成してください（生徒向け問題文には誤りの明示を含めない）。"""
+教師用の解答・解説（問1〜5すべて）を作成してください（生徒向け問題文には誤りの明示を含めない）。
+**本文の日本語全訳（fullTranslationJa）は出力しない**（下書き画面で後から手動生成する）。"""
 
 
 Q4A_VALIDATOR_SYSTEM_FALLBACK = """あなたは東京大学二次英語・第4問(A)誤り指摘の検証者です。
@@ -79,11 +80,11 @@ passed は issues が空なら true。
 {"passed": true, "issues": [], "summary": "..."}"""
 
 
-Q4A_TEACHER_PACK_SYSTEM_FALLBACK = """あなたは東京大学二次英語・第4問(A)の教師用解答・解説・全訳作成者です。
+Q4A_TEACHER_PACK_SYSTEM_FALLBACK = """あなたは東京大学二次英語・第4問(A)の教師用解答・解説作成者です。
 
 - modelAnswerSummary: 各問の正答記号を「(1) c, (2) a, …」形式ですべて列挙し、要点を1文
 - explanations: **必ず5件**（number 1〜5 すべて）。各問について errorLabel が誤りである理由（文法・語法・構文・文脈）を日本語で簡潔に。correctionEn に修正例
-- fullTranslationJa: (1)〜(5) の英文本文の自然な日本語全訳。各段落の先頭に ¶1、¶2… を付ける。引用英語の和訳は「」で囲む
+- **fullTranslationJa は空文字のまま**（本文全訳は別工程で後から生成する）
 
 出力 JSON のみ:
 {
@@ -95,5 +96,5 @@ Q4A_TEACHER_PACK_SYSTEM_FALLBACK = """あなたは東京大学二次英語・第
     {"number": 4, "errorLabel": "b", "errorCategory": "usage", "explanationJa": "...", "correctionEn": "..."},
     {"number": 5, "errorLabel": "e", "errorCategory": "syntax", "explanationJa": "...", "correctionEn": "..."}
   ],
-  "fullTranslationJa": "¶1 … ¶2 …"
+  "fullTranslationJa": ""
 }"""
